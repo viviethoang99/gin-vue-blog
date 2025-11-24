@@ -6,7 +6,7 @@ export default {
   component: Layout,
   redirect: '/message/comment',
   meta: {
-    title: '消息管理',
+    title: 'Message Management',
     icon: 'ic:twotone-email',
     order: 3,
     // role: ['admin'],
@@ -18,7 +18,7 @@ export default {
       path: 'comment',
       component: () => import('./comment/index.vue'),
       meta: {
-        title: '评论管理',
+        title: 'Comment Management',
         icon: 'ic:twotone-comment',
         keepAlive: true,
       },
@@ -28,7 +28,7 @@ export default {
       path: 'leave-msg',
       component: () => import('./leave-msg/index.vue'),
       meta: {
-        title: '留言管理',
+        title: 'Message Management',
         icon: 'ic:twotone-message',
         keepAlive: true,
       },

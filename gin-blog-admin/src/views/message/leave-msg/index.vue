@@ -10,10 +10,10 @@ import { convertImgUrl, formatDate } from '@/utils'
 import { useCRUD } from '@/composables'
 import api from '@/api'
 
-defineOptions({ name: '留言管理' })
+defineOptions({ name: 'Message Management' })
 
 onMounted(() => {
-  handleChangeTab('all') // 默认查看全部
+  handleChangeTab('all') // Default to view all
 })
 
 const $table = ref(null)
@@ -21,11 +21,11 @@ const queryItems = ref({
   nickname: '',
 })
 const extraParams = ref({
-  is_review: null, // 评论状态: 审核中 | 通过
+  is_review: null, // Message status: Under review | Approved
 })
 
 const { handleDelete } = useCRUD({
-  name: '留言',
+  name: 'Message',
   doDelete: api.deleteMessages,
   refresh: () => $table.value?.handleSearch(),
 })
@@ -33,7 +33,7 @@ const { handleDelete } = useCRUD({
 const columns = [
   { type: 'selection', width: 15, fixed: 'left' },
   {
-    title: '头像',
+    title: 'Avatar',
     key: 'avatar',
     width: 40,
     align: 'center',
@@ -42,43 +42,43 @@ const columns = [
         'height': 40,
         'imgProps': { style: { 'border-radius': '3px' } },
         'src': convertImgUrl(row.avatar),
-        'fallback-src': 'http://dummyimage.com/400x400', // 加载失败
+        'fallback-src': 'http://dummyimage.com/400x400', // Load failed
         'show-toolbar-tooltip': true,
       })
     },
   },
   {
-    title: '留言人',
+    title: 'Messenger',
     key: 'nickname',
     width: 60,
     align: 'center',
     ellipsis: { tooltip: true },
   },
   {
-    title: '留言内容',
+    title: 'Message Content',
     key: 'content',
     width: 120,
     align: 'center',
   },
   {
-    title: 'IP 地址',
+    title: 'IP Address',
     key: 'ip_address',
     width: 70,
     align: 'center',
     ellipsis: { tooltip: true },
   },
   {
-    title: 'IP 来源',
+    title: 'IP Source',
     key: 'ip_source',
     width: 70,
     align: 'center',
     ellipsis: { tooltip: true },
     render(row) {
-      return h('span', row.ip_source || '未知')
+      return h('span', row.ip_source || 'Unknown')
     },
   },
   {
-    title: '留言时间',
+    title: 'Message Time',
     key: 'created_at',
     align: 'center',
     width: 80,
@@ -94,7 +94,7 @@ const columns = [
     },
   },
   {
-    title: '状态',
+    title: 'Status',
     key: 'is_review',
     width: 50,
     align: 'center',
@@ -102,12 +102,12 @@ const columns = [
       return h(
         NTag,
         { type: row.is_review ? 'success' : 'error' },
-        { default: () => (row.is_review ? '通过' : '审核中') },
+        { default: () => (row.is_review ? 'Approved' : 'Under Review') },
       )
     },
   },
   {
-    title: '操作',
+    title: 'Actions',
     key: 'actions',
     width: 100,
     align: 'center',
@@ -123,7 +123,7 @@ const columns = [
               onClick: () => handleUpdateReview([row.id], false),
             },
             {
-              default: () => '撤下',
+              default: () => 'Revoke',
               icon: () => h('i', { class: 'i-mi:circle-error' }),
             },
           )
@@ -136,7 +136,7 @@ const columns = [
               onClick: () => handleUpdateReview([row.id], true),
             },
             {
-              default: () => '通过',
+              default: () => 'Approve',
               icon: () => h('i', { class: 'i-mi:circle-check' }),
             },
           ),
@@ -148,9 +148,9 @@ const columns = [
               h(
                 NButton,
                 { size: 'small', type: 'error', style: 'margin-left: 15px;' },
-                { default: () => '删除', icon: () => h('i', { class: 'i-material-symbols:delete-outline' }) },
+                { default: () => 'Delete', icon: () => h('i', { class: 'i-material-symbols:delete-outline' }) },
               ),
-            default: () => h('div', {}, '确定删除该条留言吗?'),
+            default: () => h('div', {}, 'Are you sure you want to delete this message?'),
           },
         ),
       ]
@@ -158,28 +158,28 @@ const columns = [
   },
 ]
 
-// 修改留言审核
+// Update message review
 async function handleUpdateReview(ids, is_review) {
   if (!ids.length) {
-    $message.info('请选择要审核的数据')
+    $message.info('Please select data to review')
     return
   }
 
   await api.updateMessageReview(ids, is_review)
-  $message?.success(is_review ? '审核成功' : '撤下成功')
+  $message?.success(is_review ? 'Review successful' : 'Revoke successful')
   $table.value?.handleSearch()
 }
 
-// 切换标签页: [全部, 通过, 审核中]
+// Switch tab: [All, Approved, Under Review]
 function handleChangeTab(value) {
   switch (value) {
     case 'all':
       extraParams.value.is_review = null
       break
-    case 'has_review': // 通过
+    case 'has_review': // Approved
       extraParams.value.is_review = 1
       break
-    case 'not_review': // 审核中
+    case 'not_review': // Under Review
       extraParams.value.is_review = 0
       break
   }
@@ -188,7 +188,7 @@ function handleChangeTab(value) {
 </script>
 
 <template>
-  <CommonPage title="留言管理">
+  <CommonPage title="Message Management">
     <template #action>
       <NButton
         type="error"
@@ -198,7 +198,7 @@ function handleChangeTab(value) {
         <template #icon>
           <span class="i-material-symbols:recycling-rounded" />
         </template>
-        批量删除
+        Batch Delete
       </NButton>
       <NButton
         type="success"
@@ -208,7 +208,7 @@ function handleChangeTab(value) {
         <template #icon>
           <span class="i-ic:outline-approval" />
         </template>
-        批量通过
+        Batch Approve
       </NButton>
     </template>
     <NTabs
@@ -217,11 +217,11 @@ function handleChangeTab(value) {
       @update:value="handleChangeTab"
     >
       <template #prefix>
-        状态
+        Status
       </template>
-      <NTabPane name="all" tab="全部" />
-      <NTabPane name="has_review" tab="通过" />
-      <NTabPane name="not_review" tab="审核中" />
+      <NTabPane name="all" tab="All" />
+      <NTabPane name="has_review" tab="Approved" />
+      <NTabPane name="not_review" tab="Under Review" />
     </NTabs>
     <CrudTable
       ref="$table"
@@ -231,12 +231,12 @@ function handleChangeTab(value) {
       :get-data="api.getMessages"
     >
       <template #queryBar>
-        <QueryItem label="用户" :label-width="40" :content-width="180">
+        <QueryItem label="User" :label-width="40" :content-width="180">
           <NInput
             v-model:value="queryItems.nickname"
             clearable
             type="text"
-            placeholder="请输入用户昵称"
+            placeholder="Enter user nickname"
             @keydown.enter=" $table?.handleSearch()"
           />
         </QueryItem>

@@ -11,7 +11,7 @@ import { formatDate } from '@/utils'
 import { useCRUD } from '@/composables'
 import api from '@/api'
 
-defineOptions({ name: '角色管理' })
+defineOptions({ name: 'Role Management' })
 
 const $table = ref(null)
 const queryItems = ref({
@@ -30,7 +30,7 @@ const {
   modalForm,
   modalFormRef,
 } = useCRUD({
-  name: '角色',
+  name: 'Role',
   initForm: {},
   doCreate: api.saveOrUpdateRole,
   doDelete: api.deleteRole,
@@ -38,10 +38,10 @@ const {
   refresh: () => $table.value?.handleSearch(),
 })
 
-// 菜单, 资源 跳出菜单的选项不同
+// Menu and resource popup menu options are different
 const showMenu = ref(true)
-const resourceOption = ref([]) // 资源选项
-const menuOption = ref([]) // 菜单选项
+const resourceOption = ref([]) // Resource options
+const menuOption = ref([]) // Menu options
 
 onMounted(() => {
   $table.value?.handleSearch()
@@ -56,14 +56,14 @@ const columns = [
     fixed: 'left',
   },
   {
-    title: '角色名',
+    title: 'Role Name',
     key: 'name',
     width: 80,
     align: 'center',
     ellipsis: { tooltip: true },
   },
   {
-    title: '角色标签',
+    title: 'Role Label',
     key: 'label',
     width: 80,
     align: 'center',
@@ -72,7 +72,7 @@ const columns = [
     },
   },
   {
-    title: '创建日期',
+    title: 'Created Date',
     key: 'created_at',
     width: 60,
     align: 'center',
@@ -81,7 +81,7 @@ const columns = [
     },
   },
   {
-    title: '是否禁用',
+    title: 'Disabled',
     key: 'is_disable',
     width: 30,
     align: 'center',
@@ -91,15 +91,15 @@ const columns = [
         size: 'small',
         rubberBand: false,
         value: row.is_disable,
-        loading: !!row.publishing, // 修改 ing 动画
+        loading: !!row.publishing, // Loading animation
         checkedValue: 1,
         uncheckedValue: 0,
-        onUpdateValue: () => $message.info('这个功能暂时还不支持~'),
+        onUpdateValue: () => $message.info('This feature is not supported yet~'),
       })
     },
   },
   {
-    title: '操作',
+    title: 'Actions',
     key: 'actions',
     width: 100,
     align: 'center',
@@ -119,7 +119,7 @@ const columns = [
             },
           },
           {
-            default: () => '菜单权限',
+            default: () => 'Menu Permissions',
             icon: () => h('i', { class: 'i-material-symbols:edit-outline' }),
           },
         ),
@@ -136,7 +136,7 @@ const columns = [
             },
           },
           {
-            default: () => '资源权限',
+            default: () => 'Resource Permissions',
             icon: () => h('i', { class: 'i-ic:baseline-folder-open' }),
           },
         ),
@@ -156,11 +156,11 @@ const columns = [
                   style: 'margin-left: 15px;',
                 },
                 {
-                  default: () => '删除',
+                  default: () => 'Delete',
                   icon: () => h('i', { class: 'i-material-symbols:delete-outline' }),
                 },
               ),
-            default: () => h('div', {}, '确定删除该角色吗?'),
+            default: () => h('div', {}, 'Are you sure you want to delete this role?'),
           },
         ),
       ]
@@ -170,13 +170,13 @@ const columns = [
 </script>
 
 <template>
-  <CommonPage title="角色管理">
+  <CommonPage title="Role Management">
     <template #action>
       <NButton type="primary" @click="handleAdd">
         <template #icon>
           <i class="i-material-symbols:add" />
         </template>
-        新建角色
+        New Role
       </NButton>
       <NButton
         type="error"
@@ -186,7 +186,7 @@ const columns = [
         <template #icon>
           <i class="i-material-symbols:add" />
         </template>
-        批量删除
+        Batch Delete
       </NButton>
     </template>
 
@@ -197,12 +197,12 @@ const columns = [
       :get-data="api.getRoles"
     >
       <template #queryBar>
-        <QueryItem label="角色名" :label-width="50">
+        <QueryItem label="Role Name" :label-width="80">
           <NInput
             v-model:value="queryItems.keyword"
             clearable
             type="text"
-            placeholder="请输入角色名"
+            placeholder="Enter role name"
             @keydown.enter=" $table?.handleSearch()"
           />
         </QueryItem>
@@ -223,15 +223,15 @@ const columns = [
         :model="modalForm"
         :disabled="modalAction === 'view'"
       >
-        <NFormItem label="角色名" path="name">
-          <NInput v-model:value="modalForm.name" placeholder="请输入角色名称" />
+        <NFormItem label="Role Name" path="name">
+          <NInput v-model:value="modalForm.name" placeholder="Enter role name" />
         </NFormItem>
-        <NFormItem label="角色标签" path="name">
-          <NInput v-model:value="modalForm.label" placeholder="请输入角色标签" />
+        <NFormItem label="Role Label" path="name">
+          <NInput v-model:value="modalForm.label" placeholder="Enter role label" />
         </NFormItem>
-        <!-- TODO: 新增时可以选择菜单和资源权限 -->
+        <!-- TODO: Can select menu and resource permissions when adding -->
         <template v-if="modalAction === 'edit'">
-          <NFormItem v-if="showMenu" label="菜单权限" path="menu_ids">
+          <NFormItem v-if="showMenu" label="Menu Permissions" path="menu_ids">
             <NTree
               :data="menuOption"
               :checked-keys="modalForm.menu_ids"
@@ -240,7 +240,7 @@ const columns = [
               @update:checked-keys="(v) => (modalForm.menu_ids = v)"
             />
           </NFormItem>
-          <NFormItem v-else label="资源权限" path="resource_ids">
+          <NFormItem v-else label="Resource Permissions" path="resource_ids">
             <NTree
               :data="resourceOption"
               :checked-keys="modalForm.resource_ids"

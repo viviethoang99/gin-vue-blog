@@ -6,7 +6,7 @@ export default {
   component: Layout,
   redirect: '/system/website',
   meta: {
-    title: '系统管理',
+    title: 'System Management',
     icon: 'ion:md-settings',
     order: 6,
     // role: ['admin'],
@@ -18,18 +18,18 @@ export default {
       path: 'website',
       component: () => import('./website/index.vue'),
       meta: {
-        title: '网站管理',
+        title: 'Website Management',
         icon: 'el:website',
         order: 1,
         keepAlive: true,
       },
     },
     {
-      name: '页面管理',
+      name: 'PageManagement',
       path: 'page',
       component: () => import('./page/index.vue'),
       meta: {
-        title: '页面管理',
+        title: 'Page Management',
         icon: 'iconoir:journal-page',
         order: 2,
         keepAlive: true,
@@ -40,7 +40,7 @@ export default {
       path: 'link',
       component: () => import('./link/index.vue'),
       meta: {
-        title: '友链管理',
+        title: 'Friend Links',
         icon: 'mdi:telegram',
         order: 3,
         keepAlive: true,
@@ -51,7 +51,7 @@ export default {
       path: 'about',
       component: () => import('./about/index.vue'),
       meta: {
-        title: '关于我',
+        title: 'About Me',
         icon: 'cib:about-me',
         order: 4,
         keepAlive: true,

@@ -12,11 +12,11 @@ import { formatDate } from '@/utils'
 import { useCRUD } from '@/composables'
 import api from '@/api'
 
-defineOptions({ name: '友链管理' })
+defineOptions({ name: 'Friend Links Management' })
 
 const $table = ref(null)
 const queryItems = ref({
-  keyword: '', // 友链名称 | 地址 | 介绍
+  keyword: '', // Friend link name | address | description
 })
 
 const {
@@ -30,7 +30,7 @@ const {
   modalForm,
   modalFormRef,
 } = useCRUD({
-  name: '友链',
+  name: 'Friend Link',
   initForm: {},
   doCreate: api.saveOrUpdateLink,
   doDelete: api.deleteLinks,
@@ -45,7 +45,7 @@ onMounted(() => {
 const columns = [
   { type: 'selection', width: 15, fixed: 'left' },
   {
-    title: '头像',
+    title: 'Avatar',
     key: 'avatar',
     width: 40,
     align: 'center',
@@ -54,20 +54,20 @@ const columns = [
         'height': 40,
         'imgProps': { style: { 'border-radius': '3px' } },
         'src': row.avatar,
-        'fallback-src': 'http://dummyimage.com/400x400', // 加载失败
+        'fallback-src': 'http://dummyimage.com/400x400', // Loading failed
         'show-toolbar-tooltip': true,
       })
     },
   },
   {
-    title: '链接名称',
+    title: 'Link Name',
     key: 'name',
     width: 100,
     align: 'center',
     ellipsis: { tooltip: true },
   },
   {
-    title: '链接地址',
+    title: 'Link Address',
     key: 'address',
     width: 120,
     align: 'center',
@@ -82,7 +82,7 @@ const columns = [
           onClick: () => {
             const { copy } = useClipboard()
             copy(row.address)
-            $message.info('链接已经复制到剪切板!')
+            $message.info('Link copied to clipboard!')
           },
         },
         row.address,
@@ -90,14 +90,14 @@ const columns = [
     },
   },
   {
-    title: '链接介绍',
+    title: 'Description',
     key: 'intro',
     width: 120,
     align: 'center',
     ellipsis: { tooltip: true },
   },
   {
-    title: '创建日期',
+    title: 'Created Date',
     key: 'created_at',
     width: 80,
     align: 'center',
@@ -113,7 +113,7 @@ const columns = [
     },
   },
   {
-    title: '操作',
+    title: 'Actions',
     key: 'actions',
     width: 100,
     align: 'center',
@@ -127,7 +127,7 @@ const columns = [
             type: 'primary',
             onClick: () => handleEdit(row),
           },
-          { default: () => '编辑', icon: () => h('i', { class: 'i-material-symbols:edit-outline' }) },
+          { default: () => 'Edit', icon: () => h('i', { class: 'i-material-symbols:edit-outline' }) },
         ),
         h(
           NPopconfirm,
@@ -136,9 +136,9 @@ const columns = [
             trigger: () => h(
               NButton,
               { size: 'small', type: 'error', style: 'margin-left: 15px;' },
-              { default: () => '删除', icon: () => h('i', { class: 'i-material-symbols:delete-outline' }) },
+              { default: () => 'Delete', icon: () => h('i', { class: 'i-material-symbols:delete-outline' }) },
             ),
-            default: () => h('div', {}, '确定删除该分类吗?'),
+            default: () => h('div', {}, 'Are you sure you want to delete this friend link?'),
           },
         ),
       ]
@@ -148,13 +148,13 @@ const columns = [
 </script>
 
 <template>
-  <CommonPage title="友链管理">
+  <CommonPage title="Friend Links">
     <template #action>
       <NButton type="primary" @click="handleAdd">
         <template #icon>
           <span class="i-material-symbols:add" />
         </template>
-        新建友链
+        New Friend Link
       </NButton>
       <NButton
         type="error"
@@ -164,7 +164,7 @@ const columns = [
         <template #icon>
           <span class="i-material-symbols:playlist-remove" />
         </template>
-        批量删除
+        Batch Delete
       </NButton>
     </template>
 
@@ -175,12 +175,12 @@ const columns = [
       :get-data="api.getLinks"
     >
       <template #queryBar>
-        <QueryItem label="友链名称 | 地址 | 介绍" :label-width="150">
+        <QueryItem label="Name | Address | Description" :label-width="150">
           <NInput
             v-model:value="queryItems.keyword"
             clearable
             type="text"
-            placeholder="搜索关键字"
+            placeholder="Search keywords"
             @keydown.enter="$table?.handleSearch()"
           />
         </QueryItem>
@@ -201,32 +201,32 @@ const columns = [
         :model="modalForm"
       >
         <NFormItem
-          label="链接名称"
+          label="Link Name"
           path="name"
-          :rule="{ required: true, message: '请输入友链名称', trigger: ['input', 'blur'] }"
+          :rule="{ required: true, message: 'Please enter link name', trigger: ['input', 'blur'] }"
         >
-          <NInput v-model:value="modalForm.name" placeholder="请输入友链名称" />
+          <NInput v-model:value="modalForm.name" placeholder="Please enter link name" />
         </NFormItem>
         <NFormItem
-          label="链接头像"
+          label="Avatar"
           path="avatar"
-          :rule="{ required: true, message: '请输入友链头像', trigger: ['input', 'blur'] }"
+          :rule="{ required: true, message: 'Please enter avatar URL', trigger: ['input', 'blur'] }"
         >
-          <NInput v-model:value="modalForm.avatar" placeholder="请输入链接头像" />
+          <NInput v-model:value="modalForm.avatar" placeholder="Please enter avatar URL" />
         </NFormItem>
         <NFormItem
-          label="链接地址"
+          label="Address"
           path="address"
-          :rule="{ required: true, message: '请输入友链地址', trigger: ['input', 'blur'] }"
+          :rule="{ required: true, message: 'Please enter link address', trigger: ['input', 'blur'] }"
         >
-          <NInput v-model:value="modalForm.address" placeholder="请输入链接地址" />
+          <NInput v-model:value="modalForm.address" placeholder="Please enter link address" />
         </NFormItem>
         <NFormItem
-          label="链接介绍"
+          label="Description"
           path="intro"
-          :rule="{ required: true, message: '请输入友链介绍', trigger: ['input', 'blur'] }"
+          :rule="{ required: true, message: 'Please enter description', trigger: ['input', 'blur'] }"
         >
-          <NInput v-model:value="modalForm.intro" placeholder="请输入友链地址" />
+          <NInput v-model:value="modalForm.intro" placeholder="Please enter description" />
         </NFormItem>
       </NForm>
     </CrudModal>

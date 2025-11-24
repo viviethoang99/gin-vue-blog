@@ -11,7 +11,7 @@ import { getLocal, removeLocal, setLocal } from '@/utils'
 import { useAuthStore, useUserStore } from '@/store'
 import api from '@/api'
 
-const title = import.meta.env.VITE_TITLE // 环境变量中读取
+const title = import.meta.env.VITE_TITLE // Read from environment variables
 
 const userStore = useUserStore()
 const authStore = useAuthStore()
@@ -26,7 +26,7 @@ const loginForm = reactive({
 
 initLoginInfo()
 
-// 从 localStorage 中获取记住的用户名和密码
+// Get remembered username and password from localStorage
 function initLoginInfo() {
   const localLoginInfo = getLocal('loginInfo')
   if (localLoginInfo) {
@@ -42,14 +42,14 @@ const loading = ref(false)
 async function handleLogin() {
   const { username, password } = loginForm
   if (!username || !password) {
-    $message.warning('请输入用户名和密码')
+    $message.warning('Please enter username and password')
     return
   }
 
   const doLogin = async (username, password) => {
     loading.value = true
 
-    // 登录接口
+    // Login API
     try {
       const resp = await api.login({ username, password })
       authStore.setToken(resp.data.token)
@@ -58,12 +58,12 @@ async function handleLogin() {
       await addDynamicRoutes()
 
       isRemember ? setLocal('loginInfo', { username, password }) : removeLocal('loginInfo')
-      $message.success('登录成功')
+      $message.success('Login successful')
 
-      // 页面跳转: 根据 URL 中的 redirect 进行跳转
+      // Page navigation: Navigate based on redirect in URL
       if (query.redirect) {
         const path = query.redirect
-        Reflect.deleteProperty(query, 'redirect') // 从对象身上删除属性
+        Reflect.deleteProperty(query, 'redirect') // Delete property from object
         router.push({ path, query })
       }
       else {
@@ -77,9 +77,9 @@ async function handleLogin() {
 
   doLogin(username, password)
 
-  // 判断是否需要验证码
+  // Check if verification code is needed
   // if (JSON.parse(import.meta.env.VITE_USE_CAPTCHA)) {
-  //   // 腾讯滑块验证码 (在 index.html 中引入 js 文件)
+  //   // Tencent slide verification code (import js file in index.html)
   //   const captcha = new TencentCaptcha(config.TENCENT_CAPTCHA, async res => res.ret === 0 && doLogin(username, password))
   //   captcha.show()
   // }

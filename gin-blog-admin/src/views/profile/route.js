@@ -15,7 +15,7 @@ export default {
       path: '/profile',
       component: () => import('./index.vue'),
       meta: {
-        title: '个人中心',
+        title: 'Profile',
         icon: 'mdi:account',
         order: 0,
       },

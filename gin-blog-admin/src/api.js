@@ -2,8 +2,8 @@ import { request } from '@/utils'
 
 export default {
   // refreshToken: () => request.post('/auth/refreshToken', null, { noNeedTip: true }),
-  report: () => request.post('/report'), // 上报用户信息
-  getHomeInfo: () => request.get('/home'), // 获取首页信息
+  report: () => request.post('/report'), // Report user information
+  getHomeInfo: () => request.get('/home'), // Get home page information
   login: ({ username, password }) => request.post('/login', { username, password }, { noNeedToken: true }),
   logout: () => request.get('/logout'),
 

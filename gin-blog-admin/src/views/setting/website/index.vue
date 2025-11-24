@@ -7,17 +7,17 @@ import UploadOne from '@/components//UploadOne.vue'
 
 import api from '@/api'
 
-defineOptions({ name: '网站管理' })
+defineOptions({ name: 'Website Management' })
 
 const formRef = ref(null)
 const form = ref({
   website_avatar: '',
-  website_name: '阵、雨的个人博客',
-  website_author: '阵、雨',
-  website_intro: '往事随风而去',
-  website_notice: '博客后端基于 gin、gorm 开发\n博客前端基于 Vue3、TS、NaiveUI 开发\n努力开发中...冲冲冲！加油！',
+  website_name: 'Personal Blog',
+  website_author: 'Admin',
+  website_intro: 'Let the past go with the wind',
+  website_notice: 'Blog backend based on Gin, GORM development\nBlog frontend based on Vue3, TS, NaiveUI development\nUnder active development... Keep going!',
   website_createtime: '2023-12-27 22:40:22',
-  website_record: '鲁ICP备2022040119号',
+  website_record: 'ICP Record Number',
   qq: '123456789',
   github: 'https://github.com/szluyu99',
   gitee: 'https://gitee.com/szluyu99',
@@ -50,7 +50,7 @@ function handleSave() {
         $loadingBar?.start()
         await api.updateConfig(form.value)
         $loadingBar?.finish()
-        $message.success('博客信息更新成功')
+        $message.success('Website information updated successfully')
         // fetchData()
       }
       catch (err) {
@@ -64,7 +64,7 @@ function handleSave() {
 <template>
   <CommonPage :show-header="false" show-footer>
     <NTabs type="line" animated>
-      <NTabPane name="website" tab="网站信息">
+      <NTabPane name="website" tab="Website">
         <NForm
           ref="formRef"
           label-placement="left"
@@ -73,55 +73,55 @@ function handleSave() {
           :model="form"
           class="mt-4 w-[500px]"
         >
-          <NFormItem label="网站头像" path="website_avatar">
+          <NFormItem label="Website Avatar" path="website_avatar">
             <UploadOne
               v-model:preview="form.website_avatar"
               :width="120"
             />
           </NFormItem>
-          <NFormItem label="网站名称" path="website_name">
-            <NInput v-model:value="form.website_name" placeholder="请输入网站名称" />
+          <NFormItem label="Website Name" path="website_name">
+            <NInput v-model:value="form.website_name" placeholder="Please enter website name" />
           </NFormItem>
-          <NFormItem label="网站作者" path="website_author">
-            <NInput v-model:value="form.website_author" placeholder="请输入网站作者" />
+          <NFormItem label="Website Author" path="website_author">
+            <NInput v-model:value="form.website_author" placeholder="Please enter website author" />
           </NFormItem>
-          <NFormItem label="网站简介" path="website_intro">
-            <NInput v-model:value="form.website_intro" placeholder="请输入网站简介" />
+          <NFormItem label="Website Description" path="website_intro">
+            <NInput v-model:value="form.website_intro" placeholder="Please enter website description" />
           </NFormItem>
-          <NFormItem label="网站创建日期" path="website_createtime">
+          <NFormItem label="Website Creation Date" path="website_createtime">
             <NDatePicker
               v-model:formatted-value="form.website_createtime"
               value-format="yyyy-MM-dd HH:mm:ss"
               type="datetime"
             />
           </NFormItem>
-          <NFormItem label="网站公告" path="website_notice">
+          <NFormItem label="Website Notice" path="website_notice">
             <NInput
               v-model:value="form.website_notice"
               type="textarea"
-              placeholder="请输入网站公告"
+              placeholder="Please enter website notice"
               :autosize="{ minRows: 4, maxRows: 6 }"
             />
           </NFormItem>
-          <NFormItem label="网站备案号" path="website_record">
-            <NInput v-model:value="form.website_record" placeholder="请输入网站备案号" />
+          <NFormItem label="Website Record Number" path="website_record">
+            <NInput v-model:value="form.website_record" placeholder="Please enter website record number" />
           </NFormItem>
-          <!-- TODO: 第三方登录 -->
-          <!-- <n-form-item label="第三方登录" path="social_login_list">
+          <!-- TODO: Third-party login -->
+          <!-- <n-form-item label="Third-party Login" path="social_login_list">
             <n-checkbox-group v-model:value="cities">
               <n-space item-style="display: flex;">
                 <n-checkbox value="QQ" label="QQ" />
-                <n-checkbox value="WeiBo" label="微博" />
-                <n-checkbox value="WeChat" label="微信" />
+                <n-checkbox value="WeiBo" label="Weibo" />
+                <n-checkbox value="WeChat" label="WeChat" />
               </n-space>
             </n-checkbox-group>
           </n-form-item> -->
           <NButton type="primary" @click="handleSave">
-            确认
+            Confirm
           </NButton>
         </NForm>
       </NTabPane>
-      <NTabPane name="contact" tab="社交信息">
+      <NTabPane name="contact" tab="Social">
         <NForm
           ref="formRef"
           label-placement="left"
@@ -131,20 +131,20 @@ function handleSave() {
           class="mt-4 w-[500px]"
         >
           <NFormItem label="QQ" path="qq">
-            <NInput v-model:value="form.qq" placeholder="请输入 QQ" />
+            <NInput v-model:value="form.qq" placeholder="Please enter QQ" />
           </NFormItem>
           <NFormItem label="Github" path="github">
-            <NInput v-model:value="form.github" placeholder="请输入 Github" />
+            <NInput v-model:value="form.github" placeholder="Please enter Github" />
           </NFormItem>
           <NFormItem label="Gitee" path="gitee">
-            <NInput v-model:value="form.gitee" placeholder="请输入 Gitee" />
+            <NInput v-model:value="form.gitee" placeholder="Please enter Gitee" />
           </NFormItem>
           <NButton type="primary" @click="handleSave">
-            确认
+            Confirm
           </NButton>
         </NForm>
       </NTabPane>
-      <NTabPane name="other" tab="其他设置">
+      <NTabPane name="other" tab="Others">
         <NForm
           ref="formRef"
           label-placement="left"
@@ -154,63 +154,63 @@ function handleSave() {
           class="mt-4"
         >
           <NForm ref="formRef" label-align="left" :label-width="120" :model="form" inline>
-            <NFormItem label="用户头像" path="user_avatar">
+            <NFormItem label="User Avatar" path="user_avatar">
               <UploadOne
                 v-model:preview="form.user_avatar"
                 :width="120"
               />
             </NFormItem>
-            <NFormItem label="游客头像" path="tourist_avatar">
+            <NFormItem label="Guest Avatar" path="tourist_avatar">
               <UploadOne
                 v-model:preview="form.tourist_avatar"
                 :width="120"
               />
             </NFormItem>
-            <!-- <n-form-item label="微信收款码" path="tourist_avatar">
+            <!-- <n-form-item label="WeChat Payment QR" path="tourist_avatar">
               <n-image border-dashed border-1 text-gray width="120" :src="form.tourist_avatar" />
             </n-form-item>
-            <n-form-item label="支付宝收款码" path="tourist_avatar">
+            <n-form-item label="Alipay Payment QR" path="tourist_avatar">
               <n-image border-dashed border-1 text-gray width="120" :src="form.tourist_avatar" />
             </n-form-item> -->
           </NForm>
-          <NFormItem label-placement="top" label="文章默认封面" path="article_cover">
+          <NFormItem label-placement="top" label="Default Article Cover" path="article_cover">
             <UploadOne
               v-model:preview="form.article_cover"
               :width="300"
             />
           </NFormItem>
-          <NFormItem label="评论默认审核" path="is_comment_review">
+          <NFormItem label="Comment Default Review" path="is_comment_review">
             <NRadioGroup v-model:value="form.is_comment_review" name="is_comment_review">
               <NRadio value="true">
-                关闭
+                Disabled
               </NRadio>
               <NRadio value="false">
-                开启
+                Enabled
               </NRadio>
             </NRadioGroup>
           </NFormItem>
-          <NFormItem label="留言默认审核" path="is_message_review">
+          <NFormItem label="Message Default Review" path="is_message_review">
             <NRadioGroup v-model:value="form.is_message_review" name="is_message_review">
               <NRadio value="true">
-                关闭
+                Disabled
               </NRadio>
               <NRadio value="false">
-                开启
+                Enabled
               </NRadio>
             </NRadioGroup>
           </NFormItem>
-          <!-- <NFormItem label="邮箱通知" path="is_email_notice">
+          <!-- <NFormItem label="Email Notification" path="is_email_notice">
             <NRadioGroup v-model:value="form.is_email_notice" name="is_email_notice">
               <NRadio :value="0">
-                关闭
+                Disabled
               </NRadio>
               <NRadio :value="1">
-                开启
+                Enabled
               </NRadio>
             </NRadioGroup>
           </NFormItem> -->
           <NButton type="primary" @click="handleSave">
-            确认
+            Confirm
           </NButton>
         </NForm>
       </NTabPane>

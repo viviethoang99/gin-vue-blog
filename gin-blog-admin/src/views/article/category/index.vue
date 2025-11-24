@@ -11,7 +11,7 @@ import { formatDate } from '@/utils'
 import { useCRUD } from '@/composables'
 import api from '@/api'
 
-defineOptions({ name: '分类管理' })
+defineOptions({ name: 'Category Management' })
 
 const $table = ref(null)
 const queryItems = ref({
@@ -33,7 +33,7 @@ const {
   modalForm,
   modalFormRef,
 } = useCRUD({
-  name: '分类',
+  name: 'Category',
   initForm: {},
   doCreate: api.saveOrUpdateCategory,
   doDelete: api.deleteCategory,
@@ -43,10 +43,10 @@ const {
 
 const columns = [
   { type: 'selection', width: 15, fixed: 'left' },
-  { title: '分类名', key: 'name', width: 100, align: 'center', ellipsis: { tooltip: true } },
-  { title: '文章量', key: 'article_count', width: 30, align: 'center' },
+  { title: 'Category Name', key: 'name', width: 100, align: 'center', ellipsis: { tooltip: true } },
+  { title: 'Article Count', key: 'article_count', width: 30, align: 'center' },
   {
-    title: '创建日期',
+    title: 'Created Date',
     key: 'created_at',
     width: 80,
     align: 'center',
@@ -62,7 +62,7 @@ const columns = [
     },
   },
   {
-    title: '更新日期',
+    title: 'Updated Date',
     key: 'updated_at',
     width: 80,
     align: 'center',
@@ -78,7 +78,7 @@ const columns = [
     },
   },
   {
-    title: '操作',
+    title: 'Actions',
     key: 'actions',
     width: 100,
     align: 'center',
@@ -88,7 +88,7 @@ const columns = [
         h(
           NButton,
           { size: 'small', type: 'primary', onClick: () => handleEdit(row) },
-          { default: () => '编辑', icon: () => h('i', { class: 'i-material-symbols:edit-outline' }) },
+          { default: () => 'Edit', icon: () => h('i', { class: 'i-material-symbols:edit-outline' }) },
         ),
         h(
           NPopconfirm,
@@ -97,9 +97,9 @@ const columns = [
             trigger: () => h(
               NButton,
               { size: 'small', type: 'error', style: 'margin-left: 15px;' },
-              { default: () => '删除', icon: () => h('i', { class: 'i-material-symbols:delete-outline' }) },
+              { default: () => 'Delete', icon: () => h('i', { class: 'i-material-symbols:delete-outline' }) },
             ),
-            default: () => h('div', {}, '确定删除该分类吗?'),
+            default: () => h('div', {}, 'Are you sure you want to delete this category?'),
           },
         ),
       ]
@@ -109,19 +109,19 @@ const columns = [
 </script>
 
 <template>
-  <CommonPage title="分类管理">
+  <CommonPage title="Category Management">
     <template #action>
       <NButton type="primary" secondary @click="$table?.handleExport()">
         <template #icon>
           <i class="i-mdi:download" />
         </template>
-        导出
+        Export
       </NButton>
       <NButton type="primary" @click="handleAdd">
         <template #icon>
           <i class="i-material-symbols:add" />
         </template>
-        新建分类
+        New Category
       </NButton>
       <NButton
         type="error"
@@ -131,7 +131,7 @@ const columns = [
         <template #icon>
           <span class="i-material-symbols:playlist-remove" />
         </template>
-        批量删除
+        Batch Delete
       </NButton>
     </template>
     <CrudTable
@@ -141,12 +141,12 @@ const columns = [
       :get-data="api.getCategorys"
     >
       <template #queryBar>
-        <QueryItem label="分类名" :label-width="50">
+        <QueryItem label="Category Name" :label-width="50">
           <NInput
             v-model:value="queryItems.keyword"
             clearable
             type="text"
-            placeholder="请输入分类名"
+            placeholder="Please enter category name"
             @keydown.enter="$table?.handleSearch()"
           />
         </QueryItem>
@@ -167,13 +167,13 @@ const columns = [
         :model="modalForm"
       >
         <NFormItem
-          label="文章分类"
+          label="Article Category"
           path="name"
-          :rule="{ required: true, message: '请输入分类名称', trigger: ['input', 'blur'] }"
+          :rule="{ required: true, message: 'Please enter category name', trigger: ['input', 'blur'] }"
         >
           <NInput
             v-model:value="modalForm.name"
-            placeholder="请输入分类名称"
+            placeholder="Please enter category name"
             clearable
           />
         </NFormItem>

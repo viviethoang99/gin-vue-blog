@@ -8,14 +8,14 @@ import CrudTable from '@/components/crud/CrudTable.vue'
 
 import api from '@/api'
 
-defineOptions({ name: '分类管理' })
+defineOptions({ name: 'Category Management' })
 
 const $table = ref(null)
 const queryItems = ref({
   keyword: '',
 })
 
-// 当前编辑行的索引
+// Index of the currently editing row
 const editIndex = ref(-1)
 
 onMounted(() => {
@@ -67,7 +67,7 @@ const ShowOrEdit = defineComponent({
 const columns = [
   { type: 'selection', width: 15, fixed: 'left' },
   {
-    title: '创建日期',
+    title: 'Created Date',
     key: 'created_at',
     width: 80,
     align: 'center',
@@ -85,7 +85,7 @@ const columns = [
     },
   },
   {
-    title: '更新日期',
+    title: 'Updated Date',
     key: 'updated_at',
     width: 80,
     align: 'center',
@@ -103,7 +103,7 @@ const columns = [
     },
   },
   {
-    title: '操作',
+    title: 'Actions',
     key: 'action',
     width: 80,
     align: 'center',
@@ -116,7 +116,7 @@ const columns = [
               editIndex.value = -1
             },
           },
-          '关闭编辑',
+          'Close Edit',
         )
       }
       else {
@@ -127,7 +127,7 @@ const columns = [
               editIndex.value = index
             },
           },
-          '进入编辑',
+          'Enter Edit',
         )
       }
     },
@@ -136,7 +136,7 @@ const columns = [
 </script>
 
 <template>
-  <CommonPage title="测试页面">
+  <CommonPage title="Test Page">
     <CrudTable
       ref="$table"
       v-model:query-items="queryItems"
@@ -144,12 +144,12 @@ const columns = [
       :get-data="api.getCategorys"
     >
       <template #queryBar>
-        <QueryItem label="分类名" :label-width="50">
+        <QueryItem label="Category" :label-width="80">
           <NInput
             v-model:value="queryItems.keyword"
             clearable
             type="text"
-            placeholder="请输入分类名"
+            placeholder="Enter category name"
             @keydown.enter="$table?.handleSearch()"
           />
         </QueryItem>

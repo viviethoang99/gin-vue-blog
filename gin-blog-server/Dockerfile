@@ -4,7 +4,6 @@ WORKDIR /gvb
 COPY go.mod go.mod
 COPY go.sum go.sum
 RUN go env -w GO111MODULE=on \
-    && go env -w GOPROXY=https://goproxy.cn,direct \
     && go mod download
 COPY . .
 RUN cd cmd && go build -o server . 

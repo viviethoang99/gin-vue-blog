@@ -45,7 +45,7 @@ type Role struct {
 
 type Resource struct {
 	Model
-	Name      string `gorm:"unique;type:varchar(50)" json:"name"`
+	Name      string `gorm:"unique;type:varchar(200)" json:"name"`
 	ParentId  int    `json:"parent_id"`
 	Url       string `gorm:"type:varchar(255)" json:"url"`
 	Method    string `gorm:"type:varchar(10)" json:"request_method"`
@@ -71,17 +71,17 @@ type Resource struct {
 type Menu struct {
 	Model
 	ParentId     int    `json:"parent_id"`
-	Name         string `gorm:"uniqueIndex:idx_name_and_path;type:varchar(20)" json:"name"` // 菜单名称
-	Path         string `gorm:"uniqueIndex:idx_name_and_path;type:varchar(50)" json:"path"` // 路由地址
-	Component    string `gorm:"type:varchar(50)" json:"component"`                          // 组件路径
-	Icon         string `gorm:"type:varchar(50)" json:"icon"`                               // 图标
-	OrderNum     int8   `json:"order_num"`                                                  // 排序
-	Redirect     string `gorm:"type:varchar(50)" json:"redirect"`                           // 重定向地址
-	Catalogue    bool   `json:"is_catalogue"`                                               // 是否为目录
-	Hidden       bool   `json:"is_hidden"`                                                  // 是否隐藏
-	KeepAlive    bool   `json:"keep_alive"`                                                 // 是否缓存
-	External     bool   `json:"is_external"`                                                // 是否外链
-	ExternalLink string `gorm:"type:varchar(255)" json:"external_link"`                     // 外链地址
+	Name         string `gorm:"uniqueIndex:idx_name_and_path;type:varchar(200)" json:"name"` // 菜单名称
+	Path         string `gorm:"uniqueIndex:idx_name_and_path;type:varchar(50)" json:"path"`  // 路由地址
+	Component    string `gorm:"type:varchar(50)" json:"component"`                           // 组件路径
+	Icon         string `gorm:"type:varchar(50)" json:"icon"`                                // 图标
+	OrderNum     int8   `json:"order_num"`                                                   // 排序
+	Redirect     string `gorm:"type:varchar(50)" json:"redirect"`                            // 重定向地址
+	Catalogue    bool   `json:"is_catalogue"`                                                // 是否为目录
+	Hidden       bool   `json:"is_hidden"`                                                   // 是否隐藏
+	KeepAlive    bool   `json:"keep_alive"`                                                  // 是否缓存
+	External     bool   `json:"is_external"`                                                 // 是否外链
+	ExternalLink string `gorm:"type:varchar(255)" json:"external_link"`                      // 外链地址
 
 	Roles []*Role `json:"roles" gorm:"many2many:role_menu"`
 }
@@ -365,46 +365,46 @@ func GetUserAuthInfoById(db *gorm.DB, id int) (*UserAuth, error) {
 }
 
 // 注册新用户
-func CreateNewUser(db *gorm.DB,username, password string) (*UserAuth,*UserInfo,*UserAuthRole,error){
+func CreateNewUser(db *gorm.DB, username, password string) (*UserAuth, *UserInfo, *UserAuthRole, error) {
 	// 创建userinfo
-	num,err := Count(db,&UserInfo{})
-	if err != nil{
+	num, err := Count(db, &UserInfo{})
+	if err != nil {
 		slog.Info(err.Error())
 	}
 	number := strconv.Itoa(num)
 	userinfo := &UserInfo{
-		Email : username,
-		Nickname : "游客"+number,
-		Avatar: "https://www.bing.com/rp/ar_9isCNU2Q-VG1yEDDHnx8HAFQ.png",
-		Intro: "我是这个程序的第"+number+"个用户",
+		Email:    username,
+		Nickname: "游客" + number,
+		Avatar:   "https://www.bing.com/rp/ar_9isCNU2Q-VG1yEDDHnx8HAFQ.png",
+		Intro:    "我是这个程序的第" + number + "个用户",
 	}
 	result := db.Create(&userinfo)
 	if result.Error != nil {
-		return nil,nil,nil,result.Error
+		return nil, nil, nil, result.Error
 	}
 
 	// 先创建userauth
-	pass ,_:= utils.BcryptHash(password)
+	pass, _ := utils.BcryptHash(password)
 	userauth := &UserAuth{
-		Username: username,
-		Password: pass,
+		Username:   username,
+		Password:   pass,
 		UserInfoId: userinfo.ID,
 	}
-	
+
 	result = db.Create(&userauth)
 	if result.Error != nil {
-		return nil,nil,nil,result.Error
+		return nil, nil, nil, result.Error
 	}
 
 	// 再创建role关联表
 	user_role := &UserAuthRole{
 		UserAuthId: userauth.ID,
-		RoleId: 2,  // 默认身份为游客
+		RoleId:     2, // 默认身份为游客
 	}
 	result = db.Create(&user_role)
 	if result.Error != nil {
-		return nil,nil,nil,result.Error
-	}	
+		return nil, nil, nil, result.Error
+	}
 
-	return userauth,userinfo,user_role,result.Error
+	return userauth, userinfo, user_role, result.Error
 }

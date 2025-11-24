@@ -89,8 +89,8 @@ function setupDialog(NDialog) {
     const showIcon = !!(option.title)
     return NDialog[option.type || 'warning']({
       showIcon,
-      positiveText: '确定',
-      negativeText: '取消',
+      positiveText: 'Confirm',
+      negativeText: 'Cancel',
       onPositiveClick: option.confirm,
       onNegativeClick: option.cancel,
       onMaskClick: option.cancel,
@@ -101,7 +101,7 @@ function setupDialog(NDialog) {
 }
 
 /**
- * 挂载 NaiveUI API
+ * Mount NaiveUI API
  */
 export function setupNaiveDiscreteApi() {
   const themeStore = useThemeStore()
@@ -121,7 +121,7 @@ export function setupNaiveDiscreteApi() {
 }
 
 /**
- * 解决 naive-ui 和 unocss 样式冲突
+ * Resolve style conflicts between naive-ui and unocss
  */
 export function setupNaiveUnocss() {
   const meta = document.createElement('meta')

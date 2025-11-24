@@ -1,4 +1,4 @@
-本后台项目基于这个项目骨架：[https://github.com/zclzone/vue-naive-admin](https://github.com/zclzone/vue-naive-admin), 感谢开源作者的奉献。
+This backend project is based on this project skeleton: [https://github.com/zclzone/vue-naive-admin](https://github.com/zclzone/vue-naive-admin), thanks to the open source author's contribution.
 
 ## 项目路由
 

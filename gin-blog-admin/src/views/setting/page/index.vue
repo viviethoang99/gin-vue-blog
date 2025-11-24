@@ -10,7 +10,7 @@ import { convertImgUrl } from '@/utils'
 import { useCRUD } from '@/composables'
 import api from '@/api'
 
-// FIXME: 只有这个页面的 KeepAlive 为什么没有生效？
+// FIXME: Why doesn't KeepAlive work for this page only?
 
 const {
   modalVisible,
@@ -23,7 +23,7 @@ const {
   modalForm,
   modalFormRef,
 } = useCRUD({
-  name: '页面',
+  name: 'Page',
   initForm: {},
   doCreate: api.saveOrUpdatePage,
   doDelete: api.deletePage,
@@ -33,7 +33,7 @@ const {
 
 const pageList = ref([])
 const reloadFlag = ref(false)
-const uploadOneRef = ref(null) // 图片上传 ref 对象
+const uploadOneRef = ref(null) // Image upload ref object
 
 onMounted(async () => {
   fetchData()
@@ -44,7 +44,7 @@ async function fetchData() {
   pageList.value = resp.data
 }
 
-// 根据输入的链接刷新预览图片
+// Refresh preview image based on input link
 function refreshImg(img) {
   reloadFlag.value = true
   uploadOneRef.value.previewImg = img
@@ -62,12 +62,12 @@ function handleSelect(key, page) {
 
 const options = [
   {
-    label: '编辑',
+    label: 'Edit',
     key: 'edit',
     icon: () => h('i', { class: 'i-mingcute:edit-2-line' }),
   },
   {
-    label: '删除',
+    label: 'Delete',
     key: 'delete',
     icon: () => h('i', { class: 'i-mingcute:delete-back-line' }),
   },
@@ -75,13 +75,13 @@ const options = [
 </script>
 
 <template>
-  <CommonPage title="页面管理">
+  <CommonPage title="Page Management">
     <template #action>
       <NButton type="primary" @click="handleAdd">
         <template #icon>
           <i class="i-material-symbols:add" />
         </template>
-        新建页面
+        New Page
       </NButton>
     </template>
     <div class="flex flex-wrap justify-between">
@@ -123,23 +123,23 @@ const options = [
         :model="modalForm"
       >
         <NFormItem
-          label="页面名称"
+          label="Name"
           path="name"
-          :rule="{ required: true, message: '请输入页面名称', trigger: ['input', 'blur'] }"
+          :rule="{ required: true, message: 'Please enter page name', trigger: ['input', 'blur'] }"
         >
-          <NInput v-model:value="modalForm.name" placeholder="页面名称" />
+          <NInput v-model:value="modalForm.name" placeholder="Page name" />
         </NFormItem>
         <NFormItem
-          label="页面标签"
+          label="Label"
           path="label"
-          :rule="{ required: true, message: '请输入页面标签', trigger: ['input', 'blur'] }"
+          :rule="{ required: true, message: 'Please enter page label', trigger: ['input', 'blur'] }"
         >
-          <NInput v-model:value="modalForm.label" placeholder="页面标签" />
+          <NInput v-model:value="modalForm.label" placeholder="Page label" />
         </NFormItem>
         <NFormItem
-          label="页面封面"
+          label="Cover"
           path="cover"
-          :rule="{ required: true, message: '请上传封面图片', trigger: ['input', 'blur'] }"
+          :rule="{ required: true, message: 'Please upload cover image', trigger: ['input', 'blur'] }"
         >
           <div class="w-full flex items-center justify-between">
             <UploadOne
@@ -157,14 +157,14 @@ const options = [
           </div>
         </NFormItem>
         <NFormItem
-          label="封面链接"
+          label="URL"
           path="cover"
-          :rule="{ required: true, message: '请输入封面链接', trigger: ['input', 'blur'] }"
+          :rule="{ required: true, message: 'Please enter cover URL', trigger: ['input', 'blur'] }"
         >
           <NInput
             v-model:value="modalForm.cover"
             type="textarea"
-            placeholder="图片上传成功自动生成，或者直接复制外链"
+            placeholder="Auto-generated after successful image upload, or directly paste external link"
           />
         </NFormItem>
       </NForm>

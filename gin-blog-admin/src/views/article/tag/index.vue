@@ -11,7 +11,7 @@ import { formatDate } from '@/utils'
 import { useCRUD } from '@/composables'
 import api from '@/api'
 
-defineOptions({ name: '标签管理' })
+defineOptions({ name: 'Tag Management' })
 
 const $table = ref(null)
 const queryItems = ref({
@@ -33,7 +33,7 @@ const {
   modalForm,
   modalFormRef,
 } = useCRUD({
-  name: '标签',
+  name: 'Tag',
   initForm: {},
   doCreate: api.saveOrUpdateTag,
   doDelete: api.deleteTag,
@@ -44,7 +44,7 @@ const {
 const columns = [
   { type: 'selection', width: 15, fixed: 'left' },
   {
-    title: '标签名',
+    title: 'Tag Name',
     key: 'name',
     width: 100,
     align: 'center',
@@ -53,13 +53,13 @@ const columns = [
     },
   },
   {
-    title: '文章量',
+    title: 'Articles',
     key: 'article_count',
     width: 30,
     align: 'center',
   },
   {
-    title: '创建日期',
+    title: 'Created Date',
     key: 'created_at',
     width: 80,
     align: 'center',
@@ -75,7 +75,7 @@ const columns = [
     },
   },
   {
-    title: '更新日期',
+    title: 'Updated Date',
     key: 'updated_at',
     width: 80,
     align: 'center',
@@ -91,7 +91,7 @@ const columns = [
     },
   },
   {
-    title: '操作',
+    title: 'Actions',
     key: 'actions',
     width: 100,
     align: 'center',
@@ -101,7 +101,7 @@ const columns = [
         h(
           NButton,
           { size: 'small', type: 'primary', onClick: () => handleEdit(row) },
-          { default: () => '编辑', icon: () => h('i', { class: 'i-material-symbols:edit-outline' }) },
+          { default: () => 'Edit', icon: () => h('i', { class: 'i-material-symbols:edit-outline' }) },
         ),
         h(
           NPopconfirm,
@@ -110,9 +110,9 @@ const columns = [
             trigger: () => h(
               NButton,
               { size: 'small', type: 'error', style: 'margin-left: 15px;' },
-              { default: () => '删除', icon: () => h('i', { class: 'i-material-symbols:delete-outline' }) },
+              { default: () => 'Delete', icon: () => h('i', { class: 'i-material-symbols:delete-outline' }) },
             ),
-            default: () => h('div', {}, '确定删除该标签吗?'),
+            default: () => h('div', {}, 'Are you sure you want to delete this tag?'),
           },
         ),
       ]
@@ -122,18 +122,18 @@ const columns = [
 
 // eslint-disable-next-line unused-imports/no-unused-vars
 function handleSorterChange(sorter) {
-  // TODO: 添加后端排序
+  // TODO: Add backend sorting
 }
 </script>
 
 <template>
-  <CommonPage title="标签管理">
+  <CommonPage title="Tag Management">
     <template #action>
       <NButton type="primary" @click="handleAdd">
         <template #icon>
           <i class="i-material-symbols:add" />
         </template>
-        新建标签
+        New Tag
       </NButton>
       <NButton
         type="error"
@@ -143,7 +143,7 @@ function handleSorterChange(sorter) {
         <template #icon>
           <span class="i-material-symbols:playlist-remove" />
         </template>
-        批量删除
+        Batch Delete
       </NButton>
     </template>
 
@@ -155,12 +155,12 @@ function handleSorterChange(sorter) {
       @sorter-change="handleSorterChange"
     >
       <template #queryBar>
-        <QueryItem label="标签名" :label-width="50">
+        <QueryItem label="Tag Name" :label-width="80">
           <NInput
             v-model:value="queryItems.keyword"
             clearable
             type="text"
-            placeholder="请输入标签名"
+            placeholder="Enter tag name"
             @keydown.enter="$table?.handleSearch()"
           />
         </QueryItem>
@@ -181,13 +181,13 @@ function handleSorterChange(sorter) {
         :model="modalForm"
       >
         <NFormItem
-          label="文章标签"
+          label="Tag"
           path="name"
-          :rule="{ required: true, message: '请输入标签名称', trigger: ['input', 'blur'] }"
+          :rule="{ required: true, message: 'Please enter tag name', trigger: ['input', 'blur'] }"
         >
           <NInput
             v-model:value="modalForm.name"
-            placeholder="请输入标签名称"
+            placeholder="Please enter tag name"
             clearable
           />
         </NFormItem>

@@ -15,6 +15,12 @@ export default defineConfig((configEnv) => {
         '@': path.resolve(process.cwd(), 'src'),
         '~': path.resolve(process.cwd()),
       },
+      dedupe: [
+        '@codemirror/state',
+        '@codemirror/view', 
+        '@codemirror/commands',
+        '@codemirror/autocomplete'
+      ],
     },
     plugins: [
       vue(),
@@ -35,7 +41,7 @@ export default defineConfig((configEnv) => {
     },
     // https://cn.vitejs.dev/guide/api-javascript.html#build
     build: {
-      chunkSizeWarningLimit: 1024, // chunk 大小警告的限制（单位kb）
+      chunkSizeWarningLimit: 1024, // Chunk size warning limit (in kb)
     },
     esbuild: {
       drop: ['debugger'], // console

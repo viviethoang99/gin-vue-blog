@@ -12,9 +12,9 @@ import { formatDate } from '@/utils'
 import { useCRUD } from '@/composables'
 import api from '@/api'
 
-defineOptions({ name: '操作日志' })
+defineOptions({ name: 'Operation Log' })
 
-// 请求方法对应不同类型的标签 (计算属性传参)
+// Request method corresponds to different types of tags (computed property with parameters)
 function tagType(type) {
   switch (type) {
     case 'GET':
@@ -43,7 +43,7 @@ const {
   modalFormRef,
   handleView,
 } = useCRUD({
-  name: '日志',
+  name: 'Log',
   doDelete: api.deleteOperationLogs,
   refresh: () => $table.value?.handleSearch(),
 })
@@ -54,11 +54,11 @@ onMounted(() => {
 
 const columns = [
   { type: 'selection', width: 20, fixed: 'left' },
-  { title: '系统模块', key: 'opt_module', width: 70, align: 'center', ellipsis: { tooltip: true } },
-  { title: '操作类型', key: 'opt_type', width: 70, align: 'center', ellipsis: { tooltip: true } },
-  // { title: '操作描述', key: 'opt_desc', width: 80, align: 'center', ellipsis: { tooltip: true } },
+  { title: 'System Module', key: 'opt_module', width: 70, align: 'center', ellipsis: { tooltip: true } },
+  { title: 'Operation Type', key: 'opt_type', width: 70, align: 'center', ellipsis: { tooltip: true } },
+  // { title: 'Operation Description', key: 'opt_desc', width: 80, align: 'center', ellipsis: { tooltip: true } },
   {
-    title: '请求方法',
+    title: 'Request Method',
     key: 'request_method',
     width: 80,
     align: 'center',
@@ -66,16 +66,16 @@ const columns = [
     render(row) {
       return h(
         NTag,
-        { type: tagType(row.request_method) }, // 注意这里使用计算属性
+        { type: tagType(row.request_method) }, // Note: using computed property here
         { default: () => row.request_method },
       )
     },
   },
-  { title: '操作人员', key: 'nickname', width: 80, align: 'center', ellipsis: { tooltip: true } },
-  { title: '登录IP', key: 'ip_address', width: 80, align: 'center', ellipsis: { tooltip: true } },
-  { title: '登录地址', key: 'ip_source', width: 80, align: 'center', ellipsis: { tooltip: true } },
+  { title: 'Operator', key: 'nickname', width: 80, align: 'center', ellipsis: { tooltip: true } },
+  { title: 'IP Address', key: 'ip_address', width: 80, align: 'center', ellipsis: { tooltip: true } },
+  { title: 'Location', key: 'ip_source', width: 80, align: 'center', ellipsis: { tooltip: true } },
   {
-    title: '发布时间',
+    title: 'Created Time',
     key: 'created_at',
     align: 'center',
     width: 80,
@@ -91,7 +91,7 @@ const columns = [
     },
   },
   {
-    title: '操作',
+    title: 'Actions',
     key: 'actions',
     width: 120,
     align: 'center',
@@ -107,7 +107,7 @@ const columns = [
             onClick: () => handleView(row),
           },
           {
-            default: () => '查看',
+            default: () => 'View',
             icon: () => h('i', { class: 'i-ic:outline-remove-red-eye' }),
           },
         ),
@@ -125,11 +125,11 @@ const columns = [
                   style: 'margin-left: 15px;',
                 },
                 {
-                  default: () => '删除',
+                  default: () => 'Delete',
                   icon: () => h('i', { class: 'i-material-symbols:delete-outline' }),
                 },
               ),
-            default: () => h('div', {}, '确定删除该日志吗?'),
+            default: () => h('div', {}, 'Are you sure you want to delete this log?'),
           },
         ),
       ]
@@ -140,12 +140,12 @@ const columns = [
 function copyFormatCode(code) {
   const { copy } = useClipboard()
   copy(JSON.stringify(JSON.parse(code), null, 2))
-  window.$message.success('内容已复制到剪切板!')
+  window.$message.success('Content copied to clipboard!')
 }
 </script>
 
 <template>
-  <CommonPage title="操作日志">
+  <CommonPage title="Operation Log">
     <template #action>
       <NButton
         type="error"
@@ -155,7 +155,7 @@ function copyFormatCode(code) {
         <template #icon>
           <span class="i-material-symbols:playlist-remove" />
         </template>
-        批量删除
+        Batch Delete
       </NButton>
     </template>
 
@@ -166,12 +166,12 @@ function copyFormatCode(code) {
       :get-data="api.getOperationLogs"
     >
       <template #queryBar>
-        <QueryItem label="模块名" :label-width="50">
+        <QueryItem label="Module" :label-width="50">
           <NInput
             v-model:value="queryItems.keyword"
             clearable
             type="text"
-            placeholder="请输入模块名或描述"
+            placeholder="Please enter module name or description"
             @keydown.enter="$table?.handleSearch()"
           />
         </QueryItem>
@@ -180,7 +180,7 @@ function copyFormatCode(code) {
 
     <CrudModal
       v-model:visible="modalVisible"
-      title="日志详情"
+      title="Log Details"
       :show-footer="false"
       :loading="modalLoading"
       width="full"
@@ -192,31 +192,31 @@ function copyFormatCode(code) {
         :label-width="90"
         :model="modalForm"
       >
-        <NFormItem label="操作模块: " path="opt_module">
+        <NFormItem label="Module: " path="opt_module">
           {{ modalForm.opt_module }}
         </NFormItem>
-        <NFormItem label="请求地址: " path="opt_url">
+        <NFormItem label="Request URL: " path="opt_url">
           {{ modalForm.opt_url }}
         </NFormItem>
-        <NFormItem label="请求方法: " path="request_method">
+        <NFormItem label="Request Method: " path="request_method">
           <NTag :type="tagType(modalForm.request_method)">
             {{ modalForm.request_method }}
           </NTag>
         </NFormItem>
-        <NFormItem label="操作类型: " path="opt_type">
+        <NFormItem label="Operation Type: " path="opt_type">
           {{ modalForm.opt_type }}
         </NFormItem>
-        <NFormItem label="操作方法: " path="opt_method">
+        <NFormItem label="Operation Method: " path="opt_method">
           <NCode
             :code="modalForm.opt_method"
             code-wrap
             language="json"
           />
         </NFormItem>
-        <NFormItem label="操作人员: " path="nickname">
+        <NFormItem label="Operator: " path="nickname">
           {{ modalForm.nickname }}
         </NFormItem>
-        <NFormItem label="请求参数: " path="request_param">
+        <NFormItem label="Request Parameters: " path="request_param">
           <NCode
             class="word-wrap cursor-pointer p-7"
             :code="JSON.stringify(JSON.parse(modalForm.request_param), null, 2)"
@@ -224,7 +224,7 @@ function copyFormatCode(code) {
             @click="copyFormatCode(modalForm.request_param)"
           />
         </NFormItem>
-        <NFormItem label="返回数据: " path="response_data">
+        <NFormItem label="Response Data: " path="response_data">
           <NCode
             class="cursor-pointer p-7"
             :code="JSON.stringify(JSON.parse(modalForm.response_data), null, 2)"

@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { convertImgUrl } from '@/utils'
 import api from '@/api'
 
-// 用户全局变量
+// User global variables
 export const useUserStore = defineStore('user', {
   state: () => ({
     userInfo: {
@@ -11,7 +11,7 @@ export const useUserStore = defineStore('user', {
       avatar: '',
       intro: '',
       website: '',
-      // roles: [], // TODO: 后端返回 roles
+      // roles: [], // TODO: Backend returns roles
     },
   }),
   getters: {

@@ -6,7 +6,7 @@ export default {
   component: Layout,
   redirect: '/article/list',
   meta: {
-    title: '文章管理',
+    title: 'Article Management',
     icon: 'ic:twotone-article',
     order: 2,
     // role: ['admin'],
@@ -18,7 +18,7 @@ export default {
       path: 'list',
       component: () => import('./list/index.vue'),
       meta: {
-        title: '文章列表',
+        title: 'Article List',
         icon: 'material-symbols:format-list-bulleted',
         // role: ['admin'],
         // requireAuth: true,
@@ -30,7 +30,7 @@ export default {
       path: 'write',
       component: () => import('./write/index.vue'),
       meta: {
-        title: '发布文章',
+        title: 'Publish Article',
         icon: 'icon-park-outline:write',
         // role: ['admin'],
         // requireAuth: true,
@@ -43,7 +43,7 @@ export default {
       component: () => import('./write/index.vue'),
       isHidden: true,
       meta: {
-        title: '编辑文章',
+        title: 'Edit Article',
         icon: 'icon-park-outline:write',
         // role: ['admin'],
         // requireAuth: true,
@@ -55,7 +55,7 @@ export default {
       path: 'category-list',
       component: () => import('./category/index.vue'),
       meta: {
-        title: '分类管理',
+        title: 'Category Management',
         icon: 'tabler:category',
         // role: ['admin'],
         // requireAuth: true,
@@ -67,7 +67,7 @@ export default {
       path: 'tag-list',
       component: () => import('./tag/index.vue'),
       meta: {
-        title: '标签管理',
+        title: 'Tag Management',
         icon: 'tabler:tag',
         keepAlive: true,
       },

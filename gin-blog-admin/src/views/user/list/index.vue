@@ -12,7 +12,7 @@ import { convertImgUrl, formatDate } from '@/utils'
 import { useCRUD } from '@/composables'
 import api from '@/api'
 
-defineOptions({ name: '用户列表' })
+defineOptions({ name: 'User List' })
 
 const $table = ref(null)
 const queryItems = ref({
@@ -29,7 +29,7 @@ const {
   modalForm,
   modalFormRef,
 } = useCRUD({
-  name: '用户',
+  name: 'User',
   doUpdate: api.updateUser,
   refresh: () => $table.value?.handleSearch(),
 })
@@ -43,7 +43,7 @@ onMounted(() => {
 
 const columns = [
   {
-    title: '头像',
+    title: 'Avatar',
     key: 'avatar',
     width: 30,
     align: 'center',
@@ -52,13 +52,13 @@ const columns = [
         'height': 30,
         'imgProps': { style: { 'border-radius': '3px' } },
         'src': convertImgUrl(row.info?.avatar),
-        'fallback-src': 'http://dummyimage.com/400x400', // 加载失败
+        'fallback-src': 'http://dummyimage.com/400x400', // Load failed
         'show-toolbar-tooltip': true,
       })
     },
   },
   {
-    title: '昵称',
+    title: 'Nickname',
     key: 'nickname',
     width: 60,
     align: 'center',
@@ -68,7 +68,7 @@ const columns = [
     },
   },
   {
-    title: '登录方式',
+    title: 'Login Type',
     key: 'login_type',
     width: 40,
     align: 'center',
@@ -76,49 +76,49 @@ const columns = [
       return h(
         NTag,
         { type: loginTypeMap[row.login_type]?.tag },
-        { default: () => loginTypeMap[row.login_type]?.name || '未知' },
+        { default: () => loginTypeMap[row.login_type]?.name || 'Unknown' },
       )
     },
   },
   {
-    title: '用户角色',
+    title: 'User Role',
     key: 'role',
     width: 80,
     align: 'center',
     render(row) {
       if (row.is_super) {
-        return h(NTag, { type: 'error' }, { default: () => '超级管理员' })
+        return h(NTag, { type: 'error' }, { default: () => 'Super Admin' })
       }
       const roles = row.roles ?? []
       const groups = []
       for (let i = 0; i < roles.length; i++) {
         groups.push(h(NTag, { type: 'info', style: { margin: '2px 3px' } }, { default: () => roles[i].name }))
       }
-      return h('span', groups.length ? groups : '无')
+      return h('span', groups.length ? groups : 'None')
     },
   },
   {
-    title: '登录 IP',
+    title: 'Login IP',
     key: 'ip_address',
     width: 70,
     align: 'center',
     ellipsis: { tooltip: true },
     render(row) {
-      return h('span', row.ip_address || '未知')
+      return h('span', row.ip_address || 'Unknown')
     },
   },
   {
-    title: '登录地址',
+    title: 'Login Location',
     key: 'ip_source',
     width: 70,
     align: 'center',
     ellipsis: { tooltip: true },
     render(row) {
-      return h('span', row.ip_source || '未知')
+      return h('span', row.ip_source || 'Unknown')
     },
   },
   {
-    title: '创建时间',
+    title: 'Created Time',
     key: 'created_at',
     align: 'center',
     width: 70,
@@ -134,7 +134,7 @@ const columns = [
     },
   },
   {
-    title: '上次登录时间',
+    title: 'Last Login Time',
     key: 'last_login_time',
     align: 'center',
     width: 70,
@@ -150,7 +150,7 @@ const columns = [
     },
   },
   {
-    title: '禁用',
+    title: 'Disabled',
     key: 'is_disable',
     width: 30,
     align: 'center',
@@ -166,7 +166,7 @@ const columns = [
     },
   },
   {
-    title: '操作',
+    title: 'Actions',
     key: 'actions',
     width: 60,
     align: 'center',
@@ -186,7 +186,7 @@ const columns = [
             },
           },
           {
-            default: () => '编辑',
+            default: () => 'Edit',
             icon: () => h('i', { class: 'i-material-symbols:delete-outline' }),
           },
         ),
@@ -195,7 +195,7 @@ const columns = [
   },
 ]
 
-// 修改用户禁用状态
+// Update user disabled status
 async function handleUpdateDisable(row) {
   if (!row.id) {
     return
@@ -204,7 +204,7 @@ async function handleUpdateDisable(row) {
   row.is_disable = !row.is_disable
   try {
     await api.updateUserDisable(row.id, row.is_disable)
-    $message?.success(row.is_disable ? '已禁用该用户' : '已取消禁用该用户')
+    $message?.success(row.is_disable ? 'User disabled' : 'User enabled')
     $table.value?.handleSearch()
   }
   catch (err) {
@@ -218,7 +218,7 @@ async function handleUpdateDisable(row) {
 </script>
 
 <template>
-  <CommonPage title="用户列表">
+  <CommonPage title="User List">
     <CrudTable
       ref="$table"
       v-model:query-items="queryItems"
@@ -226,30 +226,30 @@ async function handleUpdateDisable(row) {
       :get-data="api.getUsers"
     >
       <template #queryBar>
-        <QueryItem label="昵称" :label-width="40" :content-width="160">
+        <QueryItem label="Nickname" :label-width="40" :content-width="160">
           <NInput
             v-model:value="queryItems.nickname"
             clearable
             type="text"
-            placeholder="请输入昵称"
+            placeholder="Enter nickname"
             @keydown.enter="$table?.handleSearch()"
           />
         </QueryItem>
-        <QueryItem label="用户名" :label-width="60" :content-width="160">
+        <QueryItem label="Username" :label-width="60" :content-width="160">
           <NInput
             v-model:value="queryItems.username"
             clearable
             type="text"
-            placeholder="请输入用户名"
+            placeholder="Enter username"
             @keydown.enter="$table?.handleSearch()"
           />
         </QueryItem>
-        <QueryItem label="登录方式" :label-width="70" :content-width="160">
+        <QueryItem label="Login Type" :label-width="70" :content-width="160">
           <NSelect
             v-model:value="queryItems.login_type"
             clearable
             filterable
-            placeholder="请选择登录方式"
+            placeholder="Select login type"
             :options="loginTypeOptions"
             @update:value="$table?.handleSearch()"
           />
@@ -259,7 +259,7 @@ async function handleUpdateDisable(row) {
 
     <CrudModal
       v-model:visible="modalVisible"
-      title="修改用户"
+      title="Edit User"
       :loading="modalLoading"
       @save="handleSave"
     >
@@ -270,14 +270,14 @@ async function handleUpdateDisable(row) {
         :label-width="80"
         :model="modalForm"
       >
-        <NFormItem label="用户昵称" path="name">
+        <NFormItem label="User Nickname" path="name">
           <NInput
             v-model:value="modalForm.nickname"
             clearable
-            placeholder="请输入用户昵称"
+            placeholder="Enter user nickname"
           />
         </NFormItem>
-        <NFormItem label="角色" path="role_ids">
+        <NFormItem label="Role" path="role_ids">
           <NCheckboxGroup v-model:value="modalForm.role_ids">
             <NSpace item-style="display: flex;">
               <NCheckbox

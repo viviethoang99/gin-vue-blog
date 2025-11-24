@@ -11,7 +11,7 @@ import { formatDate } from '@/utils'
 import { useCRUD } from '@/composables'
 import api from '@/api'
 
-defineOptions({ name: '接口管理' })
+defineOptions({ name: 'Resource Management' })
 
 const $table = ref(null)
 const queryItems = ref({
@@ -30,7 +30,7 @@ const {
   modalForm,
   modalFormRef,
 } = useCRUD({
-  name: '接口',
+  name: 'Resource',
   doCreate: api.saveOrUpdateResource,
   doDelete: api.deleteResource,
   doUpdate: api.saveOrUpdateResource,
@@ -41,10 +41,10 @@ onMounted(() => {
   $table.value?.handleSearch()
 })
 
-// 请求方法
+// Request methods
 const requestMethods = ['GET', 'POST', 'DELETE', 'PUT']
 
-// 请求方法对应不同类型的标签 (计算属性传参)
+// Request methods correspond to different tag types (computed property with params)
 function tagType(type) {
   switch (type) {
     case 'GET':
@@ -62,13 +62,13 @@ function tagType(type) {
 
 const columns = [
   {
-    title: '资源名称',
+    title: 'Resource Name',
     key: 'name',
     width: 80,
     ellipsis: { tooltip: true },
   },
   {
-    title: '资源路径',
+    title: 'Resource Path',
     key: 'url',
     width: 80,
     ellipsis: { tooltip: true },
@@ -77,7 +77,7 @@ const columns = [
     },
   },
   {
-    title: '请求方式',
+    title: 'Request Method',
     key: 'request_method',
     width: 50,
     align: 'center',
@@ -86,13 +86,13 @@ const columns = [
         ? '-'
         : h(
           NTag,
-          { type: tagType(row.request_method) }, // 注意这里使用计算属性
+          { type: tagType(row.request_method) }, // Note: using computed property here
           { default: () => row.request_method },
         )
     },
   },
   {
-    title: '匿名访问',
+    title: 'Anonymous Access',
     key: 'is_hidden',
     width: 50,
     align: 'center',
@@ -104,13 +104,13 @@ const columns = [
           size: 'small',
           rubberBand: false,
           value: row.is_anonymous,
-          loading: !!row.publishing, // 修改 ing 动画
+          loading: !!row.publishing, // Loading animation
           onUpdateValue: () => handleUpdateAnonymous(row),
         })
     },
   },
   {
-    title: '创建日期',
+    title: 'Created Date',
     key: 'created_at',
     width: 60,
     render(row) {
@@ -118,7 +118,7 @@ const columns = [
     },
   },
   {
-    title: '操作',
+    title: 'Actions',
     key: 'actions',
     width: 115,
     align: 'center',
@@ -133,11 +133,11 @@ const columns = [
             type: 'primary',
             style: `display: ${row.children ? '' : 'none'};`,
             onClick: () => {
-              handleAdd() // 新增弹窗
-              modalForm.value.parent_id = row.id // 父资源id
+              handleAdd() // Add modal
+              modalForm.value.parent_id = row.id // Parent resource id
             },
           },
-          { default: () => '新增', icon: () => h('i', { class: 'i-material-symbols:add' }) },
+          { default: () => 'Add', icon: () => h('i', { class: 'i-material-symbols:add' }) },
         ),
         h(
           NButton,
@@ -147,7 +147,7 @@ const columns = [
             type: 'info',
             onClick: () => (row.children ? handleEditModule(row) : handleEdit(row)),
           },
-          { default: () => '编辑', icon: () => h('i', { class: 'i-material-symbols:edit-outline' }) },
+          { default: () => 'Edit', icon: () => h('i', { class: 'i-material-symbols:edit-outline' }) },
         ),
         h(
           NPopconfirm,
@@ -161,9 +161,9 @@ const columns = [
               h(
                 NButton,
                 { size: 'tiny', quaternary: true, type: 'error' },
-                { default: () => '删除', icon: () => h('i', { class: 'i-material-symbols:delete-outline' }) },
+                { default: () => 'Delete', icon: () => h('i', { class: 'i-material-symbols:delete-outline' }) },
               ),
-            default: () => h('div', {}, '确定删除该接口吗?'),
+            default: () => h('div', {}, 'Are you sure you want to delete this resource?'),
           },
         ),
       ]
@@ -171,7 +171,7 @@ const columns = [
   },
 ]
 
-// 修改是否允许匿名访问
+// Update anonymous access permission
 async function handleUpdateAnonymous(row) {
   if (!row.id) {
     return
@@ -180,7 +180,7 @@ async function handleUpdateAnonymous(row) {
   row.is_anonymous = !row.is_anonymous
   try {
     await api.updateResourceAnonymous(row)
-    $message?.success(row.is_anonymous ? '已允许匿名访问' : '已禁止匿名访问')
+    $message?.success(row.is_anonymous ? 'Anonymous access allowed' : 'Anonymous access denied')
   }
   catch (err) {
     row.is_anonymous = !row.is_anonymous
@@ -191,7 +191,7 @@ async function handleUpdateAnonymous(row) {
   }
 }
 
-// 模块相关
+// Module related
 const moduleModalVisible = ref(false)
 function handleAddModule() {
   modalAction.value = 'add'
@@ -210,13 +210,13 @@ async function handleModuleSave() {
 </script>
 
 <template>
-  <CommonPage title="接口管理">
+  <CommonPage title="Resource Management">
     <template #action>
       <NButton type="primary" @click="handleAddModule">
         <template #icon>
           <span class="i-material-symbols:add" />
         </template>
-        新增模块
+        New Module
       </NButton>
     </template>
 
@@ -229,12 +229,12 @@ async function handleModuleSave() {
       :single-line="true"
     >
       <template #queryBar>
-        <QueryItem label="资源名" :label-width="50">
+        <QueryItem label="Resource Name" :label-width="100">
           <NInput
             v-model:value="queryItems.keyword"
             clearable
             type="text"
-            placeholder="请输入资源名"
+            placeholder="Enter resource name"
             @keydown.enter="$table?.handleSearch()"
           />
         </QueryItem>
@@ -254,13 +254,13 @@ async function handleModuleSave() {
         :label-width="80"
         :model="modalForm"
       >
-        <NFormItem label="资源名" path="name">
-          <NInput v-model:value="modalForm.name" placeholder="请输入资源名" />
+        <NFormItem label="Resource Name" path="name">
+          <NInput v-model:value="modalForm.name" placeholder="Enter resource name" />
         </NFormItem>
-        <NFormItem label="资源路径" path="url">
-          <NInput v-model:value="modalForm.url" placeholder="请输入资源路径" />
+        <NFormItem label="Resource Path" path="url">
+          <NInput v-model:value="modalForm.url" placeholder="Enter resource path" />
         </NFormItem>
-        <NFormItem label="请求方式" path="request_method">
+        <NFormItem label="Request Method" path="request_method">
           <NRadioGroup v-model:value="modalForm.request_method" name="radiogroup">
             <NSpace>
               <NRadio v-for="method of requestMethods" :key="method" :value="method">
@@ -276,7 +276,7 @@ async function handleModuleSave() {
 
     <CrudModal
       v-model:visible="moduleModalVisible"
-      :title="`${modalAction === 'add' ? '新增' : '编辑'}模块`"
+      :title="`${modalAction === 'add' ? 'Add' : 'Edit'} Module`"
       :loading="modalVisible"
       @save="handleModuleSave"
     >
@@ -287,8 +287,8 @@ async function handleModuleSave() {
         :label-width="80"
         :model="modalForm"
       >
-        <NFormItem label="模块名" path="name">
-          <NInput v-model:value="modalForm.name" placeholder="请输入模块名" />
+        <NFormItem label="Module Name" path="name">
+          <NInput v-model:value="modalForm.name" placeholder="Enter module name" />
         </NFormItem>
       </NForm>
     </CrudModal>

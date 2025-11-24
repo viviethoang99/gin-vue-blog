@@ -22,7 +22,7 @@ const contextMenuOption = reactive({
   currentPath: '',
 })
 
-// 监听当前路由路径, 发生变化则添加到标签栏
+// Watch current route path, add to tab bar when changed
 watch(
   () => route.path,
   () => {
@@ -34,7 +34,7 @@ watch(
   { immediate: true },
 )
 
-// 监听当前激活的标签, 标签滚动到让其显示的位置
+// Watch current active tag, scroll to make it visible
 watch(
   () => tagStore.activeIndex,
   async (activeIndex) => {
@@ -49,21 +49,21 @@ watch(
 )
 
 function handleTagClick(path) {
-  tagStore.setActiveTag(path) // 激活当前点击的标签
+  tagStore.setActiveTag(path) // Activate current clicked tag
   router.push(path)
 }
 
-// 显示或隐藏右键菜单
+// Show or hide right-click menu
 function setContextMenuShow(flag) {
   contextMenuOption.show = flag
 }
 
 function setContextMenu(x, y, currentPath) {
-  // Object.assign(a, b) 将 b 的属性拷贝到 a 身上(相同覆盖), 浅拷贝
+  // Object.assign(a, b) copies properties of b to a (overwrites if same), shallow copy
   Object.assign(contextMenuOption, { x, y, currentPath })
 }
 
-// 右击菜单
+// Right-click menu
 async function handleContextMenu(e, tagItem) {
   const { clientX, clientY } = e
   setContextMenuShow(false)
@@ -73,7 +73,7 @@ async function handleContextMenu(e, tagItem) {
 }
 
 function handleRefresh(tag) {
-  // 只有当前标签会刷新
+  // Only current tag will refresh
   if (route.name === tag.name) {
     tagStore.updateAliveKey(route.name)
     tagStore.reloadTag()

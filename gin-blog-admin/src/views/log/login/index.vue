@@ -8,7 +8,7 @@ import CommonPage from '@/components/common/CommonPage.vue'
     <NResult
       class="mt-30"
       status="404"
-      title="该页面还在开发中..."
+      title="This page is still under development..."
       description="稍安毋躁"
       size="huge"
     />

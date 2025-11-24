@@ -8,7 +8,7 @@ export const useThemeStore = defineStore('theme-store', {
     paths: ['collapsed', 'watermarked'],
   },
   state: () => ({
-    collapsed: false, // 侧边栏折叠
+    collapsed: false, // Sidebar collapse
     watermarked: false, // 水印
     darkMode: isDark, // 黑暗模式
   }),

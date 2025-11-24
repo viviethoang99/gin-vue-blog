@@ -31,7 +31,7 @@ async function updateProfile() {
   infoFormRef.value?.validate(async (err) => {
     if (!err) {
       await api.updateCurrent(infoForm.value)
-      $message.success('更新成功!')
+      $message.success('Update successful!')
       userStore.getUserInfo()
     }
   })
@@ -40,13 +40,13 @@ const infoFormRules = {
   nickname: [
     {
       required: true,
-      message: '请输入昵称',
+      message: 'Please enter nickname',
       trigger: ['input', 'blur', 'change'],
     },
   ],
 }
 
-// 修改密码的表单
+// Password change form
 const passwordFormRef = ref(null)
 const passwordForm = ref({
   old_password: '',
@@ -58,7 +58,7 @@ function updatePassword() {
   passwordFormRef.value?.validate(async (err) => {
     if (!err) {
       await api.updateCurrentPassword(passwordForm.value)
-      $message.success('修改成功!')
+      $message.success('Password updated successfully!')
     }
   })
 }
@@ -66,31 +66,31 @@ const passwordFormRules = {
   old_password: [
     {
       required: true,
-      message: '请输入旧密码',
+      message: 'Please enter old password',
       trigger: ['input', 'blur', 'change'],
     },
   ],
   new_password: [
     {
       required: true,
-      message: '请输入新密码',
+      message: 'Please enter new password',
       trigger: ['input', 'blur', 'change'],
     },
   ],
   confirm_password: [
     {
       required: true,
-      message: '请再次输入密码',
+      message: 'Please enter password again',
       trigger: ['input', 'blur'],
     },
     {
       validator: validatePasswordStartWith,
-      message: '两次密码输入不一致',
+      message: 'Passwords do not match',
       trigger: 'input',
     },
     {
       validator: validatePasswordSame,
-      message: '两次密码输入不一致',
+      message: 'Passwords do not match',
       trigger: ['blur', 'password-input'],
     },
   ],
@@ -106,7 +106,7 @@ function validatePasswordSame(rule, value) {
 <template>
   <CommonPage :show-header="false">
     <NTabs type="line" animated>
-      <NTabPane name="website" tab="修改信息">
+      <NTabPane name="website" tab="Edit Information">
         <div class="m-7 flex items-center">
           <div class="mr-7 w-50">
             <UploadOne
@@ -123,34 +123,34 @@ function validatePasswordSame(rule, value) {
             :rules="infoFormRules"
             class="w-80"
           >
-            <NFormItem label="昵称" path="nickname">
+            <NFormItem label="Nickname" path="nickname">
               <NInput
                 v-model:value="infoForm.nickname"
                 type="text"
-                placeholder="请填写昵称"
+                placeholder="Please enter nickname"
               />
             </NFormItem>
-            <NFormItem label="个人简介" path="intro">
+            <NFormItem label="Biography" path="intro">
               <NInput
                 v-model:value="infoForm.intro"
                 type="text"
-                placeholder="请填写个人简介"
+                placeholder="Please enter biography"
               />
             </NFormItem>
-            <NFormItem label="个人网站" path="website">
+            <NFormItem label="Website" path="website">
               <NInput
                 v-model:value="infoForm.website"
                 type="text"
-                placeholder="请填写个人网站"
+                placeholder="Please enter website"
               />
             </NFormItem>
             <NButton type="primary" @click="updateProfile">
-              修改
+              Update
             </NButton>
           </NForm>
         </div>
       </NTabPane>
-      <NTabPane name="contact" tab="修改密码">
+      <NTabPane name="contact" tab="Change Password">
         <NForm
           ref="passwordFormRef"
           label-placement="left"
@@ -160,34 +160,34 @@ function validatePasswordSame(rule, value) {
           :rules="passwordFormRules"
           class="m-[30px] w-[400px]"
         >
-          <NFormItem label="旧密码" path="old_password">
+          <NFormItem label="Old Password" path="old_password">
             <NInput
               v-model:value="passwordForm.old_password"
               type="password"
               show-password-on="mousedown"
-              placeholder="请输入旧密码"
+              placeholder="Please enter old password"
             />
           </NFormItem>
-          <NFormItem label="新密码" path="new_password">
+          <NFormItem label="New Password" path="new_password">
             <NInput
               v-model:value="passwordForm.new_password"
               :disabled="!passwordForm.old_password"
               type="password"
               show-password-on="mousedown"
-              placeholder="请输入新密码"
+              placeholder="Please enter new password"
             />
           </NFormItem>
-          <NFormItem label="确认密码" path="confirm_password">
+          <NFormItem label="Confirm Password" path="confirm_password">
             <NInput
               v-model:value="passwordForm.confirm_password"
               :disabled="!passwordForm.new_password"
               type="password"
               show-password-on="mousedown"
-              placeholder="请再次输入新密码"
+              placeholder="Please enter new password again"
             />
           </NFormItem>
           <NButton type="primary" @click="updatePassword">
-            修改
+            Update
           </NButton>
         </NForm>
       </NTabPane>

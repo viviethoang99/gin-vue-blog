@@ -11,10 +11,10 @@ import { convertImgUrl, formatDate } from '@/utils'
 import { useCRUD } from '@/composables'
 import api from '@/api'
 
-defineOptions({ name: '评论管理' })
+defineOptions({ name: 'Comment Management' })
 
 onMounted(() => {
-  handleChangeTab('all') // 默认查看全部
+  handleChangeTab('all') // Default to view all
 })
 
 const $table = ref(null)
@@ -23,11 +23,11 @@ const queryItems = ref({
   type: '',
 })
 const extraParams = ref({
-  is_review: null, // 评论状态: 审核中 | 通过
+  is_review: null, // Comment status: Under review | Approved
 })
 
 const { handleDelete } = useCRUD({
-  name: '评论',
+  name: 'Comment',
   doDelete: api.deleteComments,
   refresh: () => $table.value?.handleSearch(),
 })
@@ -35,7 +35,7 @@ const { handleDelete } = useCRUD({
 const columns = [
   { type: 'selection', width: 15, fixed: 'left' },
   {
-    title: '头像',
+    title: 'Avatar',
     key: 'avatar',
     width: 40,
     align: 'center',
@@ -44,40 +44,40 @@ const columns = [
         'height': 40,
         'imgProps': { style: { 'border-radius': '3px' } },
         'src': convertImgUrl(row.user?.info?.avatar),
-        'fallback-src': 'http://dummyimage.com/400x400', // 加载失败
+        'fallback-src': 'http://dummyimage.com/400x400', // Load failed
         'show-toolbar-tooltip': true,
       })
     },
   },
   {
-    title: '评论人',
+    title: 'Commenter',
     key: 'nickname',
     width: 50,
     align: 'center',
     ellipsis: { tooltip: true },
     render(row) {
-      return h('span', row.user?.info?.nickname || '无')
+      return h('span', row.user?.info?.nickname || 'None')
     },
   },
-  // TODO: 合理的显示评论的文章信息
+  // TODO: Display comment article information properly
   {
-    title: '评论类型',
+    title: 'Comment Type',
     key: '',
     width: 50,
     align: 'center',
     render(row) {
-      if (row.type === 1) { // 文章
+      if (row.type === 1) { // Article
         return [
-          h(NTag, { type: 'info' }, { default: () => '文章' }),
+          h(NTag, { type: 'info' }, { default: () => 'Article' }),
         ]
       }
-      if (row.type === 2) { // 友链
-        return h(NTag, { type: 'success' }, { default: () => '友链' })
+      if (row.type === 2) { // Friend links
+        return h(NTag, { type: 'success' }, { default: () => 'Friend Link' })
       }
     },
   },
   {
-    title: '回复对象',
+    title: 'Reply To',
     key: 'reply_nick_name',
     width: 50,
     align: 'center',
@@ -86,14 +86,14 @@ const columns = [
     },
   },
   {
-    title: '评论内容',
+    title: 'Comment Content',
     key: 'content',
     width: 140,
     align: 'center',
     ellipsis: { tooltip: true },
   },
   {
-    title: '评论时间',
+    title: 'Comment Time',
     key: 'created_at',
     align: 'center',
     width: 60,
@@ -109,7 +109,7 @@ const columns = [
     },
   },
   {
-    title: '状态',
+    title: 'Status',
     key: 'is_review',
     width: 50,
     align: 'center',
@@ -117,12 +117,12 @@ const columns = [
       return h(
         NTag,
         { type: row.is_review ? 'success' : 'error' },
-        { default: () => (row.is_review ? '通过' : '审核中') },
+        { default: () => (row.is_review ? 'Approved' : 'Under Review') },
       )
     },
   },
   {
-    title: '来源',
+    title: 'Source',
     key: 'type',
     width: 50,
     align: 'center',
@@ -135,7 +135,7 @@ const columns = [
     },
   },
   {
-    title: '操作',
+    title: 'Actions',
     key: 'actions',
     width: 100,
     align: 'center',
@@ -152,7 +152,7 @@ const columns = [
               onClick: () => handleUpdateReview([row.id], false),
             },
             {
-              default: () => '撤下',
+              default: () => 'Revoke',
               icon: () => h('i', { class: 'i-mi:circle-error' }),
             },
           )
@@ -165,7 +165,7 @@ const columns = [
               onClick: () => handleUpdateReview([row.id], true),
             },
             {
-              default: () => '通过',
+              default: () => 'Approve',
               icon: () => h('i', { class: 'i-mi:circle-check' }),
             },
           ),
@@ -177,9 +177,9 @@ const columns = [
               h(
                 NButton,
                 { size: 'small', type: 'error', style: 'margin-left: 15px;' },
-                { default: () => '删除', icon: () => h('i', { class: 'i-material-symbols:delete-outline' }) },
+                { default: () => 'Delete', icon: () => h('i', { class: 'i-material-symbols:delete-outline' }) },
               ),
-            default: () => h('div', {}, '确定删除该条评论吗?'),
+            default: () => h('div', {}, 'Are you sure you want to delete this comment?'),
           },
         ),
       ]
@@ -187,27 +187,27 @@ const columns = [
   },
 ]
 
-// 修改评论审核
+// Update comment review
 async function handleUpdateReview(ids, is_review) {
   if (!ids.length) {
-    window.$message.info('请选择要审核的数据')
+    window.$message.info('Please select data to review')
     return
   }
   await api.updateCommentReview(ids, is_review)
-  window.$message?.success(is_review ? '审核成功' : '撤下成功')
+  window.$message?.success(is_review ? 'Review successful' : 'Revoke successful')
   $table.value?.handleSearch()
 }
 
-// 切换标签页: [全部, 通过, 审核中]
+// Switch tab: [All, Approved, Under Review]
 function handleChangeTab(value) {
   switch (value) {
     case 'all':
       extraParams.value.is_review = null
       break
-    case 'has_review': // 通过
+    case 'has_review': // Approved
       extraParams.value.is_review = true
       break
-    case 'not_review': // 审核中
+    case 'not_review': // Under Review
       extraParams.value.is_review = false
       break
   }
@@ -216,7 +216,7 @@ function handleChangeTab(value) {
 </script>
 
 <template>
-  <CommonPage title="评论管理">
+  <CommonPage title="Comment Management">
     <template #action>
       <NButton
         type="error"
@@ -226,7 +226,7 @@ function handleChangeTab(value) {
         <template #icon>
           <span class="i-material-symbols:recycling-rounded" />
         </template>
-        批量删除
+        Batch Delete
       </NButton>
       <NButton
         type="success"
@@ -236,7 +236,7 @@ function handleChangeTab(value) {
         <template #icon>
           <span class="i-ic:outline-approval" />
         </template>
-        批量通过
+        Batch Approve
       </NButton>
     </template>
     <NTabs
@@ -245,11 +245,11 @@ function handleChangeTab(value) {
       @update:value="handleChangeTab"
     >
       <template #prefix>
-        状态
+        Status
       </template>
-      <NTabPane name="all" tab="全部" />
-      <NTabPane name="has_review" tab="通过" />
-      <NTabPane name="not_review" tab="审核中" />
+      <NTabPane name="all" tab="All" />
+      <NTabPane name="has_review" tab="Approved" />
+      <NTabPane name="not_review" tab="Under Review" />
     </NTabs>
     <CrudTable
       ref="$table"
@@ -259,21 +259,21 @@ function handleChangeTab(value) {
       :get-data="api.getComments"
     >
       <template #queryBar>
-        <QueryItem label="用户" :label-width="40" :content-width="180">
+        <QueryItem label="User" :label-width="40" :content-width="180">
           <NInput
             v-model:value="queryItems.nickname"
             clearable
             type="text"
-            placeholder="请输入用户昵称"
+            placeholder="Enter user nickname"
             @keydown.enter="$table?.handleSearch()"
           />
         </QueryItem>
-        <QueryItem label="来源" :label-width="40" :content-width="160">
+        <QueryItem label="Source" :label-width="40" :content-width="160">
           <NSelect
             v-model:value="queryItems.type"
             clearable
             filterablec
-            placeholder="请选择评论来源"
+            placeholder="Select comment source"
             :options="commentTypeOptions"
             @update:value="$table?.handleSearch()"
           />

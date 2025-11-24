@@ -15,7 +15,7 @@ export default {
       path: 'home2',
       component: () => import('./index.vue'),
       meta: {
-        title: '首页',
+        title: 'Dashboard',
         icon: 'ic:sharp-home',
         order: 0,
       },

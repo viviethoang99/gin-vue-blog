@@ -12,8 +12,8 @@ import { useCRUD } from '@/composables'
 import { articleTypeMap, articleTypeOptions } from '@/assets/config'
 import api from '@/api'
 
-// 需要 KeepAlive 必须写 name 属性, 并且和 router 中 name 对应
-defineOptions({ name: '文章列表' })
+// KeepAlive requires name attribute that corresponds to name in router
+defineOptions({ name: 'Article List' })
 
 const route = useRoute()
 const router = useRouter()
@@ -24,30 +24,30 @@ const tagOptions = ref([])
 const $table = ref(null)
 
 const queryItems = ref({
-  title: '', // 标题
-  type: null, // 类型
-  category_id: null, // 分类
-  tag_id: null, // 标签
+  title: '', // Title
+  type: null, // Type
+  category_id: null, // Category
+  tag_id: null, // Tag
 })
 
 const extraParams = ref({
-  is_delete: null, // 未删除 | 回收站
-  status: null, // null-all, 1-公开, 2-私密, 3-草稿
+  is_delete: null, // Not deleted | Recycle bin
+  status: null, // null-all, 1-public, 2-private, 3-draft
 })
 
 const { handleDelete } = useCRUD({
-  name: '文章',
-  doDelete: updateOrDeleteArticles, // 软删除
+  name: 'Article',
+  doDelete: updateOrDeleteArticles, // Soft delete
   refresh: () => $table.value?.handleSearch(),
 })
 
 onMounted(() => {
   api.getCategoryOption().then(res => (categoryOptions.value = res.data))
   api.getTagOption().then(res => (tagOptions.value = res.data))
-  handleChangeTab('all') // 默认查看全部
+  handleChangeTab('all') // Default view all
 })
 
-// ! 切换页面时, 如果是 [写文章] 页面跳转过来, 会携带 needRefresh 参数
+// ! When switching pages, if coming from [Write Article] page, will carry needRefresh parameter
 onActivated(() => {
   const { needRefresh } = route.query
   needRefresh && ($table.value?.handleSearch())
@@ -56,7 +56,7 @@ onActivated(() => {
 const columns = [
   { type: 'selection', width: 20, fixed: 'left' },
   {
-    title: '文章封面',
+    title: 'Cover',
     key: 'img',
     width: 55,
     align: 'center',
@@ -70,24 +70,24 @@ const columns = [
     },
   },
   {
-    title: '文章标题',
+    title: 'Title',
     key: 'title',
     width: 120,
     align: 'center',
     ellipsis: { tooltip: true },
   },
   {
-    title: '分类',
+    title: 'Category',
     key: 'category.name',
     width: 60,
     align: 'center',
     ellipsis: { tooltip: true },
     render(row) {
-      return h('div', row.category.name || '无')
+      return h('div', row.category.name || 'None')
     },
   },
   {
-    title: '标签',
+    title: 'Tags',
     key: 'tags',
     width: 100,
     align: 'center',
@@ -99,25 +99,25 @@ const columns = [
           h(NTag, { type: 'info', style: { margin: '2px 3px' } }, { default: () => tags[i].name }),
         )
       }
-      return h('div', group.length ? group : '无')
+      return h('div', group.length ? group : 'None')
     },
   },
   {
-    title: '浏览量',
+    title: 'Views',
     key: 'view_count',
     width: 40,
     align: 'center',
     ellipsis: { tooltip: true },
   },
   {
-    title: '点赞量',
+    title: 'Likes',
     key: 'like_count',
     width: 40,
     align: 'center',
     ellipsis: { tooltip: true },
   },
   {
-    title: '类型',
+    title: 'Type',
     key: 'type',
     width: 50,
     align: 'center',
@@ -130,7 +130,7 @@ const columns = [
     },
   },
   {
-    title: '发布时间',
+    title: 'Published Time',
     key: 'updateDate',
     align: 'center',
     width: 80,
@@ -146,7 +146,7 @@ const columns = [
     },
   },
   {
-    title: '置顶',
+    title: 'Pin to Top',
     key: 'is_top',
     width: 50,
     align: 'center',
@@ -162,7 +162,7 @@ const columns = [
     },
   },
   {
-    title: '操作',
+    title: 'Actions',
     key: 'actions',
     width: 120,
     align: 'center',
@@ -181,7 +181,7 @@ const columns = [
                 await $table.value?.handleSearch()
               },
             },
-            { default: () => '恢复', icon: () => h('i', { class: 'i-majesticons:eye-line' }) },
+            { default: () => 'Restore', icon: () => h('i', { class: 'i-majesticons:eye-line' }) },
           )
           : h(
             NButton,
@@ -189,9 +189,9 @@ const columns = [
               size: 'small',
               type: 'primary',
               secondary: true,
-              onClick: () => router.push(`/article/write/${row.id}`), // 携带参数前往 写文章 页面
+              onClick: () => router.push(`/article/write/${row.id}`), // Navigate to write article page with parameters
             },
-            { default: () => '查看', icon: () => h('i', { class: 'i-majesticons:eye-line' }) },
+            { default: () => 'View', icon: () => h('i', { class: 'i-majesticons:eye-line' }) },
           ),
         h(
           NPopconfirm,
@@ -201,9 +201,9 @@ const columns = [
               h(
                 NButton,
                 { size: 'small', type: 'error', style: 'margin-left: 15px;' },
-                { default: () => '删除', icon: () => h('i', { class: 'i-material-symbols:delete-outline' }) },
+                { default: () => 'Delete', icon: () => h('i', { class: 'i-material-symbols:delete-outline' }) },
               ),
-            default: () => h('div', {}, '确定删除该文章吗?'),
+            default: () => h('div', {}, 'Are you sure you want to delete this article?'),
           },
         ),
       ]
@@ -217,7 +217,7 @@ function updateOrDeleteArticles(ids) {
     : api.softDeleteArticle(JSON.parse(ids), true)
 }
 
-// 修改文章置顶
+// Update article pin status
 async function handleUpdateTop(row) {
   if (!row.id) {
     return
@@ -226,7 +226,7 @@ async function handleUpdateTop(row) {
   row.is_top = !row.is_top
   try {
     await api.updateArticleTop(row.id, row.is_top)
-    $message?.success(row.is_top ? '已成功置顶' : '已取消置顶')
+    $message?.success(row.is_top ? 'Article pinned successfully' : 'Article unpinned successfully')
     $table.value?.handleSearch()
   }
   catch (err) {
@@ -237,20 +237,20 @@ async function handleUpdateTop(row) {
   }
 }
 
-// 导出文章
+// Export articles
 async function exportArticles(ids) {
-  // 方式一: 前端根据文章内容和标题进行导出
+  // Method 1: Export based on article content and title from frontend
   const list = $table.value?.tableData.filter(e => ids.includes(e.id))
   for (const item of list)
     downloadFile(item.content, `${item.title}.md`)
 
-  // 方式二: 后端导出返回链接, 前端根据链接下载
+  // Method 2: Backend export returns links, frontend downloads based on links
   // const res = await api.exportArticles(ids)
   // for (const url of res.data)
   // downloadFile(url)
 }
 
-// 切换标签页: [全部, 公开, 私密, 草稿箱, 回收站]
+// Switch tabs: [All, Public, Private, Draft, Trash]
 function handleChangeTab(value) {
   switch (value) {
     case 'all':
@@ -277,51 +277,51 @@ function handleChangeTab(value) {
   $table.value?.handleSearch()
 }
 
-// 文件上传前检查类型
+// Check file type before upload
 function beforeUpload(data) {
   if (!data.file.name.endsWith('.md')) {
-    $message.error('只能上传 .md 格式的文件，请重新上传')
+    $message.error('Only .md format files can be uploaded, please re-upload')
     return false
   }
   return true
 }
 
-// 文件上传后的操作
+// Operations after file upload
 function afterUpload({ event }) {
   const respStr = (event?.target).response
   const res = JSON.parse(respStr)
   if (res.code === 0) {
     $table.value?.handleSearch()
-    $message.success('文章导入成功！')
+    $message.success('Article imported successfully!')
   }
   else {
-    $message.error('文章导入失败！')
+    $message.error('Article import failed!')
   }
 }
 
 function downloadFile(content, fileName) {
-  const aEle = document.createElement('a') // 创建下载链接
-  aEle.download = fileName // 设置下载的名称
-  aEle.style.display = 'none'// 隐藏的可下载链接
-  // 字符内容转变成 blob 地址
+  const aEle = document.createElement('a') // Create download link
+  aEle.download = fileName // Set download filename
+  aEle.style.display = 'none'// Hidden downloadable link
+  // Convert string content to blob address
   const blob = new Blob([content])
   aEle.href = URL.createObjectURL(blob)
-  // 绑定点击时间
+  // Bind click event
   document.body.appendChild(aEle)
   aEle.click()
-  // 然后移除
+  // Then remove
   document.body.removeChild(aEle)
 }
 </script>
 
 <template>
-  <CommonPage title="文章列表">
+  <CommonPage title="Article List">
     <template #action>
       <NButton type="primary" @click="$router.replace('/article/write')">
         <template #icon>
           <i class="i-material-symbols:add" />
         </template>
-        新建文章
+        New Article
       </NButton>
       <NButton
         type="error"
@@ -331,7 +331,7 @@ function downloadFile(content, fileName) {
         <template #icon>
           <i class="i-material-symbols:recycling-rounded" />
         </template>
-        批量删除
+        Batch Delete
       </NButton>
       <NButton
         type="info"
@@ -341,7 +341,7 @@ function downloadFile(content, fileName) {
         <template #icon>
           <i class="i-mdi:export" />
         </template>
-        批量导出
+        Batch Export
       </NButton>
       <div class="inline-block">
         <NUpload
@@ -355,7 +355,7 @@ function downloadFile(content, fileName) {
             <template #icon>
               <i class="i-mdi:import" />
             </template>
-            批量导入
+            Batch Import
           </NButton>
         </NUpload>
       </div>
@@ -363,13 +363,13 @@ function downloadFile(content, fileName) {
 
     <NTabs type="line" animated @update:value="handleChangeTab">
       <template #prefix>
-        状态
+        Status
       </template>
-      <NTabPane name="all" tab="全部" />
-      <NTabPane name="public" tab="公开" />
-      <NTabPane name="secret" tab="私密" />
-      <NTabPane name="draft" tab="草稿箱" />
-      <NTabPane name="delete" tab="回收站" />
+      <NTabPane name="all" tab="All" />
+      <NTabPane name="public" tab="Public" />
+      <NTabPane name="secret" tab="Private" />
+      <NTabPane name="draft" tab="Draft" />
+      <NTabPane name="delete" tab="Trash" />
     </NTabs>
 
     <CrudTable
@@ -380,40 +380,40 @@ function downloadFile(content, fileName) {
       :get-data="api.getArticles"
     >
       <template #queryBar>
-        <QueryItem label="标题" :label-width="40" :content-width="180">
+        <QueryItem label="Title" :label-width="40" :content-width="180">
           <NInput
             v-model:value="queryItems.title"
             clearable
             type="text"
-            placeholder="请输入标题"
+            placeholder="Enter title"
             @keydown.enter="$table?.handleSearch()"
           />
         </QueryItem>
-        <QueryItem label="类型" :label-width="40" :content-width="160">
+        <QueryItem label="Type" :label-width="40" :content-width="160">
           <NSelect
             v-model:value="queryItems.type"
             clearable
-            placeholder="请选择文章类型"
+            placeholder="Select article type"
             :options="articleTypeOptions"
             @update:value="$table?.handleSearch()"
           />
         </QueryItem>
-        <QueryItem label="分类" :label-width="40" :content-width="160">
+        <QueryItem label="Category" :label-width="60" :content-width="160">
           <NSelect
             v-model:value="queryItems.category_id"
             clearable
             filterable
-            placeholder="请选择文章分类"
+            placeholder="Select article category"
             :options="categoryOptions"
             @update:value="$table?.handleSearch()"
           />
         </QueryItem>
-        <QueryItem label="标签" :label-width="40" :content-width="160">
+        <QueryItem label="Tags" :label-width="40" :content-width="160">
           <NSelect
             v-model:value="queryItems.tag_id"
             clearable
             filterable
-            placeholder="请选择文章标签"
+            placeholder="Select article tags"
             :options="tagOptions"
             @update:value="$table?.handleSearch()"
           />

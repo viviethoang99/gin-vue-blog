@@ -9,11 +9,11 @@ import CrudTable from '@/components/crud/CrudTable.vue'
 import { convertImgUrl, formatDate } from '@/utils'
 import api from '@/api'
 
-defineOptions({ name: '在线用户' })
+defineOptions({ name: 'Online Users' })
 
 const $table = ref(null)
 const queryItems = ref({
-  keyword: '', // 用户名 | 昵称
+  keyword: '', // Username | Nickname
 })
 
 onMounted(() => {
@@ -22,7 +22,7 @@ onMounted(() => {
 
 const columns = [
   {
-    title: '头像',
+    title: 'Avatar',
     key: 'avatar',
     width: 30,
     align: 'center',
@@ -30,63 +30,63 @@ const columns = [
       return h(NImage, {
         'height': 30,
         'src': convertImgUrl(row.info.avatar),
-        'fallback-src': 'http://dummyimage.com/400x400', // 加载失败
+        'fallback-src': 'http://dummyimage.com/400x400', // Load failed
         'show-toolbar-tooltip': true,
       })
     },
   },
   {
-    title: '昵称',
+    title: 'Nickname',
     key: 'nickname',
     width: 60,
     align: 'center',
     ellipsis: { tooltip: true },
     render(row) {
-      return h('span', row.info.nickname || '未知')
+      return h('span', row.info.nickname || 'Unknown')
     },
   },
   {
-    title: '登录 IP',
+    title: 'Login IP',
     key: 'ip_address',
     width: 70,
     align: 'center',
     ellipsis: { tooltip: true },
     render(row) {
-      return h('span', row.ip_address || '未知')
+      return h('span', row.ip_address || 'Unknown')
     },
   },
   {
-    title: '登录地址',
+    title: 'Login Location',
     key: 'ip_source',
     width: 70,
     align: 'center',
     ellipsis: { tooltip: true },
     render(row) {
-      return h('span', row.ip_source || '未知')
+      return h('span', row.ip_source || 'Unknown')
     },
   },
   {
-    title: '登录浏览器',
+    title: 'Browser',
     key: 'browser',
     width: 70,
     align: 'center',
     ellipsis: { tooltip: true },
     render(row) {
-      return h('span', row.browser || '未知')
+      return h('span', row.browser || 'Unknown')
     },
   },
   {
-    title: '操作系统',
+    title: 'Operating System',
     key: 'os',
     width: 70,
     align: 'center',
     ellipsis: { tooltip: true },
     render(row) {
-      return h('span', row.os || '未知')
+      return h('span', row.os || 'Unknown')
     },
   },
   {
-    title: '登录时间',
+    title: 'Login Time',
     key: 'last_login_time',
     align: 'center',
     width: 70,
@@ -95,7 +95,7 @@ const columns = [
     },
   },
   {
-    title: '操作',
+    title: 'Actions',
     key: 'actions',
     width: 60,
     align: 'center',
@@ -110,22 +110,22 @@ const columns = [
               NButton,
               { size: 'small', type: 'warning' },
               {
-                default: () => '下线',
+                default: () => 'Log Out',
                 icon: () => h('i', { class: 'i-material-symbols:delete-outline' }),
               },
             ),
-          default: () => h('div', {}, '确定强制该用户下线吗?'),
+          default: () => h('div', {}, 'Are you sure you want to force this user offline?'),
         },
       )
     },
   },
 ]
 
-// 强制用户下线
+// Force user offline
 async function handleForceOffline(row) {
   try {
     await api.forceOfflineUser(row.id)
-    window.$message.success('该用户已被强制下线!')
+    window.$message.success('User has been forced offline!')
     $table.value?.handleSearch()
   }
   catch (err) {
@@ -135,7 +135,7 @@ async function handleForceOffline(row) {
 </script>
 
 <template>
-  <CommonPage title="在线用户">
+  <CommonPage title="Online Users">
     <CrudTable
       ref="$table"
       v-model:query-items="queryItems"
@@ -144,12 +144,12 @@ async function handleForceOffline(row) {
       :is-pagination="false"
     >
       <template #queryBar>
-        <QueryItem label="用户名 | 昵称" :label-width="100" :content-width="200">
+        <QueryItem label="Username | Nickname" :label-width="150" :content-width="200">
           <NInput
             v-model:value="queryItems.keyword"
             clearable
             type="text"
-            placeholder="搜索关键字"
+            placeholder="Search keywords"
             @keydown.enter="$table?.handleSearch()"
           />
         </QueryItem>

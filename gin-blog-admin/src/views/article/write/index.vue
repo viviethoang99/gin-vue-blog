@@ -13,17 +13,17 @@ import { articleTypeOptions } from '@/assets/config'
 import { useTagStore } from '@/store'
 import api from '@/api'
 
-defineOptions({ name: '发布文章' })
+defineOptions({ name: 'Publish Article' })
 
 const route = useRoute()
 // const router = useRouter()
 const tagStore = useTagStore()
 
-const categoryOptions = ref([]) // 分类选项
-const tagOptions = ref([]) // 标签选项
-let backTagOptions = [] // 备份标签选项
+const categoryOptions = ref([]) // Category options
+const tagOptions = ref([]) // Tag options
+let backTagOptions = [] // Backup tag options
 
-// 解决同时查看多篇文章, 切换标签不刷新的问题
+// Fix the issue where viewing multiple articles at the same time, switching tabs doesn't refresh
 watch(route, async () => tagStore.reloadTag())
 
 onMounted(async () => {
@@ -49,32 +49,32 @@ async function fetchData() {
 const formRef = ref(null)
 const formModel = ref({
   title: '',
-  status: 1, // 发布形式: 默认公开
-  is_top: false, // 默认不置顶
-  type: 1, // 默认原创
+  status: 1, // Publish status: default public
+  is_top: false, // Default not pinned
+  type: 1, // Default original
   tag_names: [],
   category_name: '',
 })
 const btnLoading = ref(false)
 const modalVisible = ref(false)
-const newTag = ref(null) // 新增标签
+const newTag = ref(null) // New tag
 
-// 监听已选标签, 实时更新可选择的标签
+// Listen to selected tags, update selectable tags in real time
 watch(() => formModel.value.tag_names, (newVal) => {
   tagOptions.value = backTagOptions.filter(e => !newVal.includes(e.label))
 }, { deep: true })
 
-// 根据路由中的 id 参数获取文章信息
+// Get article information based on id parameter in route
 async function getArticleInfo() {
-  const id = route.params.id // 路由中获取参数
+  const id = route.params.id // Get parameter from route
 
-  // 没有 id, 表示是新增文章
+  // No id means creating new article
   if (!id) {
     formModel.value = { status: 1, is_top: false, title: '', type: 1 }
     return
   }
 
-  // 存在 id, 表示是编辑文章
+  // With id means editing article
   window.$loadingBar?.start()
   try {
     const resp = await api.getArticleById(id)
@@ -86,36 +86,36 @@ async function getArticleInfo() {
   }
   catch (err) {
     window.$loadingBar?.error()
-    $message?.error('加载失败')
+    $message?.error('Loading failed')
   }
 }
 
-// TODO: 保存草稿
+// TODO: Save draft
 function handleDraft() {
-  $message.info('保存草稿开发中')
+  $message.info('Save draft feature is under development')
 }
 
-// 发布文章
+// Publish article
 function handlePublish() {
   if (!formModel.value.title || !formModel.value.title?.trim()) {
     formModel.value.title = formModel.value.title?.trim()
-    $message.info('请输入标题')
+    $message.info('Please enter title')
     return
   }
   modalVisible.value = true
 }
 
-// 保存
+// Save
 async function handleSave() {
   formRef.value?.validate(async (err) => {
     if (!err) {
       btnLoading.value = true
-      // $message.loading('正在保存...')
+      // $message.loading('Saving...')
       try {
         await api.saveOrUpdateArticle(formModel.value)
         modalVisible.value = false
-        $message.success('操作成功!')
-        // 关闭当前标签, 并跳转回文章列表
+        $message.success('Operation successful!')
+        // Close current tab and return to article list
         tagStore.removeTag(route.path)
         // await router.replace({ path: '/article/list', query: { needRefresh: true } })
       }
@@ -132,16 +132,16 @@ async function handleSave() {
 const rules = {
   category_name: {
     required: true,
-    message: '请选择文章分类',
+    message: 'Please select article category',
     trigger: ['blur', 'change'],
   },
   tag_names: {
     required: true,
-    message: '请选择文章标签',
+    message: 'Please select article tags',
   },
 }
 
-// 渲染标签
+// Render tags
 function renderTag(tag, index) {
   return h(
     NTag,
@@ -157,34 +157,34 @@ function renderTag(tag, index) {
 </script>
 
 <template>
-  <CommonPage :show-header="false" title="写文章">
+  <CommonPage :show-header="false" title="Write Article">
     <div class="mb-4 flex items-center bg-white space-x-2">
       <NInput
         v-model:value="formModel.title"
         type="text"
         class="mr-5 flex-1 py-1 text-lg color-primary font-bold"
-        placeholder="输入文章标题..."
+        placeholder="Enter article title..."
       />
       <NButton ghost type="error" :loading="btnLoading" @click="handleDraft">
         <template #icon>
           <span v-if="!btnLoading" class="i-line-md:uploading-loop" />
         </template>
-        保存草稿
+        Save Draft
       </NButton>
       <NButton type="error" :loading="btnLoading" @click="handlePublish">
         <template #icon>
           <span v-if="!btnLoading" class="i-line-md:confirm-circle" />
         </template>
-        发布文章
+        Publish Article
       </NButton>
     </div>
 
-    <!-- TODO: 文件上传 -->
+    <!-- TODO: File upload -->
     <MdEditor v-model="formModel.content" style="height: calc(100vh - 245px)" />
 
     <CrudModal
       v-model:visible="modalVisible"
-      title="发布文章"
+      title="Publish Article"
       :loading="btnLoading"
       show-footer
       @save="handleSave"
@@ -197,16 +197,16 @@ function renderTag(tag, index) {
         :model="formModel"
         :rules="rules"
       >
-        <NFormItem label="文章分类" path="category_name">
+        <NFormItem label="Category" path="category_name">
           <NSelect
             v-model:value="formModel.category_name"
             style="width: 50%"
             clearable filterable tag
-            placeholder="关键字搜索，enter 添加"
+            placeholder="Search keywords, press enter to add"
             :options="categoryOptions"
           />
         </NFormItem>
-        <NFormItem label="文章标签" path="tag_names">
+        <NFormItem label="Tags" path="tag_names">
           <NDynamicTags
             v-model:value="formModel.tag_names"
             :render-tag="renderTag"
@@ -217,7 +217,7 @@ function renderTag(tag, index) {
                 v-model:value="newTag"
                 size="small" filterable tag clearable
                 :options="tagOptions"
-                placeholder="标签名称"
+                placeholder="Tag name"
                 @update:value="{
                   submit($event);
                   newTag = null;
@@ -225,55 +225,55 @@ function renderTag(tag, index) {
                 @blur="deactivate"
               >
                 <template #action>
-                  输入标签名搜索，enter 添加自定义标签
+                  Enter tag name to search, press enter to add custom tag
                 </template>
               </NSelect>
             </template>
           </NDynamicTags>
         </NFormItem>
-        <NFormItem label="文章类型" path="type">
+        <NFormItem label="Type" path="type">
           <NSelect
             v-model:value="formModel.type"
             style="width: 50%"
-            placeholder="请选择文章分类"
+            placeholder="Please select article type"
             :options="articleTypeOptions"
           />
         </NFormItem>
-        <!-- <n-form-item label="文章描述" path="desc">
+        <!-- <n-form-item label="Article Description" path="desc">
           <n-input
             v-model:value="formModel.desc"
-            placeholder="请输入文章描述"
+            placeholder="Please enter article description"
             type="textarea"
             :autosize="{ minRows: 3, maxRows: 5 }"
           />
         </n-form-item> -->
         <NFormItem
           v-if="(formModel.type === 2 || formModel.type === 3)"
-          label="原文地址" path="original_url"
+          label="Original URL" path="original_url"
         >
           <NInput
             v-model:value="formModel.original_url"
             type="text"
-            placeholder="请填写原文连接"
+            placeholder="Please enter original article link"
           />
         </NFormItem>
-        <NFormItem label="文章缩略图" path="img">
+        <NFormItem label="Thumbnail" path="img">
           <UploadOne
             v-model:preview="formModel.img"
             :width="220"
           />
         </NFormItem>
-        <NFormItem label="置顶" path="is_top">
+        <NFormItem label="Pin to Top" path="is_top">
           <NSwitch v-model:value="formModel.is_top" />
         </NFormItem>
-        <NFormItem label="发布形式" path="status">
+        <NFormItem label="Status" path="status">
           <NRadioGroup v-model:value="formModel.status" name="radiogroup">
             <NSpace>
               <NRadio :value="1">
-                公开
+                Public
               </NRadio>
               <NRadio :value="2">
-                私密
+                Private
               </NRadio>
             </NSpace>
           </NRadioGroup>

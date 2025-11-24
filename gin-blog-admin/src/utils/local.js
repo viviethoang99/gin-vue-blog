@@ -1,9 +1,9 @@
 const CryptoSecret = '__SecretKey__'
 
 /**
- * 存储序列化后的数据到 LocalStorage
+ * Store serialized data to LocalStorage
  * @param {string} key
- * @param {any} value 对象需要序列化
+ * @param {any} value Object needs to be serialized
  * @param {number} expire
  */
 export function setLocal(key, value, expire = 60 * 60 * 24 * 7) {
@@ -12,24 +12,24 @@ export function setLocal(key, value, expire = 60 * 60 * 24 * 7) {
     time: Date.now(),
     expire: expire ? new Date().getTime() + expire * 1000 : null,
   })
-  window.localStorage.setItem(key, encrypto(data)) // 加密存储
+  window.localStorage.setItem(key, encrypto(data)) // Encrypted storage
 }
 
 /**
- * 从 LocalStorage 中获取数据, 解密后反序列化, 根据是否过期来返回
+ * Get data from LocalStorage, decrypt and deserialize, return based on expiration
  * @param {string} key
  */
 export function getLocal(key) {
   const encryptedVal = window.localStorage.getItem(key)
   if (encryptedVal) {
-    const val = decrypto(encryptedVal) // 解密
+    const val = decrypto(encryptedVal) // Decrypt
     const { value, expire } = JSON.parse(val)
-    // 未过期则返回
+    // Return if not expired
     if (!expire || expire > new Date().getTime()) {
       return value
     }
   }
-  // 过期则移除
+  // Remove if expired
   removeLocal(key)
   return null
 }
@@ -43,8 +43,8 @@ export function clearLocal() {
 }
 
 /**
- * 加密数据: Base64 加密
- * @param {any} data - 数据
+ * Encrypt data: Base64 encryption
+ * @param {any} data - Data
  */
 function encrypto(data) {
   const newData = JSON.stringify(data)
@@ -53,8 +53,8 @@ function encrypto(data) {
 }
 
 /**
- * 解密数据: Base64 解密
- * @param {string} cipherText - 密文
+ * Decrypt data: Base64 decryption
+ * @param {string} cipherText - Cipher text
  */
 function decrypto(cipherText) {
   const decryptedData = atob(cipherText)

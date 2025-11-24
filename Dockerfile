@@ -1,5 +1,9 @@
 # 阶段一: 打包前后台静态资源
 FROM node:18-alpine3.19 AS BUILD
+
+# Set CI environment variable for pnpm
+ENV CI=true
+
 WORKDIR /app/front
 COPY gin-blog-front/package*.json .
 RUN npm config set registry https://registry.npmmirror.com \

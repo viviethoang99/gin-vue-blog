@@ -1,7 +1,7 @@
 import { createPinia } from 'pinia'
 
 // https://github.com/prazdevs/pinia-plugin-persistedstate
-// pinia 数据持久化，解决刷新数据丢失的问题
+// Pinia data persistence, solving the problem of data loss on refresh
 import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 
 export function setupStore(app) {

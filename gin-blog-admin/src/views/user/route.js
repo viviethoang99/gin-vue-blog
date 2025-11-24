@@ -6,7 +6,7 @@ export default {
   component: Layout,
   redirect: '/user/list',
   meta: {
-    title: '用户管理',
+    title: 'User Management',
     icon: 'ph:user-list-bold',
     order: 5,
     // role: ['admin'],
@@ -18,7 +18,7 @@ export default {
       path: 'list',
       component: () => import('./list/index.vue'),
       meta: {
-        title: '用户列表',
+        title: 'User List',
         icon: 'mdi:account',
         keepAlive: true,
       },
@@ -28,7 +28,7 @@ export default {
       path: 'online',
       component: () => import('./online/index.vue'),
       meta: {
-        title: '在线用户',
+        title: 'Online Users',
         icon: 'ic:outline-online-prediction',
         keepAlive: true,
       },

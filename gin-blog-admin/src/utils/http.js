@@ -9,7 +9,7 @@ export const request = axios.create(
 )
 
 request.interceptors.request.use(
-  // 请求成功拦截
+  // Request success interceptor
   (config) => {
     if (config.noNeedToken) {
       return config
@@ -21,33 +21,33 @@ request.interceptors.request.use(
     }
     return config
   },
-  // 请求失败拦截
+  // Request failure interceptor
   (error) => {
     return Promise.reject(error)
   },
 )
 
 request.interceptors.response.use(
-  // 响应成功拦截
+  // Response success interceptor
   (response) => {
-    // 业务信息
+    // Business information
     const responseData = response.data
     const { code, message, data } = responseData
-    if (code !== 0) { // ! 与后端约定业务状态码
+    if (code !== 0) { // ! Business status code agreed with backend
       if (data && message !== data) {
         window.$message.error(`${message} ${data}`)
       }
       else {
         window.$message.error(message)
       }
-      console.error(responseData) // 控制台输出错误信息
+      console.error(responseData) // Console output error information
 
       const authStore = useAuthStore()
-      if (code === 1201) { // Token 存在问题
+      if (code === 1201) { // Token has issues
         authStore.toLogin()
         return
       }
-      // 1202-Token 过期
+      // 1202-Token expired
       if (code === 1202 || code === 1203 || code === 1207) {
         authStore.forceOffline()
         return
@@ -56,9 +56,9 @@ request.interceptors.response.use(
     }
     return Promise.resolve(responseData)
   },
-  // 响应失败拦截
+  // Response failure interceptor
   (error) => {
-    // 主要使用业务状态码决定状态, 一般不根据 HTTP 状态码进行操作
+    // Mainly use business status codes to determine status, generally do not operate based on HTTP status codes
     const responseData = error.response?.data
     const { message, data } = responseData
     if (error.response.status === 500) {
@@ -66,7 +66,7 @@ request.interceptors.response.use(
         window.$message.error(`${message} ${data}`)
       }
       else {
-        window.$message.error('服务端异常')
+        window.$message.error('Server error')
       }
     }
     return Promise.reject(error)

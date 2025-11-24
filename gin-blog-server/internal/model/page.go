@@ -6,7 +6,7 @@ import (
 
 type Page struct {
 	Model
-	Name  string `gorm:"unique;type:varchar(20)" json:"name"`
+	Name  string `gorm:"unique;type:varchar(200)" json:"name"`
 	Label string `gorm:"unique;type:varchar(30)" json:"label"`
 	Cover string `gorm:"type:varchar(255)" json:"cover"`
 }

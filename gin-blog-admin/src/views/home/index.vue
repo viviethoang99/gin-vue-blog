@@ -21,13 +21,13 @@ onMounted(async () => {
   homeInfo.value = res.data
 })
 
-// 一言
+// Motto/Quote
 const sentence = ref('')
 async function getOneSentence() {
   fetch('https://v1.hitokoto.cn?c=i')
     .then(resp => resp.json())
     .then(data => sentence.value = data.hitokoto)
-    .catch(() => sentence.value = '宠辱不惊，看庭前花开花落；去留无意，望天上云卷云舒。')
+    .catch(() => sentence.value = 'Stay calm and composed, watching flowers bloom and wither in the garden; be indifferent to gains and losses, observing clouds gather and disperse in the sky.')
 }
 </script>
 
@@ -67,10 +67,10 @@ async function getOneSentence() {
       <NGrid class="mt-4" x-gap="12" :cols="4">
         <template
           v-for="item of [
-            { icon: 'i-fa6-solid:users', color: 'text-[#40C9C6]', label: '访问量', key: 'view_count' },
-            { icon: 'i-heroicons:users-solid', color: 'text-[#34BFA3]', label: '用户量', key: 'user_count' },
-            { icon: 'i-material-symbols:article', color: 'text-[#F4516C]', label: '文章量', key: 'article_count' },
-            { icon: 'i-bxs:comment-dots', color: 'text-[#36A3F7]', label: '留言量', key: 'message_count' },
+            { icon: 'i-fa6-solid:users', color: 'text-[#40C9C6]', label: 'Views', key: 'view_count' },
+            { icon: 'i-heroicons:users-solid', color: 'text-[#34BFA3]', label: 'Users', key: 'user_count' },
+            { icon: 'i-material-symbols:article', color: 'text-[#F4516C]', label: 'Articles', key: 'article_count' },
+            { icon: 'i-bxs:comment-dots', color: 'text-[#36A3F7]', label: 'Messages', key: 'message_count' },
           ]" :key="item.key"
         >
           <NGi>
@@ -87,11 +87,11 @@ async function getOneSentence() {
         </template>
       </NGrid>
 
-      <!-- TODO: 完善首页设计 -->
-      <NCard title="项目" size="small" class="mt-4">
+      <!-- TODO: Improve home page design -->
+      <NCard title="Projects" size="small" class="mt-4">
         <template #header-extra>
           <NButton text type="primary">
-            更多
+            More
           </NButton>
         </template>
         <NCard
@@ -101,7 +101,7 @@ async function getOneSentence() {
           size="small"
         >
           <p class="op-60">
-            这是个基于 gin 开发的博客管理后台
+            This is a blog management admin panel based on Gin framework
           </p>
         </NCard>
       </NCard>

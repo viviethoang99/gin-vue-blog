@@ -298,8 +298,8 @@ INSERT INTO `page` VALUES (6, '2022-12-08 13:53:04.159', '2023-12-28 16:30:03.92
 INSERT INTO `page` VALUES (7, '2022-12-08 13:53:17.707', '2023-12-28 16:27:13.418', 'Message', 'message', 'https://cdn.hahacode.cn/page/message.jpeg');
 INSERT INTO `page` VALUES (8, '2022-12-08 13:53:30.187', '2023-12-28 14:55:25.724', 'Personal Center', 'user', 'https://cdn.hahacode.cn/page/user.jpg');
 INSERT INTO `page` VALUES (9, '2022-12-16 23:54:52.650', '2023-12-28 14:54:42.341', 'Album', 'album', 'https://cdn.hahacode.cn/page/album.png');
-INSERT INTO `page` VALUES (10, '2022-12-16 23:55:36.059', '2023-12-28 14:55:09.345', '错误页面', '404', 'https://cdn.hahacode.cn/page/404.jpg');
-INSERT INTO `page` VALUES (11, '2022-12-16 23:56:17.917', '2023-12-28 16:33:16.644', '文章列表', 'article_list', 'https://cdn.hahacode.cn/page/article_list.jpg');
+INSERT INTO `page` VALUES (10, '2022-12-16 23:55:36.059', '2023-12-28 14:55:09.345', 'Error Page', '404', 'https://cdn.hahacode.cn/page/404.jpg');
+INSERT INTO `page` VALUES (11, '2022-12-16 23:56:17.917', '2023-12-28 16:33:16.644', 'Article List', 'article_list', 'https://cdn.hahacode.cn/page/article_list.jpg');
 
 -- ----------------------------
 -- Table structure for resource

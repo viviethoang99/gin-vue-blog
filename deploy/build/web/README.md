@@ -1,10 +1,10 @@
-# 二次开发指南
+# Development Guide
 
-## 方法一：不依赖本地 pnpm 环境进行打包
+## Method 1: Build without local pnpm
 
-执行 `./bootstrap.sh`
+Run `./bootstrap.sh`
 
 
-## 方法二：依赖本地 pnpm 环境进行打包
+## Method 2: Build using local pnpm
 
-执行 `./bootstrap.sh dev`
+Run `./bootstrap.sh dev`

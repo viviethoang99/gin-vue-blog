@@ -1,5 +1,5 @@
-# 二次开发指南
+# Development Guide
 
-后端服务的 Dockerfile 参考 gin-blog-server 目录
+The backend service Dockerfile is in the `gin-blog-server` directory.
 
-直接在修改 gin-blog-server 中的后端源码，然后执行 `./bootstrap.sh`
+Modify the backend source code in `gin-blog-server`, then run `./bootstrap.sh`.

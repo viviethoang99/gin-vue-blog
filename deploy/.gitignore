@@ -1,6 +1,6 @@
-# 容器文件映射到本地, 不上传仓库
+# Mapped container data; do not commit to VCS
 start/gvb
 
-# dist
+# Built static assets
 build/web/dist_admin
 build/web/dist_blog

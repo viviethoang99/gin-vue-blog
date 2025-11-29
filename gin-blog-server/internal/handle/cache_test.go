@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// 需要 Redis 环境
+// Requires a Redis environment
 func initRdb() *redis.Client {
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
@@ -20,7 +20,7 @@ func initRdb() *redis.Client {
 
 	_, err := rdb.Ping(context.Background()).Result()
 	if err != nil {
-		log.Fatal("Redis 连接失败: ", err)
+		log.Fatal("Redis connection failed: ", err)
 	}
 
 	return rdb
@@ -34,15 +34,15 @@ func TestPageCache(t *testing.T) {
 		{Name: "page2"},
 	}
 
-	// 直接获取缓存
-	// 不存在, 返回 redis.Nil 错误
+	// Get cache directly
+	// When not exists, returns redis.Nil error
 	{
 		cache, err := getPageCache(rdb)
 		assert.Equal(t, redis.Nil, err)
 		assert.Nil(t, cache)
 	}
 
-	// 新增, 获取 缓存
+	// Add cache and get it
 	{
 		err := addPageCache(rdb, pages)
 		assert.Nil(t, err)
@@ -52,8 +52,8 @@ func TestPageCache(t *testing.T) {
 		assert.Equal(t, pages, cache)
 	}
 
-	// 删除, 获取 缓存
-	// 不存在, 返回 redis.Nil 错误
+	// Remove cache and get it
+	// When not exists, returns redis.Nil error
 	{
 		err := removePageCache(rdb)
 		assert.Nil(t, err)
@@ -73,15 +73,15 @@ func TestConfigCache(t *testing.T) {
 		"url":  "url",
 	}
 
-	// 直接获取缓存
-	// 不存在, 返回空 map
+	// Get cache directly
+	// When not exists, returns empty map
 	{
 		cache, err := getConfigCache(rdb)
 		assert.Nil(t, err)
 		assert.Empty(t, cache)
 	}
 
-	// 新增, 获取 缓存
+	// Add cache and get it
 	{
 		err := addConfigCache(rdb, config)
 		assert.Nil(t, err)
@@ -91,8 +91,8 @@ func TestConfigCache(t *testing.T) {
 		assert.Equal(t, config, cache)
 	}
 
-	// 删除, 获取 缓存
-	// 不存在, 返回空 map
+	// Remove cache and get it
+	// When not exists, returns empty map
 	{
 		err := removeConfigCache(rdb)
 		assert.Nil(t, err)

@@ -26,7 +26,7 @@ type FAddCommentReq struct {
 	TopicId     int    `json:"topic_id" form:"topic_id"`
 	Content     string `json:"content" form:"content"`
 	ParentId    int    `json:"parent_id" form:"parent_id"`
-	Type        int    `json:"type" form:"type" validate:"required,min=1,max=3" label:"评论类型"`
+	Type        int    `json:"type" form:"type" validate:"required,min=1,max=3" label:"Comment Type"`
 }
 
 type FCommentQuery struct {
@@ -56,7 +56,7 @@ type ArticleSearchVO struct {
 	Content string `json:"content"`
 }
 
-// 前台首页信息
+// Front page info
 func (*Front) GetHomeInfo(c *gin.Context) {
 	db := GetDB(c)
 	rdb := GetRDB(c)
@@ -71,7 +71,7 @@ func (*Front) GetHomeInfo(c *gin.Context) {
 	ReturnSuccess(c, data)
 }
 
-// 查询标签列表
+// Get tag list
 func (*Front) GetTagList(c *gin.Context) {
 	list, _, err := model.GetTagList(GetDB(c), 1, 1000, "")
 	if err != nil {
@@ -81,7 +81,7 @@ func (*Front) GetTagList(c *gin.Context) {
 	ReturnSuccess(c, list)
 }
 
-// 查询分类列表
+// Get category list
 func (*Front) GetCategoryList(c *gin.Context) {
 	list, _, err := model.GetCategoryList(GetDB(c), 1, 1000, "")
 	if err != nil {
@@ -91,7 +91,7 @@ func (*Front) GetCategoryList(c *gin.Context) {
 	ReturnSuccess(c, list)
 }
 
-// 查询消息列表
+// Get message list
 func (*Front) GetMessageList(c *gin.Context) {
 	isReview := true
 	list, _, err := model.GetMessageList(GetDB(c), 1, 1000, "", &isReview)
@@ -102,7 +102,7 @@ func (*Front) GetMessageList(c *gin.Context) {
 	ReturnSuccess(c, list)
 }
 
-// 获取友链列表
+// Get friend link list
 func (*Front) GetLinkList(c *gin.Context) {
 	list, _, err := model.GetLinkList(GetDB(c), 1, 1000, "")
 	if err != nil {
@@ -114,11 +114,11 @@ func (*Front) GetLinkList(c *gin.Context) {
 }
 
 /*
-以下接口需要登录
+// The following APIs require login
 */
 
-// TODO: 添加自定义头像和昵称留言功能（即可以不登录留言）
-// 保存留言（只能新增，不能编辑）
+// TODO: Add avatar/nickname for messages (allow anonymous messages)
+// Save message (add only, no edit)
 func (*Front) SaveMessage(c *gin.Context) {
 	var req FAddMessageReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -144,10 +144,10 @@ func (*Front) SaveMessage(c *gin.Context) {
 	ReturnSuccess(c, message)
 }
 
-// 保存评论（只能新增，不能编辑）
-// TODO: 添加自定义头像和昵称留言功能（即可以不登录评论）
-// TODO: 开启邮箱通知用户功能
-// TODO: HTMLUtil.Filter 过滤 HTML 元素中的字符串...
+// Save comment (add only, no edit)
+// TODO: Add avatar/nickname for comments (allow anonymous comments)
+// TODO: Enable email notifications for users
+// TODO: HTMLUtil.Filter to sanitize strings in HTML elements...
 func (*Front) SaveComment(c *gin.Context) {
 	var req FAddCommentReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -155,7 +155,7 @@ func (*Front) SaveComment(c *gin.Context) {
 		return
 	}
 
-	// 过滤评论内容，防止XSS攻击
+	// Filter comment content to prevent XSS
 	req.Content = template.HTMLEscapeString(req.Content)
 	auth, _ := CurrentUserAuth(c)
 	db := GetDB(c)
@@ -178,7 +178,7 @@ func (*Front) SaveComment(c *gin.Context) {
 	ReturnSuccess(c, comment)
 }
 
-// 获取评论列表
+// Get comment list
 func (*Front) GetCommentList(c *gin.Context) {
 	var query FCommentQuery
 	if err := c.ShouldBindQuery(&query); err != nil {
@@ -198,7 +198,7 @@ func (*Front) GetCommentList(c *gin.Context) {
 	likeCountMap := rdb.HGetAll(rctx, g.COMMENT_LIKE_COUNT).Val()
 	for i, comment := range data {
 		if len(data[i].ReplyList) > 3 {
-			data[i].ReplyList = data[i].ReplyList[:3] // 只显示 3 条回复
+			data[i].ReplyList = data[i].ReplyList[:3] // show only 3 replies
 		}
 		data[i].LikeCount, _ = strconv.Atoi(likeCountMap[strconv.Itoa(comment.ID)])
 	}
@@ -211,7 +211,7 @@ func (*Front) GetCommentList(c *gin.Context) {
 	})
 }
 
-// 根据 [评论id] 获取 [回复列表]
+// Get reply list by comment id
 func (*Front) GetReplyListByCommentId(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("comment_id"))
 	if err != nil {
@@ -248,7 +248,7 @@ func (*Front) GetReplyListByCommentId(c *gin.Context) {
 	ReturnSuccess(c, data)
 }
 
-// 点赞评论
+// Like a comment
 func (*Front) LikeComment(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("comment_id"))
 	if err != nil {
@@ -259,13 +259,13 @@ func (*Front) LikeComment(c *gin.Context) {
 	rdb := GetRDB(c)
 	auth, _ := CurrentUserAuth(c)
 
-	// 记录某个用户已经对某个评论点过赞
+	// Record that a user liked a specific comment
 	commentLikeUserKey := g.COMMENT_USER_LIKE_SET + strconv.Itoa(auth.ID)
-	// 该评论已经被记录过, 再点赞就是取消点赞
+	// If already recorded, like toggles to unlike
 	if rdb.SIsMember(rctx, commentLikeUserKey, id).Val() {
 		rdb.SRem(rctx, commentLikeUserKey, id)
 		rdb.HIncrBy(rctx, g.COMMENT_LIKE_COUNT, strconv.Itoa(id), -1)
-	} else { // 未被记录过, 则是增加点赞
+	} else { // Not recorded, this is a new like
 		rdb.SAdd(rctx, commentLikeUserKey, id)
 		rdb.HIncrBy(rctx, g.COMMENT_LIKE_COUNT, strconv.Itoa(id), 1)
 	}
@@ -274,10 +274,10 @@ func (*Front) LikeComment(c *gin.Context) {
 }
 
 /*
-文章相关接口
+// Article related APIs
 */
 
-// 获取文章列表
+// Get article list
 func (*Front) GetArticleList(c *gin.Context) {
 	var query FArticleQuery
 	if err := c.ShouldBindQuery(&query); err != nil {
@@ -294,7 +294,7 @@ func (*Front) GetArticleList(c *gin.Context) {
 	ReturnSuccess(c, list)
 }
 
-// 根据 [文章id] 获取 [文章详情]
+// Get article detail by id
 func (*Front) GetArticleInfo(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -305,7 +305,7 @@ func (*Front) GetArticleInfo(c *gin.Context) {
 	db := GetDB(c)
 	rdb := GetRDB(c)
 
-	// 文章详情
+	// Article detail
 	val, err := model.GetBlogArticle(db, id)
 	if err != nil {
 		ReturnError(c, g.ErrDbOp, err)
@@ -314,47 +314,47 @@ func (*Front) GetArticleInfo(c *gin.Context) {
 
 	article := model.BlogArticleVO{Article: *val}
 
-	// 推荐文章（6篇）
+	// Recommended articles (6)
 	article.RecommendArticles, err = model.GetRecommendList(db, id, 6)
 	if err != nil {
 		ReturnError(c, g.ErrDbOp, err)
 		return
 	}
 
-	// 最新文章（5篇）
+	// Latest articles (5)
 	article.NewestArticles, err = model.GetNewestList(db, 5)
 	if err != nil {
 		ReturnError(c, g.ErrDbOp, err)
 		return
 	}
 
-	// 更新文章浏览量 TODO: 删除文章时删除其浏览量
+	// Update article view count TODO: remove view count when article deleted
 	// updateArticleViewCount(c, id)
 
-	// TODO: 更新访问量
-	// * 目前请求一次就会增加访问量, 即刷新可以刷访问量
+	// TODO: Update visit count
+	// * Each request increments visit count; refresh can inflate visits
 	rdb.ZIncrBy(rctx, g.ARTICLE_VIEW_COUNT, 1, strconv.Itoa(id))
 
-	// 上一篇文章
+	// Previous article
 	article.LastArticle, err = model.GetLastArticle(db, id)
 	if err != nil {
 		ReturnError(c, g.ErrDbOp, err)
 		return
 	}
 
-	// 下一篇文章
+	// Next article
 	article.NextArticle, err = model.GetNextArticle(db, id)
 	if err != nil {
 		ReturnError(c, g.ErrDbOp, err)
 		return
 	}
 
-	// 点赞量, 浏览量
+	// Like count, view count
 	article.ViewCount = int64(rdb.ZScore(rctx, g.ARTICLE_VIEW_COUNT, strconv.Itoa(id)).Val())
 	likeCount, _ := strconv.Atoi(rdb.HGet(rctx, g.ARTICLE_LIKE_COUNT, strconv.Itoa(id)).Val())
 	article.LikeCount = int64(likeCount)
 
-	// 评论数量
+	// Comment count
 	article.CommentCount, err = model.GetArticleCommentCount(db, id)
 	if err != nil {
 		ReturnError(c, g.ErrDbOp, err)
@@ -364,7 +364,7 @@ func (*Front) GetArticleInfo(c *gin.Context) {
 	ReturnSuccess(c, article)
 }
 
-// 获取文章归档
+// Get article archives
 func (*Front) GetArchiveList(c *gin.Context) {
 	var query FArticleQuery
 	if err := c.ShouldBindQuery(&query); err != nil {
@@ -395,8 +395,8 @@ func (*Front) GetArchiveList(c *gin.Context) {
 	})
 }
 
-// 点赞文章
-// 需要记录某个用户已经对某篇文章点过赞, 防止重复点赞
+// Like an article
+// Record user liked a specific article to prevent duplicate likes
 func (*Front) LikeArticle(c *gin.Context) {
 	auth, _ := CurrentUserAuth(c)
 
@@ -408,13 +408,13 @@ func (*Front) LikeArticle(c *gin.Context) {
 
 	rdb := GetRDB(c)
 
-	// 记录某个用户已经对某个文章点过赞
+	// Record that a user liked a specific article
 	articleLikeUserKey := g.ARTICLE_USER_LIKE_SET + strconv.Itoa(auth.ID)
-	// 该文章已经被记录过, 再点赞就是取消点赞
+	// If already recorded, like toggles to unlike
 	if rdb.SIsMember(rctx, articleLikeUserKey, articleId).Val() {
 		rdb.SRem(rctx, articleLikeUserKey, articleId)
 		rdb.HIncrBy(rctx, g.ARTICLE_LIKE_COUNT, strconv.Itoa(articleId), -1)
-	} else { // 未被记录过, 则是增加点赞
+	} else { // Not recorded, this is a new like
 		rdb.SAdd(rctx, articleLikeUserKey, articleId)
 		rdb.HIncrBy(rctx, g.ARTICLE_LIKE_COUNT, strconv.Itoa(articleId), 1)
 	}
@@ -422,7 +422,7 @@ func (*Front) LikeArticle(c *gin.Context) {
 	ReturnSuccess(c, nil)
 }
 
-// 文章搜索
+// Article search
 func (*Front) SearchArticle(c *gin.Context) {
 	result := make([]ArticleSearchVO, 0)
 
@@ -443,23 +443,23 @@ func (*Front) SearchArticle(c *gin.Context) {
 	}
 
 	for _, article := range articleList {
-		// 高亮标题中的关键字
+		// Highlight keywords in title
 		title := strings.ReplaceAll(article.Title, keyword,
 			"<span style='color:#f47466'>"+keyword+"</span>")
 
 		content := article.Content
-		// 关键字在内容中的起始位置
+		// Keyword start index in content
 		keywordStartIndex := unicodeIndex(content, keyword)
-		if keywordStartIndex != -1 { // 关键字在内容中
+		if keywordStartIndex != -1 { // Keyword exists in content
 			preIndex, afterIndex := 0, 0
 			if keywordStartIndex > 25 {
 				preIndex = keywordStartIndex - 25
 			}
-			// 防止中文截取出乱码 (中文在 golang 是 3 个字符, 使用 rune 中文占一个数组下标)
+			// Avoid Chinese substring garbling (use rune to handle multibyte)
 			preText := substring(content, preIndex, keywordStartIndex)
 			// string([]rune(content[preIndex:keywordStartIndex]))
 
-			// 关键字在内容中的结束位置
+			// Keyword end index in content
 			keywordEndIndex := keywordStartIndex + unicodeLen(keyword)
 			afterLength := len(content) - keywordEndIndex
 			if afterLength > 175 {
@@ -469,7 +469,7 @@ func (*Front) SearchArticle(c *gin.Context) {
 			}
 			// afterText := string([]rune(content)[keywordStartIndex:afterIndex])
 			afterText := substring(content, keywordStartIndex, afterIndex)
-			// 高亮内容中的关键字
+			// Highlight keywords in content
 			content = strings.ReplaceAll(preText+afterText, keyword,
 				"<span style='color:#f47466'>"+keyword+"</span>")
 		}
@@ -484,9 +484,9 @@ func (*Front) SearchArticle(c *gin.Context) {
 	ReturnSuccess(c, result)
 }
 
-// 获取带中文的字符串中子字符串的实际位置，非字节位置
+// Get substring index in Chinese string (rune-based, not bytes)
 func unicodeIndex(str, substr string) int {
-	// 子串在字符串的字节位置
+	// Byte index of substring in string
 	result := strings.Index(str, substr)
 	if result > 0 {
 		prefix := []byte(str)[0:result]
@@ -496,13 +496,13 @@ func unicodeIndex(str, substr string) int {
 	return result
 }
 
-// 获取带中文的字符串实际长度，非字节长度
+// Get real length of Chinese string (rune-based, not bytes)
 func unicodeLen(str string) int {
 	var r = []rune(str)
 	return len(r)
 }
 
-// 解决中文获取位置不正确问题
+// Fix incorrect position for Chinese characters
 func substring(source string, start int, end int) string {
 	var unicodeStr = []rune(source)
 	length := len(unicodeStr)

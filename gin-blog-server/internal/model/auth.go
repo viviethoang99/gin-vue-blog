@@ -10,18 +10,18 @@ import (
 	"gorm.io/gorm"
 )
 
-// 权限控制: 7 张表（4 模型 + 3 关联）
+// Access control: 7 tables (4 models + 3 relations)
 
 type UserAuth struct {
 	Model
 	Username      string     `gorm:"unique;type:varchar(50)" json:"username"`
 	Password      string     `gorm:"type:varchar(100)" json:"-"`
-	LoginType     int        `gorm:"type:tinyint(1);comment:登录类型" json:"login_type"`
-	IpAddress     string     `gorm:"type:varchar(20);comment:登录IP地址" json:"ip_address"`
-	IpSource      string     `gorm:"type:varchar(50);comment:IP来源" json:"ip_source"`
+	LoginType     int        `gorm:"type:tinyint(1);comment:Login type" json:"login_type"`
+	IpAddress     string     `gorm:"type:varchar(20);comment:Login IP address" json:"ip_address"`
+	IpSource      string     `gorm:"type:varchar(50);comment:IP source" json:"ip_source"`
 	LastLoginTime *time.Time `json:"last_login_time"`
 	IsDisable     bool       `json:"is_disable"`
-	IsSuper       bool       `json:"is_super"` // 超级管理员只能后台设置
+	IsSuper       bool       `json:"is_super"` // Super admin can only be set in the backend
 
 	UserInfoId int       `json:"user_info_id"`
 	UserInfo   *UserInfo `json:"info"`
@@ -55,33 +55,33 @@ type Resource struct {
 }
 
 /*
-菜单设计:
+Menu design:
 
-目录: catalogue === true
-  - 如果是目录, 作为单独项, 不展开子菜单（例如 "首页", "个人中心"）
-  - 如果不是目录, 且 parent_id 为 0, 则为一级菜单, 可展开子菜单（例如 "文章管理" 下有 "文章列表", "文章分类", "文章标签" 等子菜单）
-  - 如果不是目录, 且 parent_id 不为 0, 则为二级菜单
+Catalogue: catalogue === true
+	- If it is a catalogue, it appears as a single item and does not expand a submenu (e.g., "Home", "Profile").
+	- If not a catalogue and parent_id is 0, it is a first-level menu that can expand submenus (e.g., under "Article Management" there are "Article List", "Article Category", "Article Tag").
+	- If not a catalogue and parent_id is not 0, it is a second-level menu.
 
-隐藏: hidden
-  - 隐藏则不显示在菜单栏中
+Hidden: hidden
+	- If hidden, it does not appear in the sidebar menu.
 
-外链: external, external_link
-  - 如果是外链, 如果设置为外链, 则点击后会在新窗口打开
+External: external, external_link
+	- If external, clicking opens in a new window.
 */
 type Menu struct {
 	Model
 	ParentId     int    `json:"parent_id"`
-	Name         string `gorm:"uniqueIndex:idx_name_and_path;type:varchar(200)" json:"name"` // 菜单名称
-	Path         string `gorm:"uniqueIndex:idx_name_and_path;type:varchar(50)" json:"path"`  // 路由地址
-	Component    string `gorm:"type:varchar(50)" json:"component"`                           // 组件路径
-	Icon         string `gorm:"type:varchar(50)" json:"icon"`                                // 图标
-	OrderNum     int8   `json:"order_num"`                                                   // 排序
-	Redirect     string `gorm:"type:varchar(50)" json:"redirect"`                            // 重定向地址
-	Catalogue    bool   `json:"is_catalogue"`                                                // 是否为目录
-	Hidden       bool   `json:"is_hidden"`                                                   // 是否隐藏
-	KeepAlive    bool   `json:"keep_alive"`                                                  // 是否缓存
-	External     bool   `json:"is_external"`                                                 // 是否外链
-	ExternalLink string `gorm:"type:varchar(255)" json:"external_link"`                      // 外链地址
+		Name         string `gorm:"uniqueIndex:idx_name_and_path;type:varchar(200)" json:"name"` // Menu name
+		Path         string `gorm:"uniqueIndex:idx_name_and_path;type:varchar(50)" json:"path"`  // Route path
+		Component    string `gorm:"type:varchar(50)" json:"component"`                           // Component path
+		Icon         string `gorm:"type:varchar(50)" json:"icon"`                                // Icon
+		OrderNum     int8   `json:"order_num"`                                                   // Order
+		Redirect     string `gorm:"type:varchar(50)" json:"redirect"`                            // Redirect URL
+		Catalogue    bool   `json:"is_catalogue"`                                                // Is catalogue
+		Hidden       bool   `json:"is_hidden"`                                                   // Hidden
+		KeepAlive    bool   `json:"keep_alive"`                                                  // Keep alive (cache)
+		External     bool   `json:"is_external"`                                                 // External link
+		ExternalLink string `gorm:"type:varchar(255)" json:"external_link"`                      // External URL
 
 	Roles []*Role `json:"roles" gorm:"many2many:role_menu"`
 }
@@ -149,13 +149,13 @@ func CheckMenuHasChild(db *gorm.DB, id int) (bool, error) {
 	return count > 0, result.Error
 }
 
-// 获取所有菜单列表（超级管理员用）
+// Get all menu list (for super admin)
 func GetAllMenuList(db *gorm.DB) (menu []Menu, err error) {
 	result := db.Find(&menu)
 	return menu, result.Error
 }
 
-// 根据 user_id 获取菜单列表
+// Get menu list by user_id
 func GetMenuListByUserId(db *gorm.DB, id int) (menus []Menu, err error) {
 	var userAuth UserAuth
 	result := db.Where(&UserAuth{Model: Model{ID: id}}).
@@ -210,9 +210,9 @@ func SaveOrUpdateResource(db *gorm.DB, id, pid int, name, url, method string) er
 		result = db.Updates(&resource)
 	} else {
 		result = db.Create(&resource)
-		// TODO: ????
-		// * 解决前端的 BUG: 级联选中某个父节点后, 新增的子节点默认会展示被选中, 实际上未被选中值
-		// * 解决方案: 新增子节点后, 删除该节点对应的父节点与角色的关联关系
+		// TODO: Front-end workaround
+		// - Fix a front-end bug: after cascade-selecting a parent node, a newly added child node appears selected by default though it isn't actually selected.
+		// - Workaround: After adding a child node, remove the association between its parent node and roles.
 		// dao.Delete(model.RoleResource{}, "resource_id", data.ParentId)
 	}
 	return result.Error
@@ -331,7 +331,7 @@ func UpdateRole(db *gorm.DB, id int, name, label string, isDisable bool, resourc
 	})
 }
 
-// 删除角色: 事务删除 role, role_resource, role_menu
+// Delete roles: transactionally delete role, role_resource, and role_menu
 func DeleteRoles(db *gorm.DB, ids []int) error {
 	return db.Transaction(func(tx *gorm.DB) error {
 
@@ -364,9 +364,9 @@ func GetUserAuthInfoById(db *gorm.DB, id int) (*UserAuth, error) {
 	return &userAuth, result.Error
 }
 
-// 注册新用户
+// Register a new user
 func CreateNewUser(db *gorm.DB, username, password string) (*UserAuth, *UserInfo, *UserAuthRole, error) {
-	// 创建userinfo
+	// Create user info
 	num, err := Count(db, &UserInfo{})
 	if err != nil {
 		slog.Info(err.Error())
@@ -374,16 +374,16 @@ func CreateNewUser(db *gorm.DB, username, password string) (*UserAuth, *UserInfo
 	number := strconv.Itoa(num)
 	userinfo := &UserInfo{
 		Email:    username,
-		Nickname: "游客" + number,
+		Nickname: "Visitor" + number,
 		Avatar:   "https://www.bing.com/rp/ar_9isCNU2Q-VG1yEDDHnx8HAFQ.png",
-		Intro:    "我是这个程序的第" + number + "个用户",
+		Intro:    "I am user #" + number + " of this application",
 	}
 	result := db.Create(&userinfo)
 	if result.Error != nil {
 		return nil, nil, nil, result.Error
 	}
 
-	// 先创建userauth
+	// Create user auth first
 	pass, _ := utils.BcryptHash(password)
 	userauth := &UserAuth{
 		Username:   username,
@@ -396,10 +396,10 @@ func CreateNewUser(db *gorm.DB, username, password string) (*UserAuth, *UserInfo
 		return nil, nil, nil, result.Error
 	}
 
-	// 再创建role关联表
+	// Then create role association record
 	user_role := &UserAuthRole{
 		UserAuthId: userauth.ID,
-		RoleId:     2, // 默认身份为游客
+		RoleId:     2, // Default role is visitor
 	}
 	result = db.Create(&user_role)
 	if result.Error != nil {

@@ -9,18 +9,18 @@ import (
 
 type Category struct{}
 
-// 添加/编辑分类对象
+// Add/Edit category request
 type AddOrEditCategoryReq struct {
 	ID   int    `json:"id"`
 	Name string `json:"name" binding:"required"`
 }
 
-// @Summary 获取分类列表
-// @Description 根据条件查询获取分类列表
+// @Summary Get category list
+// @Description Get category list by conditions
 // @Tags Category
-// @Param page_size query int false "当前页数"
-// @Param page_num query int false "每页条数"
-// @Param keyword query string false "搜索关键字"
+// @Param page_size query int false "Current page"
+// @Param page_num query int false "Page size"
+// @Param keyword query string false "Keyword"
 // @Accept json
 // @Produce json
 // @Success 0 {object} Response[PageResult[model.CategoryVO]]
@@ -47,10 +47,10 @@ func (*Category) GetList(c *gin.Context) {
 	})
 }
 
-// @Summary 添加或修改分类
-// @Description 添加或修改分类
+// @Summary Add or edit category
+// @Description Add or edit category
 // @Tags Category
-// @Param form body AddOrEditCategoryReq true "添加或修改分类"
+// @Param form body AddOrEditCategoryReq true "Add or edit category"
 // @Accept json
 // @Produce json
 // @Success 0 {object} Response[model.Category]
@@ -72,10 +72,10 @@ func (*Category) SaveOrUpdate(c *gin.Context) {
 	ReturnSuccess(c, category)
 }
 
-// @Summary 删除分类（批量）
-// @Description 根据 ID 数组删除分类
+// @Summary Delete categories (batch)
+// @Description Delete categories by ID array
 // @Tags Category
-// @Param ids body []int true "分类 ID 数组"
+// @Param ids body []int true "Category ID array"
 // @Accept json
 // @Produce json
 // @Success 0 {object} Response[int]
@@ -90,7 +90,7 @@ func (*Category) Delete(c *gin.Context) {
 
 	db := GetDB(c)
 
-	// 检查分类下是否存在文章
+	// Check whether categories have articles
 	count, err := model.Count(db, &model.Article{}, "category_id in ?", ids)
 	if err != nil {
 		ReturnError(c, g.ErrDbOp, err)
@@ -110,8 +110,8 @@ func (*Category) Delete(c *gin.Context) {
 	ReturnSuccess(c, rows)
 }
 
-// @Summary 获取分类选项列表
-// @Description 获取标签选项列表
+// @Summary Get category options
+// @Description Get category options list
 // @Tags Category
 // @Accept json
 // @Produce json

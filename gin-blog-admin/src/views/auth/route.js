@@ -6,7 +6,7 @@ export default {
   component: Layout,
   redirect: '/auth/menu',
   meta: {
-    title: '权限管理',
+    title: 'Permission Management',
     icon: 'cib:adguard',
     order: 3,
     // role: ['admin'],
@@ -18,7 +18,7 @@ export default {
       path: 'menu',
       component: () => import('./menu/index.vue'),
       meta: {
-        title: '菜单管理',
+        title: 'Menu Management',
         icon: 'ic:twotone-menu-book',
         keepAlive: true,
       },
@@ -28,7 +28,7 @@ export default {
       path: 'resource',
       component: () => import('./resource/index.vue'),
       meta: {
-        title: '接口管理',
+        title: 'API Management',
         icon: 'mdi:api',
         keepAlive: true,
       },
@@ -38,7 +38,7 @@ export default {
       path: 'role',
       component: () => import('./role/index.vue'),
       meta: {
-        title: '角色管理',
+        title: 'Role Management',
         icon: 'carbon:user-role',
         keepAlive: true,
       },

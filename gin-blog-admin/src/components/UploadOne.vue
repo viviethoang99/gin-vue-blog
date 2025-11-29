@@ -22,7 +22,7 @@ const previewImg = ref(props.preview)
 
 watch(() => props.preview, val => previewImg.value = val)
 
-// 上传图片
+// Upload image
 function handleImgUpload({ event }) {
   const respStr = (event?.target).response
   const res = JSON.parse(respStr)
@@ -34,8 +34,8 @@ function handleImgUpload({ event }) {
   emit('update:preview', previewImg.value)
 }
 
-// 判断是本地上传的图片或网络资源
-// 开发环境可以使用本地文件上传, 生产环境建议使用云存储
+// Determine whether it's a locally uploaded image or a network resource
+// In development you can use local file upload; in production, cloud storage is recommended
 const imgUrl = computed(() => convertImgUrl(previewImg.value))
 
 defineExpose({ previewImg })
@@ -55,7 +55,7 @@ defineExpose({ previewImg })
           class="cursor-pointer border-2 rounded-lg border-dashed hover:border-color-lightblue"
           :style="{ width: `${props.width}px` }"
           :src="imgUrl"
-          alt="文章封面"
+          alt="Article Cover"
         >
       </template>
       <template v-else>
@@ -66,7 +66,7 @@ defineExpose({ previewImg })
             </NIcon>
           </div>
           <NText>
-            点击或者拖动文件到该区域来上传
+            Click or drag file to this area to upload
           </NText>
         </NUploadDragger>
       </template>

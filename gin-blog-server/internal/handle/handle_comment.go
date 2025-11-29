@@ -16,10 +16,10 @@ type CommentQuery struct {
 
 type Comment struct{}
 
-// @Summary 删除评论（批量）
-// @Description 根据 ID 数组删除评论
+// @Summary Delete comments (batch)
+// @Description Delete comments by ID array
 // @Tags Comment
-// @Param ids body []int true "评论 ID 数组"
+// @Param ids body []int true "Comment ID array"
 // @Accept json
 // @Produce json
 // @Success 0 {object} Response[int]
@@ -41,10 +41,10 @@ func (*Comment) Delete(c *gin.Context) {
 	ReturnSuccess(c, result.RowsAffected)
 }
 
-// @Summary 修改评论审核（批量）
-// @Description 根据 ID 数组修改审核状态
+// @Summary Update comment review (batch)
+// @Description Update review status by ID array
 // @Tags Comment
-// @Param form body UpdateReviewReq true "修改审核状态"
+// @Param form body UpdateReviewReq true "Update review status"
 // @Accept json
 // @Produce json
 // @Success 0 {object} Response[any]
@@ -66,14 +66,14 @@ func (*Comment) UpdateReview(c *gin.Context) {
 	ReturnSuccess(c, result.RowsAffected)
 }
 
-// @Summary 条件查询评论列表
-// @Description 根据条件查询评论列表
+// @Summary Query comment list
+// @Description Get comment list by conditions
 // @Tags Comment
-// @Param nickname query string false "昵称"
-// @Param is_review query int false "审核状态"
-// @Param type query int false "评论类型"
-// @Param page_num query int false "页码"
-// @Param page_size query int false "每页数量"
+// @Param nickname query string false "Nickname"
+// @Param is_review query int false "Review status"
+// @Param type query int false "Comment type"
+// @Param page_num query int false "Page number"
+// @Param page_size query int false "Page size"
 // @Accept json
 // @Produce json
 // @Success 0 {object} Response[model.CommentVO]

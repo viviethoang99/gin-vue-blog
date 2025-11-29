@@ -2,7 +2,7 @@ package model
 
 import "gorm.io/gorm"
 
-// 权限控制相关操作
+// Access control operations
 
 // resource
 

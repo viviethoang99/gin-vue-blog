@@ -9,7 +9,7 @@ import (
 func TestUserAuth(t *testing.T) {
 	db, _ := initModelDB()
 
-	// 添加用户认证信息
+	// Add user authentication info
 	userAuth := UserAuth{
 		Username: "admin",
 		Password: "123456",
@@ -24,7 +24,7 @@ func TestUserAuth(t *testing.T) {
 	assert.Equal(t, userAuth.Username, val.Username)
 	assert.Equal(t, userAuth.Password, val.Password)
 	assert.Equal(t, userAuth.UserInfoId, val.UserInfoId)
-	// preload 从 user_auth 表中获取到了 user_info 的信息
+	// preload fetched user_info from the user_auth table
 	assert.Equal(t, userAuth.UserInfo.Nickname, val.UserInfo.Nickname)
 }
 

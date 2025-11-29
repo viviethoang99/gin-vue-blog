@@ -1,7 +1,7 @@
-## 博客设计
+## Blog Design
 
-响应式：移动优先，大屏适应
+Responsive: mobile-first, adapts to large screens
 
 ## TODO
 
-- 不使用 NaiveUI 作为组件库，使用自研组件库 ✅
+- Do not use NaiveUI as the component library; use an in-house component library ✅

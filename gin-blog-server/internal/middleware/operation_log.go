@@ -14,53 +14,53 @@ import (
 	"gorm.io/gorm"
 )
 
-// TODO: 优化 API 路径格式
+// TODO: Optimize API path format
 var optMap = map[string]string{
-	"Article":      "文章",
-	"BlogInfo":     "博客信息",
-	"Category":     "分类",
-	"Comment":      "评论",
-	"FriendLink":   "友链",
-	"Menu":         "菜单",
-	"Message":      "留言",
-	"OperationLog": "操作日志",
-	"Resource":     "资源权限",
-	"Role":         "角色",
-	"Tag":          "标签",
-	"User":         "用户",
-	"Page":         "页面",
-	// "Login":        "登录",
+	"Article":      "Article",
+	"BlogInfo":     "Blog Info",
+	"Category":     "Category",
+	"Comment":      "Comment",
+	"FriendLink":   "Friend Link",
+	"Menu":         "Menu",
+	"Message":      "Message",
+	"OperationLog": "Operation Log",
+	"Resource":     "Resource Permission",
+	"Role":         "Role",
+	"Tag":          "Tag",
+	"User":         "User",
+	"Page":         "Page",
+	// "Login":        "Login",
 
-	"POST":   "新增或修改",
-	"PUT":    "修改",
-	"DELETE": "删除",
+	"POST":   "Create or Update",
+	"PUT":    "Update",
+	"DELETE": "Delete",
 }
 
 func GetOptString(key string) string {
 	return optMap[key]
 }
 
-// 在 gin 中获取 Response Body 内容: 对 gin 的 ResponseWriter 进行包装, 每次往请求方响应数据时, 将响应数据返回出去
+// Get Response Body content in gin: wrap gin's ResponseWriter so that each response also writes to a buffer
 type CustomResponseWriter struct {
 	gin.ResponseWriter
-	body *bytes.Buffer // 响应体缓存
+	body *bytes.Buffer // Response body cache
 }
 
 func (w CustomResponseWriter) Write(b []byte) (int, error) {
-	w.body.Write(b) // 将响应数据存到缓存中
+	w.body.Write(b) // Write response data to cache
 	return w.ResponseWriter.Write(b)
 }
 
 func (w CustomResponseWriter) WriteString(s string) (int, error) {
-	w.body.WriteString(s) // 将响应数据存到缓存中
+	w.body.WriteString(s) // Write response data to cache
 	return w.ResponseWriter.WriteString(s)
 }
 
-// 记录操作日志中间件
+// Operation log middleware
 func OperationLog() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// TODO: 记录文件上传
-		// 不记录 GET 请求操作记录 (太多了) 和 文件上传操作记录 (请求体太长)
+		// TODO: Record file uploads
+		// Do not record GET requests (too many) and file upload operations (request body too long)
 		if c.Request.Method != "GET" && !strings.Contains(c.Request.RequestURI, "upload") {
 			blw := &CustomResponseWriter{
 				body:           bytes.NewBufferString(""),
@@ -78,11 +78,11 @@ func OperationLog() gin.HandlerFunc {
 
 			moduleName := getOptResource(c.HandlerName())
 			operationLog := model.OperationLog{
-				OptModule:     moduleName, // TODO: 优化
+				OptModule:     moduleName, // TODO: optimize
 				OptType:       GetOptString(c.Request.Method),
 				OptUrl:        c.Request.RequestURI,
 				OptMethod:     c.HandlerName(),
-				OptDesc:       GetOptString(c.Request.Method) + moduleName, // TODO: 优化
+				OptDesc:       GetOptString(c.Request.Method) + " " + moduleName, // TODO: optimize
 				RequestParam:  string(body),
 				RequestMethod: c.Request.Method,
 				UserId:        auth.UserInfoId,
@@ -91,11 +91,11 @@ func OperationLog() gin.HandlerFunc {
 				IpSource:      ipSource,
 			}
 			c.Next()
-			operationLog.ResponseData = blw.body.String() // 从缓存中获取响应体内容
+			operationLog.ResponseData = blw.body.String() // Get response body content from cache
 
 			db := c.MustGet(g.CTX_DB).(*gorm.DB)
 			if err := db.Create(&operationLog).Error; err != nil {
-				slog.Error("操作日志记录失败: ", err)
+				slog.Error("Failed to record operation log: ", err)
 				handle.ReturnError(c, g.ErrDbOp, err)
 				return
 			}

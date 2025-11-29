@@ -24,8 +24,8 @@ type AddOrEditArticleReq struct {
 	Desc        string `json:"desc"`
 	Content     string `json:"content" binding:"required"`
 	Img         string `json:"img"`
-	Type        int    `json:"type" binding:"required,min=1,max=3"`   // 类型: 1-原创 2-转载 3-翻译
-	Status      int    `json:"status" binding:"required,min=1,max=3"` // 状态: 1-公开 2-私密 3-评论可见
+	Type        int    `json:"type" binding:"required,min=1,max=3"`   // Type: 1-Original 2-Repost 3-Translation
+	Status      int    `json:"status" binding:"required,min=1,max=3"` // Status: 1-Public 2-Private 3-Comment-only
 	IsTop       bool   `json:"is_top"`
 	OriginalUrl string `json:"original_url"`
 
@@ -33,7 +33,7 @@ type AddOrEditArticleReq struct {
 	CategoryName string   `json:"category_name"`
 }
 
-// TODO: 添加对标签数组的查询
+// TODO: Add query by tag array
 type ArticleQuery struct {
 	PageQuery
 	Title      string `form:"title"`
@@ -68,11 +68,11 @@ func (*Article) SaveOrUpdate(c *gin.Context) {
 	auth, _ := CurrentUserAuth(c)
 
 	if req.Img == "" {
-		req.Img = model.GetConfig(db, g.CONFIG_ARTICLE_COVER) // 默认图片
+		req.Img = model.GetConfig(db, g.CONFIG_ARTICLE_COVER) // default image
 	}
 
 	if req.Type == 0 {
-		req.Type = 1 // 默认为原创
+		req.Type = 1 // default to Original
 	}
 
 	article := model.Article{
@@ -173,7 +173,7 @@ func (*Article) GetList(c *gin.Context) {
 
 }
 
-// 获取文章详细信息
+// Get article detail
 func (*Article) GetDetail(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -190,7 +190,7 @@ func (*Article) GetDetail(c *gin.Context) {
 	ReturnSuccess(c, article)
 }
 
-// 修改置顶信息
+// Update top (pin) status
 func (*Article) UpdateTop(c *gin.Context) {
 	var req UpdateArticleTopReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -207,13 +207,13 @@ func (*Article) UpdateTop(c *gin.Context) {
 	ReturnSuccess(c, nil)
 }
 
-// TODO: 目前是前端导出
-// 导出文章: 获取导出后的资源链接列表
+// TODO: Currently exported on frontend
+// Export articles: get resource links after export
 func (*Article) Export(c *gin.Context) {
 	ReturnSuccess(c, nil)
 }
 
-// 导入文章: 题目 + 内容
+// Import article: title + content
 func (*Article) Import(c *gin.Context) {
 	db := GetDB(c)
 	auth, _ := CurrentUserAuth(c)
@@ -233,7 +233,7 @@ func (*Article) Import(c *gin.Context) {
 	}
 
 	defaultImg := model.GetConfig(db, g.CONFIG_ARTICLE_COVER)
-	err = model.ImportArticle(db, auth.ID, title, content, defaultImg,"学习","Golang")
+	err = model.ImportArticle(db, auth.ID, title, content, defaultImg,"Study","Golang")
 	if err != nil {
 		ReturnError(c, g.ErrDbOp, err)
 		return
@@ -245,13 +245,13 @@ func (*Article) Import(c *gin.Context) {
 func readFromFileHeader(file *multipart.FileHeader) (string, error) {
 	open, err := file.Open()
 	if err != nil {
-		slog.Error("文件读取, 目标地址错误: ", err)
+		slog.Error("File read, invalid destination: ", err)
 		return "", err
 	}
 	defer open.Close()
 	all, err := io.ReadAll(open)
 	if err != nil {
-		slog.Error("文件读取失败: ", err)
+		slog.Error("File read failed: ", err)
 		return "", err
 	}
 	return string(all), nil

@@ -29,7 +29,7 @@ onMounted(async () => {
 async function updateUserInfo() {
   try {
     await api.updateUser(form)
-    window.$message?.success('修改成功!')
+    window.$message?.success('Updated successfully!')
     userStore.getUserInfo()
   }
   catch (err) {
@@ -39,9 +39,9 @@ async function updateUserInfo() {
 </script>
 
 <template>
-  <BannerPage label="user" title="个人中心" card>
+  <BannerPage label="user" title="User Center" card>
     <p class="mb-6 text-xl font-bold">
-      基本信息
+      Basic Information
     </p>
     <div class="grid grid-cols-12 gap-4">
       <div class="col-span-4 f-c-c">
@@ -51,23 +51,23 @@ async function updateUserInfo() {
         <div class="my-6 space-y-3">
           <div
             v-for="item of [
-              { label: '昵称', key: 'nickname' },
-              { label: '个人网站', key: 'website' },
-              { label: '简介', key: 'intro' },
-              { label: '邮箱', key: 'email' },
+              { label: 'Nickname', key: 'nickname' },
+              { label: 'Website', key: 'website' },
+              { label: 'Intro', key: 'intro' },
+              { label: 'Email', key: 'email' },
             ]" :key="item.label"
           >
             <div class="mb-2">
               {{ item.label }}
             </div>
             <input
-              v-model="form[item.key]" required :placeholder="`请输入${item.label}`"
+              v-model="form[item.key]" required :placeholder="`Please enter ${item.label}`"
               class="block w-full border-0 rounded-md p-2 text-gray-900 shadow-sm outline-none ring-1 ring-gray-300 ring-inset placeholder:text-gray-400 focus:ring-2 focus:ring-emerald"
             >
           </div>
         </div>
         <button class="the-button mt-2" @click="updateUserInfo">
-          修改
+          Update
         </button>
       </div>
       <div class="col-span-0 lg:col-span-1" />

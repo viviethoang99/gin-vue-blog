@@ -11,10 +11,10 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:preview'])
-const previewImg = ref(props.preview) // 图片预览
+const previewImg = ref(props.preview) // Image preview
 
-// 判断是本地上传的图片或网络资源
-// 开发环境可以使用本地文件上传, 生产环境建议使用云存储
+// Determine whether the image is local upload or web resource
+// Local file upload is fine in development; use cloud storage in production
 const imgUrl = computed(() => convertImgUrl(previewImg.value))
 
 const fileRef = ref(null)
@@ -44,13 +44,13 @@ async function handleFileChange() {
   }
   catch (err) {
     console.error(err)
-    window.$message?.error('文件上传失败')
+    window.$message?.error('File upload failed')
   }
 }
 </script>
 
 <template>
-  <!-- TODO: 拖拽文件上传 -->
+  <!-- TODO: Drag-and-drop file upload -->
   <main class="flex items-center justify-center bg-gray-100 font-sans">
     <label for="dropzone-file" class="mx-auto max-w-[300px] w-full cursor-pointer items-center border-1 border-blue-400 rounded-xl border-dashed bg-white p-2 text-center">
       <template v-if="previewImg">
@@ -65,7 +65,7 @@ async function handleFileChange() {
         <div class="f-c-c lg:h-[160px] lg:w-[160px]">
           <div class="flex flex-col items-center">
             <span class="i-mdi:upload text-[58px] text-blue-500" />
-            <span class="text-blue-400"> 点击上传文件</span>
+            <span class="text-blue-400"> Click to upload file</span>
           </div>
         </div>
       </template>

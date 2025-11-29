@@ -9,12 +9,12 @@ import (
 
 type Upload struct{}
 
-// @Summary 上传文件
-// @Description 上传文件
+// @Summary Upload file
+// @Description Upload file
 // @Tags upload
 // @Accept multipart/form-data
 // @Produce json
-// @Param file formData file true "文件"
+// @Param file formData file true "File"
 // @Success 0 {object} Response[string]
 // @Router /upload/file [post]
 func (*Upload) UploadFile(c *gin.Context) {

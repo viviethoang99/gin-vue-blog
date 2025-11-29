@@ -19,34 +19,34 @@ const tagStore = useTagStore()
 
 const options = computed(() => [
   {
-    label: '重新加载',
+    label: 'Reload',
     key: 'reload',
-    disabled: props.currentPath !== tagStore.activeTag, // 只能重新加载当前标签
+    disabled: props.currentPath !== tagStore.activeTag, // Can only reload current tag
     icon: () => h('i', { class: 'i-mdi:refresh' }),
   },
   {
-    label: '关闭',
+    label: 'Close',
     key: 'close',
-    disabled: tagStore.tags.length <= 1, // 只有一个标签时, 不能关闭
+    disabled: tagStore.tags.length <= 1, // Cannot close when only one tag exists
     icon: () => h('i', { class: 'i-mdi:close' }),
   },
   {
-    label: '关闭其他',
+    label: 'Close Others',
     key: 'close-other',
-    disabled: tagStore.tags.length <= 1, // 只有一个标签时, 不能关闭其他
+    disabled: tagStore.tags.length <= 1, // Cannot close others when only one tag exists
     icon: () => h('i', { class: 'i-mdi:arrow-expand-horizontal' }),
   },
   {
-    label: '关闭左侧',
+    label: 'Close Left',
     key: 'close-left',
-    // 只有一个标签 或者 当前选中的是第一个标签, 不能关闭左侧
+    // Cannot close left when only one tag or current selected is the first tag
     disabled: tagStore.tags.length <= 1 || props.currentPath === tagStore.tags[0].path,
     icon: () => h('i', { class: 'i-mdi:arrow-expand-left' }),
   },
   {
-    label: '关闭右侧',
+    label: 'Close Right',
     key: 'close-right',
-    // 只有一个标签 或者 当前选中的是最后一个标签, 不能关闭右侧
+    // Cannot close right when only one tag or current selected is the last tag
     disabled: tagStore.tags.length <= 1 || props.currentPath === tagStore.tags[tagStore.tags.length - 1].path,
     icon: () => h('i', { class: 'i-mdi:arrow-expand-right' }),
   },
@@ -56,7 +56,7 @@ const actionMap = new Map([
   [
     'reload',
     () => {
-      // 重新加载, 不管是不是 keepAlive, 都要重新获取数据
+      // Reload, regardless of keepAlive, need to re-fetch data
       tagStore.updateAliveKey(route.name)
       tagStore.reloadTag()
     },

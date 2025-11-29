@@ -20,13 +20,13 @@ onMounted(() => {
 </script>
 
 <template>
-  <BannerPage label="link" title="友情链接" card :loading="loading">
+  <BannerPage label="link" title="Friendly Links" card :loading="loading">
     <div class="space-y-5">
-      <!-- 友链列表 -->
+      <!-- Link list -->
       <LinkList :link-list="linkList" />
-      <!-- 添加友链 -->
+      <!-- Add link -->
       <AddLink />
-      <!-- 评论 -->
+      <!-- Comments -->
       <Comment class="mt-30" :type="2" />
     </div>
   </BannerPage>

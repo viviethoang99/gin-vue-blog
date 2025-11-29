@@ -5,13 +5,13 @@ import (
 	"mime/multipart"
 )
 
-// OSS 对象存储接口
+// OSS object storage interface
 type OSS interface {
 	UploadFile(file *multipart.FileHeader) (string, string, error)
 	DeleteFile(key string) error
 }
 
-// 根据配置文件中的配置判断文件上传实例
+// Select file upload implementation based on configuration
 func NewOSS() OSS {
 	switch g.GetConfig().Upload.OssType {
 	case "local":

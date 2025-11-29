@@ -8,10 +8,10 @@ import (
 )
 
 var (
-	ErrTokenExpired     = errors.New("token 已过期, 请重新登录")
-	ErrTokenNotValidYet = errors.New("token 无效, 请重新登录")
-	ErrTokenMalformed   = errors.New("token 不正确, 请重新登录")
-	ErrTokenInvalid     = errors.New("这不是一个 token, 请重新登录")
+	ErrTokenExpired     = errors.New("Token has expired, please log in again")
+	ErrTokenNotValidYet = errors.New("Token is not valid yet, please log in again")
+	ErrTokenMalformed   = errors.New("Malformed token, please log in again")
+	ErrTokenInvalid     = errors.New("Invalid token, please log in again")
 )
 
 type MyClaims struct {

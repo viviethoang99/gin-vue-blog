@@ -6,41 +6,41 @@ export const config = {
   TENCENT_CAPTCHA: '2088053498',
 }
 
-// 登录方式选项
+// Login type options
 export const loginTypeOptions = [
-  { label: '邮箱', value: 1 },
+  { label: 'Email', value: 1 },
   { label: 'QQ', value: 2 },
-  { label: '微博', value: 3 },
+  { label: 'Weibo', value: 3 },
 ]
 
 export const loginTypeMap = {
-  1: { name: '邮箱', tag: 'success' },
+  1: { name: 'Email', tag: 'success' },
   2: { name: 'QQ', tag: 'info' },
-  3: { name: '微博', tag: 'warning' },
+  3: { name: 'Weibo', tag: 'warning' },
 }
 
-// 文章类型选项
+// Article type options
 export const articleTypeOptions = [
-  { label: '原创', value: 1 },
-  { label: '转载', value: 2 },
-  { label: '翻译', value: 3 },
+  { label: 'Original', value: 1 },
+  { label: 'Repost', value: 2 },
+  { label: 'Translation', value: 3 },
 ]
 
 export const articleTypeMap = {
-  1: { name: '原创', tag: 'error' },
-  2: { name: '转载', tag: 'success' },
-  3: { name: '翻译', tag: 'warning' },
+  1: { name: 'Original', tag: 'error' },
+  2: { name: 'Repost', tag: 'success' },
+  3: { name: 'Translation', tag: 'warning' },
 }
 
-// 评论类型选项
+// Comment type options
 export const commentTypeOptions = [
-  { label: '文章', value: 1 },
-  { label: '友链', value: 2 },
-  { label: '说说', value: 3 },
+  { label: 'Article', value: 1 },
+  { label: 'Friend Link', value: 2 },
+  { label: 'Talk', value: 3 },
 ]
 
 export const commentTypeMap = {
-  1: { name: '文章', tag: 'info' },
-  2: { name: '友链', tag: 'warning' },
-  3: { name: '说说', tag: 'error' },
+  1: { name: 'Article', tag: 'info' },
+  2: { name: 'Friend Link', tag: 'warning' },
+  3: { name: 'Talk', tag: 'error' },
 }

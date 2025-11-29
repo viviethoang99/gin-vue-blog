@@ -1,68 +1,66 @@
-## 重构
+## Refactor
 
-- 使用 slog 作为日志库。对于 Go 1.21 以后版本的项目，slog 内置在标准库中。对于之前版本，需要 引入 `exp/slog` 来使用（TODO: 日志持久化）
-- 修改为 Golang 官方标准项目结构 
-- 使用 Swagger 生成接口文档（TODO: 给每个接口完善注释，而且感觉 go swagger 并不好用，寻找更好的方案）
-- 修改全局变量的使用为依赖注入形式, 统一在 main.go 初始化
-- 修改 utils 包架构, 精简项目架构
-- 开发环境使用 sqlite 进行单元测试, 线上支持 MySQL 环境
-- 移除 Casbin，自己实现基于 RBAC 的权限控制
-- 之前版本错误码使用 panic 机制, 使用 gin 中间件全局捕获 panic
-- TODO: 使用 errors 机制来统一错误码机制
+- Use `slog` as the logging library. For Go 1.21+, `slog` is in the standard library. For earlier versions, import `exp/slog` (TODO: log persistence).
+- Adopt the official Golang project layout.
+- Generate API docs with Swagger (TODO: enrich comments for each API; consider alternatives to go-swagger).
+- Replace global variables with dependency injection; initialize in `main.go`.
+- Restructure the `utils` package to simplify the architecture.
+- Use SQLite for unit tests in development; support MySQL in production.
+- Remove Casbin and implement RBAC-based access control.
+- Previous versions used panic for error codes; now use a Gin middleware to catch panics globally.
+- TODO: Standardize error handling via `errors`.
 
-新版本项目运行：运行/初始化数据 相关文件都在 cmd 下
+Run the new version (run/init data): all related files are under `cmd/`.
 
-1、MySQL，`config.yml` 中 `DbType = "mysql"` 并修改 MySQL 连接信息， 导入 `assets/gvb.sql`（也可以手动初始化数据，参考 SQLite 的情况）
+1. MySQL: set `DbType = "mysql"` in `config.yml`, update MySQL connection info, and import `assets/gvb.sql` (you can also initialize data manually similar to SQLite flow).
 
-2、SQLite，`config.yml` 中 `DbType = "sqlite"`，并执行初始化数据操作：
-- `create_superadmin.sh` 创建一个超级管理员（拥有所有权限），用户名 superadmin 密码 superadmin
-- `generate_data.sh` 初始化 三个默认角色 (admin, user, guest) + 三个默认用户 (admin, user, guest, 密码都是 123456),  初始化配置数据, 初始化页面数据, 初始化资源数据 (TODO: )
+2. SQLite: set `DbType = "sqlite"` in `config.yml`, then initialize data:
+- `create_superadmin.sh` creates a super admin (all permissions), username `superadmin`, password `superadmin`.
+- `generate_data.sh` initializes three default roles (admin, user, guest) + three default users (admin, user, guest; all passwords `123456`), initializes config, pages, and resource data (TODO).
 
 ---
 
-以下是一些旧版本的笔记记录，可以不看
+The following are notes from older versions and can be skipped.
 
-## 项目部署
+## Deployment
 
-项目使用 docker-compose 一键部署运行。
+Use docker-compose for one-command deployment.
 
-./config/config.docker.toml 是部署时读取的配置文件，其中有些变量会由 docker-compose 中的环境变量覆盖
+`./config/config.docker.toml` is the config file used in deployment; some values are overridden by docker-compose environment variables.
 
-具体可参考 deploy/start/docker-compose.yml
+See `deploy/start/docker-compose.yml` for details.
 
-配置文件读取值的优先级: 环境变量 > config.docker.toml 中的值，因此使用 docker-compose 运行时，修改其中的 environment 即可。
+Config precedence: environment variables > values in `config.docker.toml`. When using docker-compose, modify the `environment` block.
 
-## 开发规范
+## Development Guidelines
 
-Model 层返回 error, Service 层返回 code, Controller 层通过 `GetMsg(code)` 获取具体信息返回给前端
+Model layer returns `error`; Service layer returns a `code`; Controller uses `GetMsg(code)` to return messages to frontend.
 
-- 错误码在 global/errmsg 中维护
+- Error codes are maintained in `global/errmsg`.
 
-JSON 传输数据一律使用 **小写 + 下划线**，Go 项目中使用 **驼峰**
+For JSON, use snake_case; in Go code, use camelCase.
 
-## 数据库
+## Database
 
-MySQL 设置字段 true false 使用 tinyint, 注意在 Golang 定义结构体时该字段要使用指针
-否则结构体的字段会被初始化其零值 (0), 设置为指针可以用 nil 来判断
+For MySQL boolean fields, use `tinyint`. In Go structs, define such fields as pointers so you can distinguish zero values via `nil`.
 
-## 单元测试
+## Tests
 
-单元测试很重要，尤其是项目开发到中后期要进行重构和调整，需要使用测试来减少每次手动调用接口花费的时间，同时可以保证程序的正确性。
+Unit tests are important, especially for refactoring and iterative changes. They reduce manual API calls and ensure correctness.
 
 ## Gin
 
-### gin 的参数校验 validator 中零值问题
+### Validator and zero values
 
-gin 的参数校验是基于 validator 的，如果给了 `required` 标签，则不能传入零值
-- 比如字符串的不能传入空串
-- int 类型的不能传入 0
-- bool 类型的不能传入 false。
+Gin uses `validator` for parameter validation. If a field is tagged `required`, it must not receive the type's zero value.
+- Strings: cannot be empty.
+- Int: cannot be 0.
+- Bool: cannot be false.
 
-有时候需要参数是必填，并且需要可以传入 0，例如 sex 为 0 表示女，为 1 表示男，且必填
-通过定义 int 类型的**指针** 解决这个问题：指针的零值是 `nil`
+Sometimes a field is required yet 0 is a valid value (e.g., `sex` 0=female, 1=male). Use a pointer to the type: the pointer's zero value is `nil`.
 
 ```go
-Golang 解析 JSON 格式数据时，若以 any 接收数据，则会按照以下规则解析:
+When decoding JSON into `any` in Go, the types map as follows:
 bool, for JSON booleans
 float64, for JSON numbers
 string, for JSON strings
@@ -71,29 +69,29 @@ map[string]interface{}, for JSON objects
 nil for JSON null
 ```
 
-### 关于使用 POST 还是 PUT？
+### POST vs PUT
 
 POST:
-- 用于提交请求，可以更新或者创建资源，是非幂等的
-- 在用户注册时，每次提交都是创建一个用户账号，此时用 POST
+- Submits requests to create or update resources; not idempotent.
+- For user registration, each request creates a new account; use POST.
 
 PUT:
-- 用于向指定的 url 传送更新资源，是幂等的
-- 比如修改密码，虽然提交的还是账户名和密码，但是每次提交都只是更新该用户密码，每次请求都只是覆盖原型的值，此时用 PUT
+- Updates resources at a specific URL; idempotent.
+- For changing a password, each request overwrites the same user's password; use PUT.
 
-### 菜单、资源是树形的数据，如何处理？
+### Tree data for menus/resources
 
-三种方式处理：
-1. MySQL 查询时直接查出树形结构（使用自定义函数 或 其他方式）
-2. 程序中使用递归构建树形结构数据
-3. 通过一个 map，遍历一次就可以完成树的构建 :star:
-> map 的方法似乎只能构建出二级菜单？？？ TODO: 待查询资料
+Three approaches:
+1. Query a tree directly from MySQL (custom functions or other techniques).
+2. Build the tree with recursion in code.
+3. Use a single pass with a `map` to build the tree.
+> Note: the `map` approach may only easily handle two levels. TODO: investigate.
 
-### 日志记录
+### Logging
 
-启动相关的日志直接输出到控制台，运行过程中的日志记录到文件
+Log startup to console; write runtime logs to files.
 
 
-# Nginx 部署
+# Nginx Deployment
 
-Nginx 配置 Https 参考: [Nginx 服务器 SSL 证书安装部署](https://cloud.tencent.com/document/product/400/35244)
+HTTPS reference: [Nginx SSL certificate setup](https://cloud.tencent.com/document/product/400/35244)

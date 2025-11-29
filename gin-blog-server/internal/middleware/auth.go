@@ -16,12 +16,12 @@ import (
 	"gorm.io/gorm"
 )
 
-// 基于 JWT 的授权
-// 如果存在 session, 则直接从 session 中获取用户信息
-// 如果不存在 session, 则从 Authorization 中获取 token, 并解析 token 获取用户信息, 并设置到 session 中
+// JWT-based authorization
+// If a session exists, get user info from session
+// If no session, read token from Authorization, parse it to get user info, and set session
 func JWTAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// FIXME: 前后台 session 混乱, 暂时无法将用户信息挂载在 gin context 缓存
+		// FIXME: Session mix-up between front/back; cannot cache user in gin context for now
 		// auth, _ := handle.CurrentUserAuth(c)
 		// if auth != nil {
 		// 	slog.Debug("[middleware-JWTAuth] user auth exist, skip jwt auth")
@@ -33,11 +33,11 @@ func JWTAuth() gin.HandlerFunc {
 
 		db := c.MustGet(g.CTX_DB).(*gorm.DB)
 
-		// 系统管理的资源需要做验证, 没有加进来的不需要
+		// Only system-managed resources require verification; others are skipped
 		url, method := c.FullPath()[4:], c.Request.Method
 		resource, err := model.GetResource(db, url, method)
 		if err != nil {
-			// 没有找到的资源, 直接跳过后续验证
+			// Resource not found; skip further checks
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				slog.Debug("[middleware-JWTAuth] resource not exist, skip jwt auth")
 				c.Set("skip_check", true)
@@ -49,7 +49,7 @@ func JWTAuth() gin.HandlerFunc {
 			return
 		}
 
-		// 匿名资源, 直接跳过后续验证
+		// Anonymous resource; skip further checks
 		if resource.Anonymous {
 			slog.Debug(fmt.Sprintf("[middleware-JWTAuth] resource: %s %s is anonymous, skip jwt auth!", url, method))
 			c.Set("skip_check", true)
@@ -64,7 +64,7 @@ func JWTAuth() gin.HandlerFunc {
 			return
 		}
 
-		// token 的正确格式: `Bearer [tokenString]`
+		// Token format: `Bearer [tokenString]`
 		parts := strings.Split(authorization, " ")
 		if len(parts) != 2 || parts[0] != "Bearer" {
 			handle.ReturnError(c, g.ErrTokenType, nil)
@@ -77,7 +77,7 @@ func JWTAuth() gin.HandlerFunc {
 			return
 		}
 
-		// 判断 token 已过期
+		// Check whether token expired
 		if time.Now().Unix() > claims.ExpiresAt.Unix() {
 			handle.ReturnError(c, g.ErrTokenRuntime, nil)
 			return
@@ -99,7 +99,7 @@ func JWTAuth() gin.HandlerFunc {
 	}
 }
 
-// 资源访问权限验证
+// Resource access permission check
 func PermissionCheck() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if c.GetBool("skip_check") {

@@ -11,12 +11,12 @@ const router = useRouter()
 
 const options = [
   {
-    label: '个人中心',
+    label: 'Profile',
     key: 'profile',
     icon: () => h('i', { class: 'i-mdi:account' }),
   },
   {
-    label: '退出登录',
+    label: 'Logout',
     key: 'logout',
     icon: () => h('i', { class: 'i-mdi:exit-to-app' }),
   },
@@ -25,9 +25,9 @@ const options = [
 function handleSelect(key) {
   if (key === 'logout') {
     window.$dialog.confirm({
-      title: '提示',
+      title: 'Notice',
       type: 'info',
-      content: '确认退出？',
+      content: 'Confirm logout?',
       confirm() {
         authStore.logout()
       },

@@ -18,31 +18,33 @@ import (
 	"gopkg.in/gomail.v2"
 )
 
-// 注册的核心思想即发送邮件的同时创建code存储在本地redis中，当用户点击验证链接时即向sever发出code数据，如果这个数据在redis中存在，则验证成功，否则失败
+// Registration flow: send a verification email while storing a code in local Redis.
+// When the user clicks the verification link, the server receives the code and verifies it.
+// If the code exists in Redis, verification succeeds; otherwise it fails.
 type EmailData struct {
-	URL  		template.URL // 验证链接
-	UserName    string // 用户名即邮箱地址
-	Subject     string // 邮件主题
+	URL         template.URL // Verification link
+	UserName    string       // Username (email address)
+	Subject     string       // Email subject
 }
 
-// 将邮箱地址转换成小写，并去除空格
-// 格式化邮件地址可以防止写错大小写重复注册，同时给用户预留犯错空间，输入空格和大小写错误也能正常处理
+// Convert email address to lowercase and trim spaces
+// Formatting avoids duplicate registrations due to case, and tolerates minor user input errors
 func Format(email string) string{
 	return strings.ToLower(strings.TrimSpace(email))
 }
 
-// 生成随机字符串
+// Generate random string
 func GetCode() string{
 	code := randstr.String(24)
 	return code
 }
 
-// 返回 生成base64编码
+// Return base64-encoded string
 func Encode (s string) string{
 	data := base64.StdEncoding.EncodeToString([]byte(s))
 	return data
 }
-// 返回 解码base64
+// Return base64-decoded string
 func Decode (s string) (string,error){
 	data ,err := base64.StdEncoding.DecodeString(s)
 	if err != nil{
@@ -51,14 +53,14 @@ func Decode (s string) (string,error){
 	return string(data),nil
 }
 
-// 返回生成加密后的base64字符串
+// Return base64 string containing verification info
 func GenEmailVerificationInfo(email string,password string) string{
 	code := GetCode()
-	info := Encode(email+"|"+password+"|"+code)   // 加密
+	info := Encode(email+"|"+password+"|"+code)   // Encoded
 	return info
 }
 
-// 返回解析base64字符串后的 邮箱地址和code
+// Parse base64 string and return email and code
 func ParseEmailVerificationInfo(info string) (string,string,error){
 	data,err := Decode(info)
 	if err!= nil{
@@ -66,38 +68,38 @@ func ParseEmailVerificationInfo(info string) (string,string,error){
 	}
 
 	str := strings.Split(data,"|")
-	if len(str) != 3{   // 被篡改了格式
+	if len(str) != 3{   // Invalid format
 		return "","",errors.New("Wrong Vertifacion Info fomat")
 	}
 
 	return str[0],str[1],nil
 }
 
-//生成验证链接
+// Generate verification URL
 func GetEmailVerifyURL(info string) string{
 	baseurl := g.GetConfig().Server.Port
 	if baseurl[0] ==':'{
 		baseurl = fmt.Sprintf("localhost%s",baseurl)
 	}
-	// 如果是用docker部署,则 注释上面的代码，使用下面的代码
-	// baseurl := "你的域名"   切记不需要加端口
+	// If deploying via Docker, comment out the above and set below instead
+	// baseurl := "your-domain.com"  (no port needed)
 
-	return fmt.Sprintf("%s/api/email/verify?info=%s",baseurl,info)  // form数据
+	return fmt.Sprintf("%s/api/email/verify?info=%s",baseurl,info)  // form data
 }
 
-//生成邮件数据
+// Build email data
 func GetEmailData(email string,info string) *EmailData{
 	return &EmailData{
-		URL: template.URL(GetEmailVerifyURL(info)),// 验证链接
-		UserName: email,  // 用户邮箱地址
-		Subject: "请完成帐号注册", // 邮件主题
+		URL: template.URL(GetEmailVerifyURL(info)), // Verification link
+		UserName: email,                            // Email address
+		Subject: "Please complete account registration", // Subject
 	}
 }
 
-//解析模板目录
+// Parse template directory
 func ParseTemplateDir(dir string) (*template.Template,error){
 	var paths []string
-	// 遍历模板目录，将所有模板文件路径添加到paths中
+	// Walk template directory and collect all template paths
 	err := filepath.Walk(dir,func(path string,info os.FileInfo,err error) error{
 				if err != nil {
 					return err
@@ -114,9 +116,9 @@ func ParseTemplateDir(dir string) (*template.Template,error){
 	return template.ParseFiles(paths...)
 }
 
-// 发送邮件
-// 发送邮件需要配置邮箱服务器信息， 可以在config.yaml中配置
-// 以下情况会发生错误: 1. 邮箱配置错误,smtp信息错误 2. 修改模板后,解析模板失败!
+// Send email
+// Requires SMTP mail server configuration (see config.yaml)
+// Errors may occur if: 1) mail/SMTP config is wrong; 2) template parsing fails
 func SendEmail(email string,data *EmailData) error{
 	config := g.GetConfig().Email
 	from := config.From
@@ -128,36 +130,36 @@ func SendEmail(email string,data *EmailData) error{
 	slog.Info("User:"+User+"  Pass:"+Pass+"  Host:"+Host+"  Port:")
 
 	var body bytes.Buffer
-	// 解析模板
+	// Parse templates
 	template,err := ParseTemplateDir("../assets/templates")
 	if err != nil {
-		return errors.New("解析模板失败")
+		return errors.New("Failed to parse templates")
 	}
-	slog.Info("解析模板成功\n")
+	slog.Info("Template parsed successfully\n")
 
 	fmt.Println("URL:",data.URL)
-	// 执行模板
-	template.ExecuteTemplate(&body,"email-verify.tpl",&data) // 把html数据存储在body中， 第二个参数是模板名称， 第三个参数是模板数据（把模板中的占位符换成data数据）
-	//为了确保html文件在各个邮件客户端都能正常显示，把html转换成内联模式
+	// Execute template
+	template.ExecuteTemplate(&body,"email-verify.tpl",&data) // Render HTML into body
+	// Convert HTML to inline styles for better email client compatibility
     htmlString := body.String()
 	prem,_ := premailer.NewPremailerFromString(htmlString,nil)
 	htmlline,_ := prem.Transform()
-	m :=gomail.NewMessage()   // 使用gomail库发送邮件
+	m :=gomail.NewMessage()   // Send email using gomail
 
-	slog.Info("准备发送邮件\n")
-	// 设定m头
+	slog.Info("Preparing to send email\n")
+	// Set email headers
 	m.SetHeader("From",from)
 	m.SetHeader("To",to)
 	m.SetHeader("Subject",data.Subject)
 
-	// 设定html体 内容
+	// Set HTML body content
 	m.SetBody("text/html",htmlline)	
 	m.AddAlternative("text/plain",html2text.HTML2Text(body.String()))
 
-	//配置SMTP连接
+	// Configure SMTP connection
 	d := gomail.NewDialer(Host,Port,User,Pass)
 	d.TLSConfig = &tls.Config{InsecureSkipVerify:true}
-	slog.Info("smtp 连接已建立")
+	slog.Info("SMTP connection established")
 	if err := d.DialAndSend(m); err != nil{
 		return err
 	}

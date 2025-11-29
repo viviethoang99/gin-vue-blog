@@ -1,11 +1,11 @@
 window.MathJax = {
   tex: {
-    // 行内公式选择符
+    // Inline math delimiters
     inlineMath: [
       ['$', '$'],
       ['\\(', '\\)'],
     ],
-    // 段内公式选择符
+    // Display math delimiters
     displayMath: [
       ['$$', '$$'],
       ['\\[', '\\]'],

@@ -29,7 +29,7 @@ type ResourceTreeVO struct {
 	Children  []ResourceTreeVO `json:"children"`
 }
 
-// TODO: 使用 oneof 标签校验数据
+// TODO: Use oneof tag to validate data
 type AddOrEditResourceReq struct {
 	ID       int    `json:"id"`
 	Url      string `json:"url"`
@@ -43,7 +43,7 @@ type EditAnonymousReq struct {
 	Anonymous bool `json:"is_anonymous"`
 }
 
-// 获取资源列表(树形)
+// Get resource list (tree)
 func (*Resource) GetTreeList(c *gin.Context) {
 	keyword := c.Query("keyword")
 
@@ -56,7 +56,7 @@ func (*Resource) GetTreeList(c *gin.Context) {
 	ReturnSuccess(c, resources2ResourceVos(resourceList))
 }
 
-// 获取数据选项(树形)
+// Get option data (tree)
 func (*Resource) GetOption(c *gin.Context) {
 	result := make([]TreeOptionVO, 0)
 
@@ -87,7 +87,7 @@ func (*Resource) GetOption(c *gin.Context) {
 	ReturnSuccess(c, result)
 }
 
-// 新增或编辑资源, 关联更新 casbin_rule 中数据
+// Add or edit resource; update casbin_rule accordingly
 func (*Resource) SaveOrUpdate(c *gin.Context) {
 	var req AddOrEditResourceReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -105,7 +105,7 @@ func (*Resource) SaveOrUpdate(c *gin.Context) {
 	ReturnSuccess(c, nil)
 }
 
-// 编辑资源的匿名访问, 关联更新 casbin_rule 中数据
+// Edit resource anonymous access; update casbin_rule accordingly
 func (*Resource) UpdateAnonymous(c *gin.Context) {
 	var req EditAnonymousReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -122,8 +122,8 @@ func (*Resource) UpdateAnonymous(c *gin.Context) {
 	ReturnSuccess(c, nil)
 }
 
-// TODO: 考虑删除模块后, 其子资源怎么办? 目前做法是有子资源无法删除
-// TODO: 强制删除?
+// TODO: Consider behavior after deleting a module; currently cannot delete if it has children
+// TODO: Force delete?
 func (*Resource) Delete(c *gin.Context) {
 	resourceId, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -133,14 +133,14 @@ func (*Resource) Delete(c *gin.Context) {
 
 	db := GetDB(c)
 
-	// 检查该资源是否被角色使用
+	// Check if the resource is used by any role
 	use, _ := model.CheckResourceInUse(db, resourceId)
 	if use {
 		ReturnError(c, g.ErrResourceUsedByRole, nil)
 		return
 	}
 
-	// 获取该资源
+	// Get the resource
 	resource, err := model.GetResourceById(db, resourceId)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -151,7 +151,7 @@ func (*Resource) Delete(c *gin.Context) {
 		return
 	}
 
-	// 如果作为模块, 检查模块下是否有子资源
+	// If it's a module, check whether it has child resources
 	if resource.ParentId == 0 {
 		hasChild, _ := model.CheckResourceHasChild(db, resourceId)
 		if hasChild {
@@ -197,7 +197,7 @@ func resource2ResourceVo(r model.Resource) ResourceTreeVO {
 	}
 }
 
-// 存储每个节点对应 [子资源列表] 的 map
+// Map storing child resource list for each node
 // key: resourceId
 // value: childrenList
 func getChildrenMap(resources []model.Resource) map[int][]model.Resource {
@@ -210,7 +210,7 @@ func getChildrenMap(resources []model.Resource) map[int][]model.Resource {
 	return m
 }
 
-// 获取一级资源 (parent_id == 0)
+// Get top-level resources (parent_id == 0)
 func getModuleList(resources []model.Resource) []model.Resource {
 	list := make([]model.Resource, 0)
 	for _, r := range resources {

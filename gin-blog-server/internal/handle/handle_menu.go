@@ -18,7 +18,7 @@ type MenuTreeVO struct {
 	Children []MenuTreeVO `json:"children"`
 }
 
-// 获取当前用户菜单: 生成后台管理界面的菜单
+// Get current user's menus: generate admin panel menus
 func (*Menu) GetUserMenu(c *gin.Context) {
 	db := GetDB(c)
 	auth, _ := CurrentUserAuth(c)
@@ -76,14 +76,14 @@ func (*Menu) Delete(c *gin.Context) {
 
 	db := GetDB(c)
 
-	// 检查要删除的菜单是否被角色使用
+	// Check whether the menu to delete is used by any role
 	use, _ := model.CheckMenuInUse(db, menuId)
 	if use {
 		ReturnError(c, g.ErrMenuUsedByRole, nil)
 		return
 	}
 
-	// 如果是一级菜单, 检查其是否有子菜单
+	// If it's a first-level menu, check if it has child menus
 	menu, err := model.GetMenuById(db, menuId)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -94,7 +94,7 @@ func (*Menu) Delete(c *gin.Context) {
 		return
 	}
 
-	// 一级菜单下有子菜单, 不允许删除
+	// Cannot delete if a first-level menu has child menus
 	if menu.ParentId == 0 {
 		has, _ := model.CheckMenuHasChild(db, menuId)
 		if has {
@@ -130,7 +130,7 @@ func (*Menu) GetOption(c *gin.Context) {
 	ReturnSuccess(c, result)
 }
 
-// 构建菜单列表的树形结构数据, []Menu => []MenuVo
+// Build tree structure for menus, []Menu => []MenuVo
 func menus2MenuVos(menus []model.Menu) []MenuTreeVO {
 	result := make([]MenuTreeVO, 0)
 
@@ -150,7 +150,7 @@ func menus2MenuVos(menus []model.Menu) []MenuTreeVO {
 	return result
 }
 
-// 筛选出一级菜单 (parentId == 0 的菜单)
+// Filter first-level menus (parentId == 0)
 func getFirstLevelMenus(menuList []model.Menu) []model.Menu {
 	firstLevelMenus := make([]model.Menu, 0)
 	for _, menu := range menuList {
@@ -161,7 +161,7 @@ func getFirstLevelMenus(menuList []model.Menu) []model.Menu {
 	return firstLevelMenus
 }
 
-// key 是菜单 ID, value 是该菜单对应的子菜单列表
+// key is menu ID, value is the corresponding child menu list
 func getMenuChildrenMap(menus []model.Menu) map[int][]model.Menu {
 	childrenMap := make(map[int][]model.Menu)
 	for _, menu := range menus {
@@ -172,7 +172,7 @@ func getMenuChildrenMap(menus []model.Menu) map[int][]model.Menu {
 	return childrenMap
 }
 
-// 以 orderNum 降序排序，包括子菜单
+// Sort by orderNum ascending (including child menus)
 func sortMenu(menus []MenuTreeVO) {
 	sort.Slice(menus, func(i, j int) bool {
 		return menus[i].OrderNum < menus[j].OrderNum
@@ -184,28 +184,28 @@ func sortMenu(menus []MenuTreeVO) {
 	}
 }
 
-// 构建用户菜单的树形结构数据, []Menu => []MenuVO
+// Build user menu tree structure, []Menu => []MenuVO
 // func menus2UserMenuVos(menus []model.Menu) []MenuTreeVO {
 // 	firstLevelMenuList := getFirstLevelMenus(menus)
 // 	childrenMap := getMenuChildrenMap(menus)
 
 // 	result := make([]MenuTreeVO, 0)
 
-// 	// 遍历一级 Menu, 将其元素构造成 UserMenu
+// 	// Iterate first-level menus and build UserMenu entries
 // 	for _, firstLevelMenu := range firstLevelMenuList {
-// 		var menuVO MenuTreeVO             // 当前 [用户菜单]
-// 		var userMenuChildren []MenuTreeVO // 当前 [用户菜单] 的 [子用户菜单]
+// 		var menuVO MenuTreeVO             // current user menu
+// 		var userMenuChildren []MenuTreeVO // current user menu's children
 
-// 		children := childrenMap[firstLevelMenu.ID] // 子菜单
-// 		if len(children) > 0 {                     // 存在子菜单
-// 			menuVO = menu2UserMenuVo(firstLevelMenu) // [菜单] -> [用户菜单]
-// 			// userMenu.Path = ""                           // TODO! 外层一定是 "" 吗?
-// 			sortMenu(children) // 对子菜单按照 OrderNum 排序
-// 			// 遍历子菜单, 将其构造成 用户菜单
+// 		children := childrenMap[firstLevelMenu.ID] // child menus
+// 		if len(children) > 0 {                     // has child menus
+// 			menuVO = menu2UserMenuVo(firstLevelMenu) // [Menu] -> [UserMenu]
+// 			// userMenu.Path = ""                           // TODO: Must outer path be ""?
+// 			sortMenu(children) // sort child menus by OrderNum
+// 			// Iterate child menus and build user menus
 // 			for _, child := range children {
 // 				userMenuChildren = append(userMenuChildren, menu2UserMenuVo(child))
 // 			}
-// 		} else { // 没有子菜单, 利用一级菜单构造一个用户菜单(Layout), 将原本的一级菜单作为子菜单变成新菜单的 children
+// 		} else { // No child menus: use first-level menu to construct a Layout user menu; put original menu as its child
 // 			menuVO = MenuTreeVO{
 // 				Menu: firstLevelMenu,
 // 				// ID:        firstLevelMenu.ID,
@@ -218,7 +218,7 @@ func sortMenu(menus []MenuTreeVO) {
 // 				// Redirect:  firstLevelMenu.Redirect,
 // 			}
 // 			tmpUserMenu := menu2UserMenuVo(firstLevelMenu)
-// 			// tmpUserMenu.Path = "" // TODO! 考虑一下
+// 			// tmpUserMenu.Path = "" // TODO: consider this
 // 			userMenuChildren = append(userMenuChildren, tmpUserMenu)
 // 		}
 // 		menuVO.Children = userMenuChildren
@@ -228,10 +228,10 @@ func sortMenu(menus []MenuTreeVO) {
 // }
 
 /*
-菜单数据: []menuVo
+Menu data: []menuVo
 {
 	"id": 1,
-	"name": "首页",
+	"name": "Home",
 	"path": "/",
 	"component": "/home/Home.vue",
 	"icon": "el-icon-myshouye",
@@ -243,7 +243,7 @@ func sortMenu(menus []MenuTreeVO) {
 },
 {
 	"id": 2,
-	"name": "文章管理",
+	"name": "Article Management",
 	"path": "/article-submenu",
 	"component": "Layout",
 	"icon": "el-icon-mywenzhang-copy",
@@ -254,7 +254,7 @@ func sortMenu(menus []MenuTreeVO) {
 	"children": [
 		{
 			"id": 6,
-			"name": "发布文章",
+			"name": "Publish Article",
 			"path": "/articles",
 			"component": "/article/Article.vue",
 			"icon": "el-icon-myfabiaowenzhang",
@@ -266,7 +266,7 @@ func sortMenu(menus []MenuTreeVO) {
 		},
 		{
 			"id": 7,
-			"name": "修改文章",
+			"name": "Edit Article",
 			"path": "/articles/*",
 			"component": "/article/Article.vue",
 			"icon": "el-icon-myfabiaowenzhang",
@@ -278,7 +278,7 @@ func sortMenu(menus []MenuTreeVO) {
 		},
 		{
 			"id": 8,
-			"name": "文章列表",
+			"name": "Article List",
 			"path": "/article-list",
 			"component": "/article/ArticleList.vue",
 			"icon": "el-icon-mywenzhangliebiao",
@@ -293,7 +293,7 @@ func sortMenu(menus []MenuTreeVO) {
 */
 
 /*
-用户菜单数据: []userMenuVo
+User menu data: []userMenuVo
 
 {
 	"name": null,
@@ -303,7 +303,7 @@ func sortMenu(menus []MenuTreeVO) {
 	"hidden": false,
 	"children": [
 		{
-			"name": "首页",
+			"name": "Home",
 			"path": "",
 			"component": "/home/Home.vue",
 			"icon": "el-icon-myshouye",
@@ -313,14 +313,14 @@ func sortMenu(menus []MenuTreeVO) {
 	]
 },
 {
-	"name": "文章管理",
+	"name": "Article Management",
 	"path": "/article-submenu",
 	"component": "Layout",
 	"icon": "el-icon-mywenzhang-copy",
 	"hidden": false,
 	"children": [
 		{
-			"name": "发布文章",
+			"name": "Publish Article",
 			"path": "/articles",
 			"component": "/article/Article.vue",
 			"icon": "el-icon-myfabiaowenzhang",
@@ -328,7 +328,7 @@ func sortMenu(menus []MenuTreeVO) {
 			"children": null
 		},
 		{
-			"name": "修改文章",
+			"name": "Edit Article",
 			"path": "/articles/*",
 			"component": "/article/Article.vue",
 			"icon": "el-icon-myfabiaowenzhang",
@@ -336,7 +336,7 @@ func sortMenu(menus []MenuTreeVO) {
 			"children": null
 		},
 		{
-			"name": "文章列表",
+			"name": "Article List",
 			"path": "/article-list",
 			"component": "/article/ArticleList.vue",
 			"icon": "el-icon-mywenzhangliebiao",

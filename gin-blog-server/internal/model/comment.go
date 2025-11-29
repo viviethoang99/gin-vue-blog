@@ -5,24 +5,24 @@ import (
 )
 
 const (
-	TYPE_ARTICLE = iota + 1 // 文章
-	TYPE_LINK               // 友链
-	TYPE_TALK               // 说说
+	TYPE_ARTICLE = iota + 1 // Article
+	TYPE_LINK               // Friend link
+	TYPE_TALK               // Talk
 )
 
 /*
-如果评论类型是文章，那么 topic_id 就是文章的 id
-如果评论类型是友链，不需要 topic_id
+If the comment type is an article, then topic_id is the article ID.
+If the comment type is a friend link, topic_id is not required.
 */
 
 type Comment struct {
 	Model
-	UserId      int    `json:"user_id"`       // 评论者
-	ReplyUserId int    `json:"reply_user_id"` // 被回复者
-	TopicId     int    `json:"topic_id"`      // 评论的文章
-	ParentId    int    `json:"parent_id"`     // 父评论 被回复的评论
+	UserId      int    `json:"user_id"`       // Comment author
+	ReplyUserId int    `json:"reply_user_id"` // Replied-to user
+	TopicId     int    `json:"topic_id"`      // Article being commented
+	ParentId    int    `json:"parent_id"`     // Parent comment (the comment being replied to)
 	Content     string `gorm:"type:varchar(500);not null" json:"content"`
-	Type        int    `gorm:"type:tinyint(1);not null;comment:评论类型(1.文章 2.友链 3.说说)" json:"type"` // 评论类型 1.文章 2.友链 3.说说
+	Type        int    `gorm:"type:tinyint(1);not null;comment:Comment type (1.Article 2.Friend link 3.Talk)" json:"type"` // Comment type 1.Article 2.Friend link 3.Talk
 	IsReview    bool   `json:"is_review"`
 
 	// Belongs To
@@ -38,7 +38,7 @@ type CommentVO struct {
 	ReplyList  []CommentVO `json:"reply_list" gorm:"-"`
 }
 
-// 新增评论
+// Add a comment
 func AddComment(db *gorm.DB, userId, typ, topicId int, content string, isReview bool) (*Comment, error) {
 	comment := Comment{
 		UserId:   userId,
@@ -51,7 +51,7 @@ func AddComment(db *gorm.DB, userId, typ, topicId int, content string, isReview 
 	return &comment, result.Error
 }
 
-// 回复评论
+// Reply to a comment
 func ReplyComment(db *gorm.DB, userId, replyUserId, parentId int, content string, isReview bool) (*Comment, error) {
 	var parent Comment
 	result := db.First(&parent, parentId)
@@ -65,14 +65,14 @@ func ReplyComment(db *gorm.DB, userId, replyUserId, parentId int, content string
 		ReplyUserId: replyUserId,
 		ParentId:    parentId,
 		IsReview:    isReview,
-		TopicId:     parent.TopicId, // 主题和父评论一样
-		Type:        parent.Type,    // 类型和父评论一样
+		TopicId:     parent.TopicId, // Topic same as parent comment
+		Type:        parent.Type,    // Type same as parent comment
 	}
 	result = db.Create(&comment)
 	return &comment, result.Error
 }
 
-// 获取后台评论列表
+// Get admin comment list
 func GetCommentList(db *gorm.DB, page, size, typ int, isReview *bool, nickname string) (data []Comment, total int64, err error) {
 	
 	// SELECT UID FROM user_info WHERE nikename LIKE nickname
@@ -104,7 +104,7 @@ func GetCommentList(db *gorm.DB, page, size, typ int, isReview *bool, nickname s
 	return data, total, result.Error
 }
 
-// 获取博客评论列表
+// Get blog comment list
 func GetCommentVOList(db *gorm.DB, page, size, topic, typ int) (data []CommentVO, total int64, err error) {
 	var list []Comment
 
@@ -116,7 +116,7 @@ func GetCommentVOList(db *gorm.DB, page, size, topic, typ int) (data []CommentVO
 		tx = tx.Where("topic_id = ?", topic)
 	}
 
-	// 获取顶级评论列表
+	// Get top-level comments
 	tx.Where("parent_id = 0").
 		Count(&total).
 		Preload("User").Preload("User.UserInfo").
@@ -127,7 +127,7 @@ func GetCommentVOList(db *gorm.DB, page, size, topic, typ int) (data []CommentVO
 		return nil, 0, err
 	}
 
-	// 获取顶级评论的回复列表
+	// Get replies for each top-level comment
 	for _, v := range list {
 		replyList := make([]CommentVO, 0)
 
@@ -150,7 +150,7 @@ func GetCommentVOList(db *gorm.DB, page, size, topic, typ int) (data []CommentVO
 	return data, total, nil
 }
 
-// 根据 [评论id] 获取 [回复列表]
+// Get reply list by comment ID
 func GetCommentReplyList(db *gorm.DB, id, page, size int) (data []Comment, err error) {
 	result := db.Model(&Comment{}).
 		Where(&Comment{ParentId: id}).
@@ -161,7 +161,7 @@ func GetCommentReplyList(db *gorm.DB, id, page, size int) (data []Comment, err e
 	return data, result.Error
 }
 
-// 获取某篇文章的评论数
+// Get the number of comments for an article
 func GetArticleCommentCount(db *gorm.DB, articleId int) (count int64, err error) {
 	result := db.Model(&Comment{}).
 		Where("topic_id = ? AND type = 1 AND is_review = 1", articleId).

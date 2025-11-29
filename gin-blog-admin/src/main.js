@@ -9,7 +9,7 @@ import { setupStore } from './store'
 
 async function bootstrap() {
   const app = createApp(App)
-  setupStore(app) // 优先级最高
+  setupStore(app) // Highest priority
   setupNaiveUnocss()
   setupNaiveDiscreteApi()
   await setupRouter(app)

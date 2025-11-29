@@ -32,16 +32,16 @@ type RegisterReq struct {
 type LoginVO struct {
 	model.UserInfo
 
-	// 点赞 Set: 用于记录用户点赞过的文章, 评论
+	// Like sets: record which articles/comments the user liked
 	ArticleLikeSet []string `json:"article_like_set"`
 	CommentLikeSet []string `json:"comment_like_set"`
 	Token          string   `json:"token"`
 }
 
-// @Summary 登录
-// @Description 登录
+// @Summary Login
+// @Description Login
 // @Tags UserAuth
-// @Param form body LoginReq true "登录"
+// @Param form body LoginReq true "Login"
 // @Accept json
 // @Produce json
 // @Success 0 {object} Response[model.LoginVO]
@@ -66,13 +66,13 @@ func (*UserAuth) Login(c *gin.Context) {
 		return
 	}
 
-	// 检查密码是否正确
+	// Check whether password is correct
 	if !utils.BcryptCheck(req.Password, userAuth.Password) {
 		ReturnError(c, g.ErrPassword, nil)
 		return
 	}
 
-	// 获取 IP 相关信息 FIXME: 好像无法读取到 ip 信息
+	// Get IP related info
 	ipAddress := utils.IP.GetIpAddress(c)
 	ipSource := utils.IP.GetIpSourceSimpleIdle(ipAddress)
 
@@ -109,9 +109,9 @@ func (*UserAuth) Login(c *gin.Context) {
 		return
 	}
 
-	// 登录信息正确, 生成 Token
+	// Credentials valid, generate token
 
-	// UUID 生成方法: ip + 浏览器信息 + 操作系统信息
+	// UUID idea: ip + browser info + OS info
 	// uuid := utils.MD5(ipAddress + browser + os)
 	conf := g.Conf.JWT
 	token, err := jwt.GenToken(conf.Secret, conf.Issuer, int(conf.Expire), userAuth.ID, roleIds)
@@ -120,20 +120,20 @@ func (*UserAuth) Login(c *gin.Context) {
 		return
 	}
 
-	// 更新用户验证信息: ip 信息 + 上次登录时间
+	// Update user login info: ip + last login time
 	err = model.UpdateUserLoginInfo(db, userAuth.ID, ipAddress, ipSource)
 	if err != nil {
 		ReturnError(c, g.ErrDbOp, err)
 		return
 	}
 
-	slog.Info("用户登录成功: " + userAuth.Username)
+	slog.Info("User login success: " + userAuth.Username)
 
 	session := sessions.Default(c)
 	session.Set(g.CTX_USER_AUTH, userAuth.ID)
 	session.Save()
 
-	// 删除 Redis 中的离线状态
+	// Remove offline status from Redis
 	offlineKey := g.OFFLINE_USER + strconv.Itoa(userAuth.ID)
 	rdb.Del(rctx, offlineKey).Result()
 
@@ -147,8 +147,8 @@ func (*UserAuth) Login(c *gin.Context) {
 }
 
 
-// @Summary 退出登录
-// @Description 退出登录
+// @Summary Logout
+// @Description Logout
 // @Tags UserAuth
 // @Accept json
 // @Produce json
@@ -157,7 +157,7 @@ func (*UserAuth) Login(c *gin.Context) {
 func (*UserAuth) Logout(c *gin.Context) {
 	c.Set(g.CTX_USER_AUTH, nil)
 	
-	// 已经退出登录
+	// Already logged out
 	auth, _ := CurrentUserAuth(c)
 	if auth == nil {
 		ReturnSuccess(c, nil)
@@ -168,7 +168,7 @@ func (*UserAuth) Logout(c *gin.Context) {
 	session.Delete(g.CTX_USER_AUTH)
 	session.Save()
 	
-	// 删除 Redis 中的在线状态
+	// Remove online status from Redis
 	rdb := GetRDB(c)
 	onlineKey := g.ONLINE_USER + strconv.Itoa(auth.ID)
 	rdb.Del(rctx, onlineKey)
@@ -176,19 +176,19 @@ func (*UserAuth) Logout(c *gin.Context) {
 	ReturnSuccess(c, nil)
 }
 
-// 完成注册功能
-// 首先检查用户名是否存在，避免重复注册；其次把用户输入的信息加密保存在redis中，等待验证
-// 在以下情况下会出错：1. 用户邮箱已经注册过 2.用户邮箱无效等原因导致的发送邮件失败
+// Complete registration flow
+// First check whether the username exists to avoid duplicate registration; then store encrypted info in Redis waiting for verification
+// Errors: 1) Email already registered 2) Invalid email causing send failure
 func (*UserAuth) Register(c *gin.Context) {
 	var regreq RegisterReq
 	if err := c.ShouldBindJSON(&regreq); err != nil {
 		ReturnError(c,g.ErrRequest,err)
 		return
 	}
-	// 格式化用户名
+	// Normalize username
 	regreq.Username = utils.Format(regreq.Username)
 
-	// 检查用户名是否存在，避免重复注册
+	// Check whether username exists to avoid duplicate registration
 	auth,err := model.GetUserAuthInfoByName(GetDB(c),regreq.Username)
 	if err != nil {
 		var flag bool = false
@@ -207,9 +207,9 @@ func (*UserAuth) Register(c *gin.Context) {
 	}
 	
 
-	// 通过邮箱验证
+	// Verify via email
 	info := utils.GenEmailVerificationInfo(regreq.Username,regreq.Password)
-	SetMailInfo(GetRDB(c),info,15*time.Minute) // 15分钟过期
+	SetMailInfo(GetRDB(c),info,15*time.Minute) // expires in 15 minutes
 	EmailData := utils.GetEmailData(regreq.Username,info)
 	err = utils.SendEmail(regreq.Username,EmailData)
 	if err != nil {
@@ -220,10 +220,10 @@ func (*UserAuth) Register(c *gin.Context) {
 	ReturnSuccess(c,nil)
 }
 
-// 邮箱验证
-// 当用户点击邮箱中的链接时，会携带info（加密后的帐号密码）向这个接口发送请求。
-// Verify会检查info是否存在redis中，若存在则认证成功，完成注册
-// 会在以下方面出错： 1. 发送信息中没有info 2. info不存在redis中(已过期) 3. 创造新用户失败
+// Email verification
+// When the user clicks the link in the email, it sends info (encrypted username/password) to this endpoint.
+// Verify checks whether info exists in Redis; if present, verification succeeds and registration completes.
+// Errors: 1) Missing info in request 2) Info not in Redis (expired) 3) Failed to create user
 func (*UserAuth) VerifyCode(c *gin.Context) {
     var code string
     if code = c.Query("info"); code == "" {
@@ -231,7 +231,7 @@ func (*UserAuth) VerifyCode(c *gin.Context) {
         return
     }
 
-    // 验证是否有code在数据库中
+	// Verify code exists in Redis
     ifExist, err := GetMailInfo(GetRDB(c), code)
     if err != nil {
         returnErrorPage(c)
@@ -250,21 +250,21 @@ func (*UserAuth) VerifyCode(c *gin.Context) {
         return
     }
 
-    // 注册用户
+	// Register user
       _,_,_,err = model.CreateNewUser(GetDB(c), username, password)
     if err != nil {
         returnErrorPage(c)
         return
     }
 
-    // 注册成功，返回成功页面
+	// Registration success: return success page
     c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(`
         <!DOCTYPE html>
-        <html lang="zh-CN">
+		<html lang="en">
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>注册成功</title>
+			<title>Registration Successful</title>
             <style>
                 body {
                     font-family: Arial, sans-serif;
@@ -292,8 +292,8 @@ func (*UserAuth) VerifyCode(c *gin.Context) {
         </head>
         <body>
             <div class="container">
-                <h1>注册成功</h1>
-                <p>恭喜您，注册成功！</p>
+				<h1>Registration Successful</h1>
+				<p>Congratulations, registration succeeded!</p>
             </div>
         </body>
         </html>
@@ -303,11 +303,11 @@ func (*UserAuth) VerifyCode(c *gin.Context) {
 func returnErrorPage(c *gin.Context) {
     c.Data(http.StatusInternalServerError, "text/html; charset=utf-8", []byte(`
         <!DOCTYPE html>
-        <html lang="zh-CN">
+		<html lang="en">
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>注册失败</title>
+			<title>Registration Failed</title>
             <style>
                 body {
                     font-family: Arial, sans-serif;
@@ -335,8 +335,8 @@ func returnErrorPage(c *gin.Context) {
         </head>
         <body>
             <div class="container">
-                <h1>注册失败</h1>
-                <p>请重试。</p>
+				<h1>Registration Failed</h1>
+				<p>Please try again.</p>
             </div>
         </body>
         </html>

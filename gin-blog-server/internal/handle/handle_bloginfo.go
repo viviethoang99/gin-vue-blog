@@ -15,13 +15,13 @@ import (
 type BlogInfo struct{}
 
 type BlogHomeVO struct {
-	ArticleCount int `json:"article_count"` // 文章数量
-	UserCount    int `json:"user_count"`    // 用户数量
-	MessageCount int `json:"message_count"` // 留言数量
-	ViewCount    int `json:"view_count"`    // 访问量
-	// CategoryCount int64 `json:"category_count"` // 分类数量
-	// TagCount      int64 `json:"tag_count"`      // 标签数量
-	// BlogConfig    model.BlogConfigDetail `json:"blog_config"`    // 博客信息
+	ArticleCount int `json:"article_count"` // Article count
+	UserCount    int `json:"user_count"`    // User count
+	MessageCount int `json:"message_count"` // Message count
+	ViewCount    int `json:"view_count"`    // Visit count
+	// CategoryCount int64 `json:"category_count"` // Category count
+	// TagCount      int64 `json:"tag_count"`      // Tag count
+	// BlogConfig    model.BlogConfigDetail `json:"blog_config"`    // Blog info
 	// PageList      []Page                 `json:"pageList"`
 }
 
@@ -83,8 +83,8 @@ func (*BlogInfo) UpdateConfig(c *gin.Context) {
 	ReturnSuccess(c, nil)
 }
 
-// @Summary 获取博客首页信息
-// @Description 获取博客首页信息
+// @Summary Get blog homepage info
+// @Description Get blog homepage info
 // @Tags blog_info
 // @Produce json
 // @Success 0 {object} Response[model.BlogHomeVO]
@@ -123,8 +123,8 @@ func (*BlogInfo) GetHomeInfo(c *gin.Context) {
 	})
 }
 
-// @Summary 获取关于
-// @Description 获取关于
+// @Summary Get About
+// @Description Get About
 // @Tags blog_info
 // @Produce json
 // @Success 0 {object} Response[string]
@@ -133,12 +133,12 @@ func (*BlogInfo) GetAbout(c *gin.Context) {
 	ReturnSuccess(c, model.GetConfig(GetDB(c), g.CONFIG_ABOUT))
 }
 
-// @Summary 更新关于
-// @Description 更新关于
+// @Summary Update About
+// @Description Update About
 // @Tags blog_info
 // @Accept json
 // @Produce json
-// @Param data body object true "关于"
+// @Param data body object true "About"
 // @Success 0 {object} Response[string]
 // @Router /about [put]
 func (*BlogInfo) UpdateAbout(c *gin.Context) {
@@ -157,12 +157,12 @@ func (*BlogInfo) UpdateAbout(c *gin.Context) {
 	ReturnSuccess(c, req.Content)
 }
 
-// @Summary 上报用户信息
-// @Description 用户登进后台时上报信息
+// @Summary Report user info
+// @Description Report when user logs into admin
 // @Tags blog_info
 // @Accept json
 // @Produce json
-// @Param data body object true "用户信息"
+// @Param data body object true "User info"
 // @Success 0 {object} Response[any]
 // @Router /report [post]
 func (*BlogInfo) Report(c *gin.Context) {
@@ -176,36 +176,36 @@ func (*BlogInfo) Report(c *gin.Context) {
 
 	ctx := context.Background()
 
-	// 当前用户没有统计过访问人数 (不在 用户set 中)
+	// Current user not counted in visitor set
 	if !rdb.SIsMember(ctx, g.KEY_UNIQUE_VISITOR_SET, uuid).Val() {
-		// 统计地域信息
+		// Collect area statistics
 		ipSource := utils.IP.GetIpSource(ipAddress)
-		if ipSource != "" { // 获取到具体的位置, 提取出其中的 省份
+		if ipSource != "" { // Got a specific location, extract province
 			address := strings.Split(ipSource, "|")
 			province := strings.ReplaceAll(address[2], "省", "")
 			rdb.HIncrBy(ctx, g.VISITOR_AREA, province, 1)
 		} else {
-			rdb.HIncrBy(ctx, g.VISITOR_AREA, "未知", 1)
+			rdb.HIncrBy(ctx, g.VISITOR_AREA, "Unknown", 1)
 		}
-		// 访问数量 + 1
+		// Increase visit count by 1
 		rdb.Incr(ctx, g.VIEW_COUNT)
-		// 将当前用户记录到 用户set
+		// Add current user to visitor set
 		rdb.SAdd(ctx, g.KEY_UNIQUE_VISITOR_SET, uuid)
 	}
 
 	ReturnSuccess(c, nil)
 }
 
-// 获取博客设置
+// Get blog settings
 // func GetBlogConfig() model.BlogConfigDetail {
-// 	// 尝试从 Redis 中取值
+// 	// Try to get value from Redis
 // 	blogConfig := utils.Redis.GetVal(KEY_BLOG_CONFIG)
-// 	// Redis 中没有值, 再查数据库, 查到后设置到 Redis 中
+// 	// If Redis missing, query DB and set Redis
 // 	if blogConfig == "" {
 // 		blogConfig = dao.GetOne(model.BlogConfig{}, "id", 1).Config
 // 		utils.Redis.Set(KEY_BLOG_CONFIG, blogConfig, 0)
 // 	}
-// 	// 反序列化字符串为 golang 对象
+// 	// Deserialize string to Go object
 // 	var result model.BlogConfigDetail
 // 	utils.Json.Unmarshal(blogConfig, &result)
 // 	return result

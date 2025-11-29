@@ -17,11 +17,11 @@ func TestUpdateUserPassword(t *testing.T) {
 	}
 	db.Create(&auth)
 
-	// 测试正常修改
+	// Test normal update
 	err := UpdateUserPassword(db, auth.ID, "654321")
 	assert.Nil(t, err)
 
-	// 测试不存在的用户
+	// Test non-existent user
 	err = UpdateUserPassword(db, auth.ID, "654321")
 	assert.Nil(t, err)
 }
@@ -42,7 +42,7 @@ func TestGetUserAuthInfoById(t *testing.T) {
 		assert.Equal(t, "test", val.Username)
 	}
 
-	// 测试不存在的用户
+	// Test non-existent user
 	{
 		val, err := GetUserAuthInfoById(db, -99)
 		assert.Nil(t, val)
@@ -61,7 +61,7 @@ func TestUpdateUserInfo(t *testing.T) {
 	}
 	db.Create(&userInfo)
 
-	// 测试正常修改
+	// Test normal update
 	err := UpdateUserInfo(db, userInfo.ID, "update_nickname", "update_avatar", "intro", "website")
 	assert.Nil(t, err)
 

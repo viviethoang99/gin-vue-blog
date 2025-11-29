@@ -9,7 +9,7 @@ import (
 
 type Link struct{}
 
-// 添加或修改友链
+// Add or edit friend link
 type AddOrEditLinkReq struct {
 	ID      int    `json:"id"`
 	Name    string `json:"name" binding:"required"`
@@ -18,12 +18,12 @@ type AddOrEditLinkReq struct {
 	Intro   string `json:"intro"`
 }
 
-// @Summary 获取友链列表
-// @Description 根据条件查询获取友链列表
+// @Summary Get friend link list
+// @Description Get friend link list by conditions
 // @Tags Link
-// @Param page_size query int false "当前页数"
-// @Param page_num query int false "每页条数"
-// @Param keyword query string false "搜索关键字"
+// @Param page_size query int false "Current page"
+// @Param page_num query int false "Page size"
+// @Param keyword query string false "Keyword"
 // @Accept json
 // @Produce json
 // @Success 0 {object} Response[PageResult[model.FriendLink]]
@@ -50,10 +50,10 @@ func (*Link) GetList(c *gin.Context) {
 	})
 }
 
-// @Summary 添加或修改友链
-// @Description 添加或修改友链
+// @Summary Add or edit friend link
+// @Description Add or edit friend link
 // @Tags Link
-// @Param form body AddOrEditLinkReq true "添加或修改友链"
+// @Param form body AddOrEditLinkReq true "Add or edit friend link"
 // @Accept json
 // @Produce json
 // @Success 0 {object} Response[model.FriendLink]
@@ -75,10 +75,10 @@ func (*Link) SaveOrUpdate(c *gin.Context) {
 	ReturnSuccess(c, link)
 }
 
-// @Summary 删除友链（批量）
-// @Description 根据 ID 数组删除友链
+// @Summary Delete friend links (batch)
+// @Description Delete friend links by ID array
 // @Tags Link
-// @Param ids body []int true "友链ID数组"
+// @Param ids body []int true "Friend link ID array"
 // @Accept json
 // @Produce json
 // @Success 0 {object} Response[int64]

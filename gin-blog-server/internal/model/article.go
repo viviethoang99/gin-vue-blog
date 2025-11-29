@@ -7,20 +7,20 @@ import (
 )
 
 const (
-	STATUS_PUBLIC = iota + 1 // 公开
-	STATUS_SECRET            // 私密
-	STATUS_DRAFT             // 草稿
+	STATUS_PUBLIC = iota + 1 // Public
+	STATUS_SECRET            // Private
+	STATUS_DRAFT             // Draft
 )
 
 const (
-	TYPE_ORIGINAL  = iota + 1 // 原创
-	TYPE_REPRINT              // 转载
-	TYPE_TRANSLATE            // 翻译
+	TYPE_ORIGINAL  = iota + 1 // Original
+	TYPE_REPRINT              // Reprint
+	TYPE_TRANSLATE            // Translation
 )
 
-// belongTo: 一个文章 属于 一个分类
-// belongTo: 一个文章 属于 一个用户
-// many2many: 一个文章 可以拥有 多个标签, 多个文章 可以使用 一个标签
+// belongTo: An article belongs to a category
+// belongTo: An article belongs to a user
+// many2many: An article can have multiple tags; multiple articles can share a tag
 type Article struct {
 	Model
 
@@ -28,8 +28,8 @@ type Article struct {
 	Desc        string `json:"desc"`
 	Content     string `json:"content"`
 	Img         string `json:"img"`
-	Type        int    `gorm:"type:tinyint;comment:类型(1-原创 2-转载 3-翻译)" json:"type"` // 1-原创 2-转载 3-翻译
-	Status      int    `gorm:"type:tinyint;comment:状态(1-公开 2-私密)" json:"status"`    // 1-公开 2-私密
+	Type        int    `gorm:"type:tinyint;comment:Type (1-Original 2-Reprint 3-Translation)" json:"type"` // 1-Original 2-Reprint 3-Translation
+	Status      int    `gorm:"type:tinyint;comment:Status (1-Public 2-Private)" json:"status"`    // 1-Public 2-Private
 	IsTop       bool   `json:"is_top"`
 	IsDelete    bool   `json:"is_delete"`
 	OriginalUrl string `json:"original_url"`
@@ -50,14 +50,14 @@ type ArticleTag struct {
 type BlogArticleVO struct {
 	Article
 
-	CommentCount int64 `json:"comment_count"` // 评论数量
-	LikeCount    int64 `json:"like_count"`    // 点赞数量
-	ViewCount    int64 `json:"view_count"`    // 访问数量
+	CommentCount int64 `json:"comment_count"` // Comment count
+	LikeCount    int64 `json:"like_count"`    // Like count
+	ViewCount    int64 `json:"view_count"`    // View count
 
-	LastArticle       ArticlePaginationVO  `gorm:"-" json:"last_article"`       // 上一篇
-	NextArticle       ArticlePaginationVO  `gorm:"-" json:"next_article"`       // 下一篇
-	RecommendArticles []RecommendArticleVO `gorm:"-" json:"recommend_articles"` // 推荐文章
-	NewestArticles    []RecommendArticleVO `gorm:"-" json:"newest_articles"`    // 最新文章
+	LastArticle       ArticlePaginationVO  `gorm:"-" json:"last_article"`       // Previous
+	NextArticle       ArticlePaginationVO  `gorm:"-" json:"next_article"`       // Next
+	RecommendArticles []RecommendArticleVO `gorm:"-" json:"recommend_articles"` // Recommended articles
+	NewestArticles    []RecommendArticleVO `gorm:"-" json:"newest_articles"`    // Latest articles
 }
 
 type ArticlePaginationVO struct {
@@ -73,7 +73,7 @@ type RecommendArticleVO struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// 文章的详细信息
+// Article details
 func GetArticle(db *gorm.DB, id int) (data *Article, err error) {
 	result := db.Preload("Category").Preload("Tags").
 		Where(Article{Model: Model{ID: id}}).
@@ -81,7 +81,7 @@ func GetArticle(db *gorm.DB, id int) (data *Article, err error) {
 	return data, result.Error
 }
 
-// 获取第一个可获得的文章 （不在回收站并且状态为公开）
+// Get first accessible article (not in recycle bin and public)
 func GetBlogArticle(db *gorm.DB, id int) (data *Article, err error) {
 	result := db.Preload("Category").Preload("Tags").
 		Where(Article{Model: Model{ID: id}}).
@@ -90,7 +90,7 @@ func GetBlogArticle(db *gorm.DB, id int) (data *Article, err error) {
 	return data, result.Error
 }
 
-// 前台文章列表（不在回收站并且状态为公开）
+// Frontend article list (not in recycle bin and public)
 func GetBlogArticleList(db *gorm.DB, page, size, categoryId, tagId int) (data []Article, total int64, err error) {
 	db = db.Model(Article{})
 	db = db.Where("is_delete = 0 AND status = 1") // *
@@ -132,7 +132,7 @@ func GetArticleList(db *gorm.DB, page, size int, title string, isDelete *bool, s
 
 	db = db.Preload("Category").Preload("Tags").
 		Joins("LEFT JOIN article_tag ON article_tag.article_id = article.id").
-		Group("id") // 去重
+		Group("id") // Deduplicate
 	if tagId != 0 {
 		db = db.Where("tag_id = ?", tagId)
 	}
@@ -144,14 +144,14 @@ func GetArticleList(db *gorm.DB, page, size int, title string, isDelete *bool, s
 	return list, total, result.Error
 }
 
-// 查询 n 篇推荐文章 (根据标签)
+// Query n recommended articles (by tags)
 func GetRecommendList(db *gorm.DB, id, n int) (list []RecommendArticleVO, err error) {
-	// sub1: 查出标签id列表
+	// sub1: find tag ID list
 	// SELECT tag_id FROM `article_tag` WHERE `article_id` = ?
 	sub1 := db.Table("article_tag").
 		Select("tag_id").
 		Where("article_id", id)
-	// sub2: 查出这些标签对应的文章id列表 (去重, 且不包含当前文章)
+	// sub2: find article IDs for these tags (distinct, excluding current article)
 	// SELECT DISTINCT article_id FROM (sub1) t
 	// JOIN article_tag t1 ON t.tag_id = t1.tag_id
 	// WHERE `article_id` != ?
@@ -159,7 +159,7 @@ func GetRecommendList(db *gorm.DB, id, n int) (list []RecommendArticleVO, err er
 		Select("DISTINCT article_id").
 		Joins("JOIN article_tag t ON t.tag_id = t1.tag_id").
 		Where("article_id != ?", id)
-	// 根据 文章id列表 查出文章信息 (前 n 个)
+	// Fetch article info by article ID list (first n)
 	result := db.Table("(?) t2", sub2).
 		Select("id, title, img, created_at").
 		Joins("JOIN article a ON t2.article_id = a.id").
@@ -170,7 +170,7 @@ func GetRecommendList(db *gorm.DB, id, n int) (list []RecommendArticleVO, err er
 	return list, result.Error
 }
 
-// 查询上一篇文章 (id < 当前文章 id)
+// Query previous article (id < current article id)
 func GetLastArticle(db *gorm.DB, id int) (val ArticlePaginationVO, err error) {
 	sub := db.Table("article").Select("max(id)").Where("id < ?", id)
 	result := db.Table("article").
@@ -181,7 +181,7 @@ func GetLastArticle(db *gorm.DB, id int) (val ArticlePaginationVO, err error) {
 	return val, result.Error
 }
 
-// 查询下一篇文章 (id > 当前文章 id)
+// Query next article (id > current article id)
 func GetNextArticle(db *gorm.DB, id int) (data ArticlePaginationVO, err error) {
 	result := db.Model(&Article{}).
 		Select("id, title, img").
@@ -191,7 +191,7 @@ func GetNextArticle(db *gorm.DB, id int) (data ArticlePaginationVO, err error) {
 	return data, result.Error
 }
 
-// 查询最新的 n 篇文章
+// Query latest n articles
 func GetNewestList(db *gorm.DB, n int) (data []RecommendArticleVO, err error) {
 	result := db.Model(&Article{}).
 		Select("id, title, img, created_at").
@@ -202,15 +202,15 @@ func GetNewestList(db *gorm.DB, n int) (data []RecommendArticleVO, err error) {
 	return data, result.Error
 }
 
-// 物理删除文章
+// Physically delete articles
 func DeleteArticle(db *gorm.DB, ids []int) (int64, error) {
-	// 删除 [文章-标签] 关联
+	// Delete [article-tag] relations
 	result := db.Where("article_id IN ?", ids).Delete(&ArticleTag{})
 	if result.Error != nil {
 		return 0, result.Error
 	}
 
-	// 删除 [文章]
+	// Delete [articles]
 	result = db.Where("id IN ?", ids).Delete(&Article{})
 	if result.Error != nil {
 		return 0, result.Error
@@ -219,7 +219,7 @@ func DeleteArticle(db *gorm.DB, ids []int) (int64, error) {
 	return result.RowsAffected, nil
 }
 
-// 软删除文章（修改）
+// Soft delete articles (update)
 func UpdateArticleSoftDelete(db *gorm.DB, ids []int, isDelete bool) (int64, error) {
 	result := db.Model(Article{}).
 		Where("id IN ?", ids).
@@ -230,10 +230,10 @@ func UpdateArticleSoftDelete(db *gorm.DB, ids []int, isDelete bool) (int64, erro
 	return result.RowsAffected, nil
 }
 
-// 新增/编辑文章, 同时根据 分类名称, 标签名称 维护关联表
+// Create or edit an article, and maintain relations by category name and tag names
 func SaveOrUpdateArticle(db *gorm.DB, article *Article, categoryName string, tagNames []string) error {
 	return db.Transaction(func(tx *gorm.DB) error {
-		// 分类不存在则创建
+		// Create category if it does not exist
 		category := Category{Name: categoryName}
 		result := db.Model(&Category{}).Where("name", categoryName).FirstOrCreate(&category)
 		if result.Error != nil {
@@ -241,7 +241,7 @@ func SaveOrUpdateArticle(db *gorm.DB, article *Article, categoryName string, tag
 		}
 		article.CategoryId = category.ID
 
-		// 先 添加/更新 文章, 获取到其 ID
+		// First create/update the article to get its ID
 		if article.ID == 0 {
 			result = db.Create(&article)
 		} else {
@@ -251,7 +251,7 @@ func SaveOrUpdateArticle(db *gorm.DB, article *Article, categoryName string, tag
 			return result.Error
 		}
 
-		// 清空文章标签关联
+		// Clear article-tag associations
 		result = db.Delete(ArticleTag{}, "article_id", article.ID)
 		if result.Error != nil {
 			return result.Error
@@ -259,7 +259,7 @@ func SaveOrUpdateArticle(db *gorm.DB, article *Article, categoryName string, tag
 
 		var articleTags []ArticleTag
 		for _, tagName := range tagNames {
-			// 标签不存在则创建
+			// Create tag if it does not exist
 			tag := Tag{Name: tagName}
 			result := db.Model(&Tag{}).Where("name", tagName).FirstOrCreate(&tag)
 			if result.Error != nil {

@@ -13,41 +13,41 @@ import (
 	"time"
 )
 
-// 本地文件上传
+// Local file upload
 type Local struct{}
 
-// 文件上传到本地
+// Upload file to local storage
 func (*Local) UploadFile(file *multipart.FileHeader) (filePath, fileName string, err error) {
-	ext := path.Ext(file.Filename)                                     // 读取文件后缀
-	name := strings.TrimSuffix(file.Filename, ext)                     // 读取文件名
-	name = utils.MD5(name)                                             // 加密文件名
-	filename := name + "_" + time.Now().Format("20060102150405") + ext // 拼接新文件名
+	ext := path.Ext(file.Filename)                                     // Read file extension
+	name := strings.TrimSuffix(file.Filename, ext)                     // Read file name
+	name = utils.MD5(name)                                             // Hash file name
+	filename := name + "_" + time.Now().Format("20060102150405") + ext // Compose new file name
 
 	conf := g.Conf.Upload
-	mkdirErr := os.MkdirAll(conf.StorePath, os.ModePerm) // 尝试创建存储路径
+	mkdirErr := os.MkdirAll(conf.StorePath, os.ModePerm) // Try to create storage path
 	if mkdirErr != nil {
 		slog.Error("function os.MkdirAll() Filed", slog.Any("err", mkdirErr.Error()))
 		return "", "", errors.New("function os.MkdirAll() Filed, err:" + mkdirErr.Error())
 	}
 
-	storePath := conf.StorePath + "/" + filename // 文件存储路径
-	filepath := conf.Path + "/" + filename       // 文件展示路径
+	storePath := conf.StorePath + "/" + filename // File storage path
+	filepath := conf.Path + "/" + filename       // File access path
 
-	f, openError := file.Open() // 读取文件
+	f, openError := file.Open() // Read file
 	if openError != nil {
 		slog.Error("function file.Open() Filed", slog.String("err", openError.Error()))
 		return "", "", errors.New("function file.Open() Filed, err:" + openError.Error())
 	}
-	defer f.Close() // 创建文件 defer 关闭
+	defer f.Close() // Defer close after file open
 
 	out, createErr := os.Create(storePath)
 	if createErr != nil {
 		slog.Error("function os.Create() Filed", slog.String("err", createErr.Error()))
 		return "", "", errors.New("function os.Create() Filed, err:" + createErr.Error())
 	}
-	defer out.Close() // 创建文件 defer 关闭
+	defer out.Close() // Defer close after file create
 
-	_, copyErr := io.Copy(out, f) // 拷贝文件
+	_, copyErr := io.Copy(out, f) // Copy file
 	if copyErr != nil {
 		slog.Error("function io.Copy() Filed", slog.String("err", copyErr.Error()))
 		return "", "", errors.New("function io.Copy() Filed, err:" + copyErr.Error())
@@ -55,12 +55,12 @@ func (*Local) UploadFile(file *multipart.FileHeader) (filePath, fileName string,
 	return filepath, filename, nil
 }
 
-// 从本地删除文件
+// Delete file from local storage
 func (*Local) DeleteFile(key string) error {
 	p := g.GetConfig().Upload.StorePath + "/" + key
 	if strings.Contains(p, g.GetConfig().Upload.StorePath) {
 		if err := os.Remove(p); err != nil {
-			return errors.New("本地文件删除失败, err:" + err.Error())
+			return errors.New("Failed to delete local file, err:" + err.Error())
 		}
 	}
 	return nil

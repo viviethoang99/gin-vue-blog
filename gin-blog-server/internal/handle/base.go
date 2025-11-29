@@ -14,20 +14,21 @@ import (
 )
 
 /*
-响应设计方案：不使用 HTTP 码来表示业务状态, 采用业务状态码的方式
-- 只要能到达后端的请求, HTTP 状态码都为 200
-- 业务状态码为 0 表示成功, 其他都表示失败
-- 当后端发生 panic 并且被 gin 中间件捕获时, 才会返回 HTTP 500 状态码
+Response design:
+- Do not use HTTP status codes to represent business status; use business codes instead
+- Any request that reaches the backend returns HTTP 200
+- Business code 0 indicates success; non-zero indicates failure
+- Only when a backend panic occurs and is caught by gin middleware, HTTP 500 is returned
 */
 
-// 响应结构体
+// Response structure
 type Response[T any] struct {
-	Code    int    `json:"code"`    // 业务状态码
-	Message string `json:"message"` // 响应消息
-	Data    T      `json:"data"`    // 响应数据
+	Code    int    `json:"code"`    // Business status code
+	Message string `json:"message"` // Response message
+	Data    T      `json:"data"`    // Response data
 }
 
-// HTTP 码 + 业务码 + 消息 + 数据
+// HTTP code + Business code + Message + Data
 func ReturnHttpResponse(c *gin.Context, httpCode, code int, msg string, data any) {
 	c.JSON(httpCode, Response[any]{
 		Code:    code,
@@ -36,19 +37,19 @@ func ReturnHttpResponse(c *gin.Context, httpCode, code int, msg string, data any
 	})
 }
 
-// 业务码 + 数据
+// Business code + Data
 func ReturnResponse(c *gin.Context, r g.Result, data any) {
 	ReturnHttpResponse(c, http.StatusOK, r.Code(), r.Msg(), data)
 }
 
-// 成功业务码 + 数据
+// Success business code + Data
 func ReturnSuccess(c *gin.Context, data any) {
 	ReturnResponse(c, g.OkResult, data)
 }
 
-// 所有可预料的错误 = 业务错误 + 系统错误, 在业务层面处理, 返回 HTTP 200 状态码
-// 对于不可预料的错误, 会触发 panic, 由 gin 中间件捕获, 并返回 HTTP 500 状态码
-// err 是业务错误, data 是错误数据 (可以是 error 或 string)
+// All predictable errors = business + system errors, handled at business layer, return HTTP 200
+// Unpredictable errors trigger panic, caught by gin middleware, return HTTP 500
+// err is business error; data is error payload (error or string)
 func ReturnError(c *gin.Context, r g.Result, data any) {
 	slog.Info("[Func-ReturnError] " + r.Msg())
 
@@ -61,7 +62,7 @@ func ReturnError(c *gin.Context, r g.Result, data any) {
 		case string:
 			val = v
 		}
-		slog.Error(val) // 错误日志
+		slog.Error(val) // Error log
 	}
 
 	c.AbortWithStatusJSON(
@@ -74,36 +75,36 @@ func ReturnError(c *gin.Context, r g.Result, data any) {
 	)
 }
 
-// 分页获取数据
+// Pagination query parameters
 type PageQuery struct {
-	Page    int    `form:"page_num"`  // 当前页数（从1开始）
-	Size    int    `form:"page_size"` // 每页条数
-	Keyword string `form:"keyword"`   // 搜索关键字
+	Page    int    `form:"page_num"`  // Current page (starts from 1)
+	Size    int    `form:"page_size"` // Page size
+	Keyword string `form:"keyword"`   // Keyword
 }
 
-// 分页响应数据
+// Pagination response data
 type PageResult[T any] struct {
-	Page  int   `json:"page_num"`  // 每页条数
-	Size  int   `json:"page_size"` // 上次页数
-	Total int64 `json:"total"`     // 总条数
-	List  []T   `json:"page_data"` // 分页数据
+	Page  int   `json:"page_num"`  // Current page
+	Size  int   `json:"page_size"` // Page size
+	Total int64 `json:"total"`     // Total count
+	List  []T   `json:"page_data"` // Paged data
 }
 
-// 获取 *gorm.DB
+// Get *gorm.DB
 func GetDB(c *gin.Context) *gorm.DB {
 	return c.MustGet(g.CTX_DB).(*gorm.DB)
 }
 
-// 获取 *redis.Client
+// Get *redis.Client
 func GetRDB(c *gin.Context) *redis.Client {
 	return c.MustGet(g.CTX_RDB).(*redis.Client)
 }
 
 /*
-获取当前登录用户信息
-1. 能从 gin Context 上获取到 user 对象, 说明本次请求链路中获取过了
-2. 从 session 中获取到 uid
-3. 根据 uid 获取用户信息, 并设置到 gin Context 上
+Get current logged-in user info
+1. If a user object exists on gin Context, it was already fetched in this request chain
+2. Get uid from session
+3. Fetch user info by uid and set it on gin Context
 */
 func CurrentUserAuth(c *gin.Context) (*model.UserAuth, error) {
 	key := g.CTX_USER_AUTH
@@ -118,7 +119,7 @@ func CurrentUserAuth(c *gin.Context) (*model.UserAuth, error) {
 	session := sessions.Default(c)
 	id := session.Get(key)
 	if id == nil {
-		return nil, errors.New("session 中没有 user_auth_id")
+		return nil, errors.New("no user_auth_id in session")
 	}
 
 	// 3

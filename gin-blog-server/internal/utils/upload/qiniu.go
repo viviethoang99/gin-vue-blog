@@ -14,7 +14,7 @@ import (
 	"github.com/qiniu/go-sdk/v7/storage"
 )
 
-// 七牛云文件上传
+// Qiniu Cloud file upload
 type Qiniu struct{}
 
 func (*Qiniu) UploadFile(file *multipart.FileHeader) (filePath, fileName string, err error) {
@@ -31,7 +31,7 @@ func (*Qiniu) UploadFile(file *multipart.FileHeader) (filePath, fileName string,
 	}
 	defer f.Close()
 
-	// 文件名格式 建议保证唯一性
+	// File name format: recommended to ensure uniqueness
 	fileKey := fmt.Sprintf("%d%s%s", time.Now().Unix(), utils.MD5(file.Filename), path.Ext(file.Filename))
 	putErr := formUploader.Put(context.Background(), &ret, upToken, fileKey, f, file.Size, &putExtra)
 	if putErr != nil {
@@ -50,13 +50,13 @@ func (*Qiniu) DeleteFile(key string) error {
 	return nil
 }
 
-// 七牛云配置信息
+// Qiniu Cloud configuration
 func qiniuConfig() *storage.Config {
 	cfg := storage.Config{
 		UseHTTPS:      g.GetConfig().Qiniu.UseHTTPS,
 		UseCdnDomains: g.GetConfig().Qiniu.UseCdnDomains,
 	}
-	switch g.GetConfig().Qiniu.Zone { // 根据配置文件进行初始化空间对应的机房
+	switch g.GetConfig().Qiniu.Zone { // Initialize region based on configuration
 	case "ZoneHuadong":
 		cfg.Zone = &storage.ZoneHuadong
 	case "ZoneHuabei":

@@ -7,13 +7,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// 修改审核（批量）
+// Update review status (batch)
 type UpdateReviewReq struct {
 	Ids      []int `json:"ids"`
 	IsReview bool  `json:"is_review"`
 }
 
-// 条件查询列表
+// Query list with conditions
 type MessageQuery struct {
 	PageQuery
 	Nickname string `form:"nickname"`
@@ -22,10 +22,10 @@ type MessageQuery struct {
 
 type Message struct{}
 
-// @Summary 删除留言（批量）
-// @Description 根据 ID 数组删除留言
+// @Summary Delete messages (batch)
+// @Description Delete messages by ID array
 // @Tags Category
-// @Param ids body []int true "留言 ID 数组"
+// @Param ids body []int true "Message ID array"
 // @Accept json
 // @Produce json
 // @Success 0 {object} Response[int]
@@ -47,10 +47,10 @@ func (*Message) Delete(c *gin.Context) {
 	ReturnSuccess(c, rows)
 }
 
-// @Summary 修改留言审核（批量）
-// @Description 根据 ID 数组修改审核状态
+// @Summary Update message review (batch)
+// @Description Update review status by ID array
 // @Tags Message
-// @Param form body UpdateReviewReq true "修改审核状态"
+// @Param form body UpdateReviewReq true "Update review status"
 // @Accept json
 // @Produce json
 // @Success 0 {object} Response[int]
@@ -72,13 +72,13 @@ func (*Message) UpdateReview(c *gin.Context) {
 	ReturnSuccess(c, rows)
 }
 
-// @Summary 条件查询留言列表
-// @Description 根据条件查询留言列表
+// @Summary Query message list
+// @Description Get message list by conditions
 // @Tags Message
-// @Param nickname query string false "昵称"
-// @Param is_review query int false "审核状态"
-// @Param page_size query int false "当前页数"
-// @Param page_num query int false "每页条数"
+// @Param nickname query string false "Nickname"
+// @Param is_review query int false "Review status"
+// @Param page_size query int false "Current page"
+// @Param page_num query int false "Page size"
 // @Accept json
 // @Produce json
 // @Success 0 {object} Response[PageResult[model.Message]]

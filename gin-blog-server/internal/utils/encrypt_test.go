@@ -9,11 +9,11 @@ import (
 func TestEncrypt(t *testing.T) {
 	password := "123456"
 
-	// 加密
+	// Encrypt
 	hashPassword, err := BcryptHash(password)
 	assert.Nil(t, err)
 
-	// 验证
+	// Verify
 	result := BcryptCheck(password, hashPassword)
 	assert.True(t, result)
 }

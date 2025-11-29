@@ -16,18 +16,18 @@ var IP = new(ipUtil)
 
 type ipUtil struct{}
 
-// 获取用户发送请求的 IP 地址
-// 如果服务器不经过代理, 直接把自己 IP 暴露出去, c.Request.RemoteAddr 就可以直接获取 IP
-// 目前流行的架构中, 请求经过服务器前基本会经过代理 (Nginx 最常见), 此时直接获取 IP 拿到的是代理服务器的 IP
+// Get the IP address from which the user sent the request
+// If the server is not behind a proxy, you can get the IP directly via c.Request.RemoteAddr
+// In common architectures, requests usually pass through a proxy (most commonly Nginx) before reaching the server; directly obtaining the IP yields the proxy server's IP
 func (*ipUtil) GetIpAddress(c *gin.Context) (ipAddress string) {
-	// c.ClientIP() 获取的是代理服务器的 IP (Nginx)
+	// c.ClientIP() gets the proxy server's IP (Nginx)
 
-	// X-Real-IP: Nginx 服务代理, 本项目明确使用 Nginx 作代理, 因此优先获取这个
+	// X-Real-IP: Nginx proxy header; since this project explicitly uses Nginx, prefer this first
 	ipAddress = c.Request.Header.Get("X-Real-IP")
 
-	// X-Forwarded-For 经过 HTTP 代理或 负载均衡服务器时会添加该项
-	// X-Forwarded-For 格式: client1,proxy1,proxy2
-	// 一般情况下，第一个 IP 为客户端真实 IP，后面的为经过的代理服务器 IP
+	// X-Forwarded-For is added when passing through HTTP proxies or load balancers
+	// Format: client1,proxy1,proxy2
+	// Typically, the first IP is the real client IP; the rest are proxy servers
 	if ipAddress == "" || len(ipAddress) == 0 || strings.EqualFold("unknown", ipAddress) {
 		ips := c.Request.Header.Get("X-Forwarded-For") // "ip1,ip2,ip3"
 		splitIps := strings.Split(ips, ",")            // ["ip1", "ip2", "ip3"]
@@ -36,22 +36,22 @@ func (*ipUtil) GetIpAddress(c *gin.Context) (ipAddress string) {
 		}
 	}
 
-	// Pdoxy-Client-IP: Apache 服务代理
+	// Proxy-Client-IP: Apache proxy header
 	if ipAddress == "" || len(ipAddress) == 0 || strings.EqualFold("unknown", ipAddress) {
 		ipAddress = c.Request.Header.Get("Proxy-Client-IP")
 	}
 
-	// WL-Proxy-Client-IP: Weblogic 服务代理
+	// WL-Proxy-Client-IP: Weblogic proxy header
 	if ipAddress == "" || len(ipAddress) == 0 || strings.EqualFold("unknown", ipAddress) {
 		ipAddress = c.Request.Header.Get("WL-Proxy-Client-IP")
 	}
 
-	// RemoteAddr: 发出请求的远程主机的 IP 地址 (经过代理会设置为代理机器的 IP)
+	// RemoteAddr: the remote host IP of the request (will be the proxy IP if behind a proxy)
 	if ipAddress == "" || len(ipAddress) == 0 || strings.EqualFold("unknown", ipAddress) {
 		ipAddress = c.Request.RemoteAddr
 	}
 
-	// 检测到是本机 IP, 读取其局域网 IP 地址
+	// If local IP is detected, fetch the LAN IP address
 	if strings.HasPrefix(ipAddress, "127.0.0.1") || strings.HasPrefix(ipAddress, "[::1]") {
 		ip, err := externalIP()
 		if err != nil {
@@ -68,17 +68,17 @@ func (*ipUtil) GetIpAddress(c *gin.Context) (ipAddress string) {
 	return ipAddress
 }
 
-// 获取 IP 来源
+// Get IP source
 // https://github.com/lionsoul2014/ip2region
-var vIndex []byte // 缓存 VectorIndex 索引, 减少一次固定的 IO 操作
+var vIndex []byte // Cache VectorIndex index to reduce a fixed IO operation
 
-// 获取地域信息: 中国|0|江苏省|苏州市|电信
+// Get region info: China|0|Jiangsu Province|Suzhou City|Telecom
 func (*ipUtil) GetIpSource(ipAddress string) string {
-	var dbPath = "../assets/ip2region.xdb" // IP 数据库文件
-	// 完全基于文件查询, 每次都读取文件
+	var dbPath = "../assets/ip2region.xdb" // IP database file
+	// File-only query: read from file each time
 	// searcher, err := xdb.NewWithFileOnly(dbPath)
 
-	// 缓存 VectorIndex 索引, 减少一次固定的 IO 操作
+	// Cache VectorIndex to reduce a fixed IO operation
 	if vIndex == nil {
 		var err error
 		vIndex, err = xdb.LoadVectorIndexFromFile(dbPath)
@@ -95,8 +95,8 @@ func (*ipUtil) GetIpSource(ipAddress string) string {
 	}
 	defer searcher.Close()
 
-	// 国家|区域|省份|城市|ISP
-	// 只有中国的数据绝大部分精确到了城市, 其他国家部分数据只能定位到国家, 后面的选项全部是 0
+	// Format: Country|Region|Province|City|ISP
+	// Only China's data is mostly accurate to city; for other countries, often only to country; the rest are 0
 	region, err := searcher.SearchByStr(ipAddress)
 	if err != nil {
 		slog.Error(fmt.Sprintf("failed to search ip(%s): %s\n", ipAddress, err))
@@ -105,18 +105,18 @@ func (*ipUtil) GetIpSource(ipAddress string) string {
 	return region
 }
 
-// 获取 IP 简易信息, 例如: "江苏省苏州市 电信"
+// Get simplified IP source, e.g., "Jiangsu Suzhou Telecom"
 func (i *ipUtil) GetIpSourceSimpleIdle(ipAddress string) string {
-	region := i.GetIpSource(ipAddress) // 国家|区域|省份|城市|ISP
+	region := i.GetIpSource(ipAddress) // Country|Region|Province|City|ISP
 
-	// 检测到是内网, 直接返回 "内网IP"
-	// 0|0|0|内网IP|内网IP
+	// Detected as intranet, return "Intranet IP"
+	// Example: 0|0|0|Intranet IP|Intranet IP
 	if strings.Contains(region, "内网IP") {
 		return "内网IP"
 	}
 
-	// 一般无法获取到区域
-	// 中国|0|江苏省|苏州市|电信
+	// Often unable to get region
+	// Example: China|0|Jiangsu Province|Suzhou City|Telecom
 	ipSource := strings.Split(region, "|")
 	if ipSource[0] != "中国" && ipSource[0] != "0" {
 		return ipSource[0]
@@ -140,23 +140,23 @@ func (*ipUtil) GetUserAgent(c *gin.Context) *useragent.UserAgent {
 	return useragent.Parse(c.Request.UserAgent())
 }
 
-// 获取非 127.0.0.1 的局域网 IP
+// Get LAN IP that is not 127.0.0.1
 func externalIP() (net.IP, error) {
-	// 获取服务器的网络接口列表
+	// Get the server's network interface list
 	ifaces, err := net.Interfaces()
 	if err != nil {
 		return nil, err
 	}
 	for _, iface := range ifaces {
-		// 不在活动状态
+		// Not up
 		if iface.Flags&net.FlagUp == 0 {
 			continue
 		}
-		// 环回
+		// Loopback
 		if iface.Flags&net.FlagLoopback != 0 {
 			continue
 		}
-		// 单播接口地址列表
+		// Unicast interface address list
 		addrs, err := iface.Addrs()
 		if err != nil {
 			return nil, err

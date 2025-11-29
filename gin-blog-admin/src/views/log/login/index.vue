@@ -9,7 +9,7 @@ import CommonPage from '@/components/common/CommonPage.vue'
       class="mt-30"
       status="404"
       title="This page is still under development..."
-      description="稍安毋躁"
+      description="Please be patient"
       size="huge"
     />
   </CommonPage>

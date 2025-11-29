@@ -8,8 +8,8 @@ const props = defineProps({
   title: { type: String, default: '' },
   showFooter: { type: Boolean, default: true },
   loading: { type: Boolean, default: false },
-  cancelText: { type: String, default: '取消' },
-  okText: { type: String, default: '确定' },
+  cancelText: { type: String, default: 'Cancel' },
+  okText: { type: String, default: 'Confirm' },
 })
 
 const emit = defineEmits(['update:visible', 'save'])

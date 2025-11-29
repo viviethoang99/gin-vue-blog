@@ -4,7 +4,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// hasMany: 一个分类下可以有多篇文章
+// hasMany: A category can contain multiple articles
 type Category struct {
 	Model
 	Name     string    `gorm:"unique;type:varchar(200);not null" json:"name"`

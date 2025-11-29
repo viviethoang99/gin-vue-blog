@@ -22,8 +22,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// WithRedisDB 将 redis.Client 注入到 gin.Context
-// handler 中通过 c.MustGet(g.CTX_RDB).(*redis.Client) 来使用
+// WithRedisDB injects redis.Client into gin.Context
+// Handlers can access via c.MustGet(g.CTX_RDB).(*redis.Client)
 func WithRedisDB(rdb *redis.Client) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		ctx.Set(g.CTX_RDB, rdb)
@@ -31,8 +31,8 @@ func WithRedisDB(rdb *redis.Client) gin.HandlerFunc {
 	}
 }
 
-// WithGormDB 将 gorm.DB 注入到 gin.Context
-// handler 中通过 c.MustGet(g.CTX_DB).(*gorm.DB) 来使用
+// WithGormDB injects gorm.DB into gin.Context
+// Handlers can access via c.MustGet(g.CTX_DB).(*gorm.DB)
 func WithGormDB(db *gorm.DB) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		ctx.Set(g.CTX_DB, db)
@@ -40,7 +40,7 @@ func WithGormDB(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-// CORS 跨域请求
+// CORS middleware
 func CORS() gin.HandlerFunc {
 	return cors.New(cors.Config{
 		AllowOrigins:     []string{"*"},
@@ -55,21 +55,21 @@ func CORS() gin.HandlerFunc {
 	})
 }
 
-// WithCookieStore 基于 cookie 的 session
+// WithCookieStore uses cookie-based session store
 func WithCookieStore(name, secret string) gin.HandlerFunc {
 	store := cookie.NewStore([]byte(secret))
 	store.Options(sessions.Options{Path: "/", MaxAge: 600})
 	return sessions.Sessions(name, store)
 }
 
-// WithMemStore 基于内存的 session
+// WithMemStore uses in-memory session store
 func WithMemStore(name, secret string) gin.HandlerFunc {
 	store := memstore.NewStore([]byte(secret))
 	store.Options(sessions.Options{Path: "/", MaxAge: 600})
 	return sessions.Sessions(name, store)
 }
 
-// Logger 日志记录
+// Logger middleware
 func Logger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
@@ -91,7 +91,7 @@ func Logger() gin.HandlerFunc {
 	}
 }
 
-// Recovery 恢复中间件
+// Recovery middleware
 func Recovery(stack bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
@@ -110,17 +110,17 @@ func Recovery(stack bool) gin.HandlerFunc {
 					}
 				}
 
-				// 发生 panic, 返回错误信息
+				// On panic, return error response
 				handle.ReturnHttpResponse(c, http.StatusInternalServerError, g.FAIL, g.GetMsg(g.FAIL), err)
 
-				// 处理 panic(xxx) 的操作
-				// if code, ok := err.(int); ok { // panic(code) 根据错误码获取 msg
+				// Handle panic(xxx)
+				// if code, ok := err.(int); ok { // panic(code) get msg by code
 				// 	v2.Return(c, code, nil)
-				// } else if msg, ok := err.(string); ok { // panic(string) 返回 string
+				// } else if msg, ok := err.(string); ok { // panic(string) return string
 				// 	v2.ReturnJSON(c, http.StatusOK, g.FAIL, msg, nil)
-				// } else if e, ok := err.(error); ok { // panic(error) 发送消息
+				// } else if e, ok := err.(error); ok { // panic(error) send message
 				// 	v2.ReturnJSON(c, http.StatusOK, g.FAIL, e.Error(), nil)
-				// } else { // 其他
+				// } else { // others
 				// 	v2.Return(c, g.FAIL, nil)
 				// }
 

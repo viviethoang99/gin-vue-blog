@@ -141,7 +141,7 @@ const columns = [
       :get-data="api.getCategorys"
     >
       <template #queryBar>
-        <QueryItem label="Category Name" :label-width="50">
+        <QueryItem label="Search" :label-width="50">
           <NInput
             v-model:value="queryItems.keyword"
             clearable

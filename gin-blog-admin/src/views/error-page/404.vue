@@ -5,13 +5,13 @@ import AppPage from '@/components/common/AppPage.vue'
 
 <template>
   <AppPage>
-    <NResult m-auto status="404" description="抱歉，您访问的页面不存在。">
+    <NResult m-auto status="404" description="Sorry, the page you visited does not exist.">
       <template #icon>
         <img src="/image/404.webp" width="500">
       </template>
       <template #footer>
         <NButton @click="$router.replace('/')">
-          返回首页
+          Back Home
         </NButton>
       </template>
     </NResult>

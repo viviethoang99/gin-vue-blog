@@ -46,7 +46,7 @@ func GetTagOption(db *gorm.DB) ([]OptionVO, error) {
 	return list, result.Error
 }
 
-// 根据 [文章id] 获取 [标签名称列表]
+// Get the list of tag names by article ID
 func GetTagNamesByArticleId(db *gorm.DB, id int) ([]string, error) {
 	list := make([]string, 0)
 	result := db.Table("tag").

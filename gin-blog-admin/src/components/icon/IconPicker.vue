@@ -9,8 +9,8 @@ import iconData from '@/assets/icons'
 const props = defineProps({ value: String })
 const emit = defineEmits(['update:value'])
 
-const choosed = ref(props.value) // 选中值
-const icons = ref(iconData.filter(icon => icon.includes(choosed.value))) // 可选图标列表
+const choosed = ref(props.value) // Selected value
+const icons = ref(iconData.filter(icon => icon.includes(choosed.value))) // Available icon list
 
 function filterIcons() {
   icons.value = iconData.filter(item => item.includes(choosed.value))
@@ -33,7 +33,7 @@ watchDebounced(choosed, () => {
       <template #trigger>
         <NInput
           v-model:value="choosed"
-          placeholder="请输入图标名称"
+          placeholder="Enter icon name"
           @update:value="filterIcons"
         >
           <template #prefix>
@@ -45,11 +45,10 @@ watchDebounced(choosed, () => {
         </NInput>
       </template>
       <template #footer>
-        更多图标去
+        For more icons visit
         <a class="text-blue" target="_blank" href="https://icones.js.org/collection/all">
           Icones
         </a>
-        查看
       </template>
       <ul v-if="icons.length" class="h-[150px] w-[300px] overflow-y-scroll">
         <li

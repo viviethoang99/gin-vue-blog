@@ -14,7 +14,7 @@ var rctx = context.Background()
 
 // Page
 
-// 将页面列表缓存到 Redis 中
+// Cache page list into Redis
 func addPageCache(rdb *redis.Client, pages []model.Page) error {
 	data, err := json.Marshal(pages)
 	if err != nil {
@@ -23,13 +23,13 @@ func addPageCache(rdb *redis.Client, pages []model.Page) error {
 	return rdb.Set(rctx, g.PAGE, string(data), 0).Err()
 }
 
-// 删除 Redis 中页面列表缓存
+// Remove page list cache from Redis
 func removePageCache(rdb *redis.Client) error {
 	return rdb.Del(rctx, g.PAGE).Err()
 }
 
-// 从 Redis 中获取页面列表缓存
-// rdb.Get 如果不存在 key, 会返回 redis.Nil 错误
+// Get page list cache from Redis
+// rdb.Get returns redis.Nil error if key does not exist
 func getPageCache(rdb *redis.Client) (cache []model.Page, err error) {
 	s, err := rdb.Get(rctx, g.PAGE).Result()
 	if err != nil {
@@ -45,18 +45,18 @@ func getPageCache(rdb *redis.Client) (cache []model.Page, err error) {
 
 // Config
 
-// 将博客配置缓存到 Redis 中
+// Cache blog config into Redis
 func addConfigCache(rdb *redis.Client, config map[string]string) error {
 	return rdb.HMSet(rctx, g.CONFIG, config).Err()
 }
 
-// 删除 Redis 中博客配置缓存
+// Remove blog config cache from Redis
 func removeConfigCache(rdb *redis.Client) error {
 	return rdb.Del(rctx, g.CONFIG).Err()
 }
 
-// 从 Redis 中获取博客配置缓存
-// rdb.HGetAll 如果不存在 key, 不会返回 redis.Nil 错误, 而是返回空 map
+// Get blog config cache from Redis
+// rdb.HGetAll returns empty map if key does not exist (no redis.Nil)
 func getConfigCache(rdb *redis.Client) (cache map[string]string, err error) {
 	return rdb.HGetAll(rctx, g.CONFIG).Result()
 }

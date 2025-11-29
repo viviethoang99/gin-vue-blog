@@ -11,9 +11,9 @@ func TestGetConfigMap(t *testing.T) {
 	db.AutoMigrate(&Config{})
 
 	configs := []Config{
-		{Key: "name", Value: "Blog", Desc: "姓名"},
-		{Key: "age", Value: "12", Desc: "年龄"},
-		{Key: "enabled", Value: "true", Desc: "是否可用"},
+		{Key: "name", Value: "Blog", Desc: "Name"},
+		{Key: "age", Value: "12", Desc: "Age"},
+		{Key: "enabled", Value: "true", Desc: "Enabled"},
 	}
 	db.Create(&configs)
 
@@ -30,9 +30,9 @@ func TestUpdateConfigMap(t *testing.T) {
 	db.AutoMigrate(&Config{})
 
 	configs := []Config{
-		{Key: "name", Value: "Blog", Desc: "姓名"},
-		{Key: "age", Value: "12", Desc: "年龄"},
-		{Key: "enabled", Value: "true", Desc: "是否可用"},
+		{Key: "name", Value: "Blog", Desc: "Name"},
+		{Key: "age", Value: "12", Desc: "Age"},
+		{Key: "enabled", Value: "true", Desc: "Enabled"},
 	}
 	db.Create(&configs)
 
@@ -40,7 +40,7 @@ func TestUpdateConfigMap(t *testing.T) {
 		"name":    "Alice",
 		"age":     "15",
 		"enabled": "false",
-		"dump":    "dump", // 无效数据
+		"dump":    "dump", // Invalid data
 	}
 	err := CheckConfigMap(db, m)
 	assert.Nil(t, err)

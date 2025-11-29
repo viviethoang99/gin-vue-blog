@@ -14,15 +14,15 @@ type AddOrEditTagReq struct {
 	Name string `json:"name" binding:"required"`
 }
 
-// @Summary 获取标签列表
-// @Description 根据条件查询获取标签列表
+// @Summary Get tag list
+// @Description Get tag list by conditions
 // @Tags Tag
-// @Param page_size query int false "当前页数"
-// @Param page_num query int false "每页条数"
-// @Param keyword query string false "搜索关键字"
+// @Param page_size query int false "Current page"
+// @Param page_num query int false "Page size"
+// @Param keyword query string false "Keyword"
 // @Accept json
 // @Produce json
-// @Success 0 {object} Response[PageResult[model.TagVO]] "成功"
+// @Success 0 {object} Response[PageResult[model.TagVO]] "Success"
 // @Security ApiKeyAuth
 // @Router /tag/list [get]
 func (*Tag) GetList(c *gin.Context) {
@@ -46,13 +46,12 @@ func (*Tag) GetList(c *gin.Context) {
 	})
 }
 
-// @Summary 添加或修改标签
-// @Description 添加或修改标签
+// @Summary Add or edit tag
+// @Description Add or edit tag
 // @Tags Tag
-// @Param form body AddOrEditTagReq true "添加或修改标签"
+// @Param form body AddOrEditTagReq true "Add or edit tag"
 // @Accept json
 // @Produce json
-// @Success 0 {object} Response[model.Tag]
 // @Security ApiKeyAuth
 // @Router /tag [post]
 func (*Tag) SaveOrUpdate(c *gin.Context) {
@@ -71,14 +70,13 @@ func (*Tag) SaveOrUpdate(c *gin.Context) {
 	ReturnSuccess(c, tag)
 }
 
-// TODO: 删除行为, 添加强制删除: 有关联数据则将删除关联数据
-// @Summary 删除标签（批量）
-// @Description 根据 ID 数组删除标签
+// TODO: Delete behavior: add force delete to remove related data if exists
+// @Summary Delete tags (batch)
+// @Description Delete tags by ID array
 // @Tags Tag
-// @Param ids body []int true "标签 ID 数组"
+// @Param ids body []int true "Tag ID array"
 // @Accept json
 // @Produce json
-// @Success 0 {object} Response[int]
 // @Security ApiKeyAuth
 // @Router /tag [delete]
 func (*Tag) Delete(c *gin.Context) {
@@ -89,7 +87,7 @@ func (*Tag) Delete(c *gin.Context) {
 	}
 	db := GetDB(c)
 
-	// 检查标签下面有没有文章
+	// Check if the tag has related articles
 	count, err := model.Count(db, &model.ArticleTag{}, "tag_id in ?", ids)
 	if err != nil {
 		ReturnError(c, g.ErrDbOp, err)
@@ -110,14 +108,14 @@ func (*Tag) Delete(c *gin.Context) {
 	ReturnSuccess(c, result.RowsAffected)
 }
 
-// @Summary 获取标签选项列表
-// @Description 获取标签选项列表
+// @Summary Get tag options
+// @Description Get tag options list
 // @Tags Tag
 // @Accept json
 // @Produce json
-// @Success 0 {object} Response[model.OptionVO]
 // @Security ApiKeyAuth
 // @Router /tag/option [get]
+// @Success 0 {object} Response[model.OptionVO]
 func (*Tag) GetOption(c *gin.Context) {
 	list, err := model.GetTagOption(GetDB(c))
 	if err != nil {

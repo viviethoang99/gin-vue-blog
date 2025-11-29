@@ -11,18 +11,18 @@ import (
 
 type Role struct{}
 
-// 新增/编辑 角色, 关联维护 role_resource, role_menu
+// Add/Edit role; maintain associations role_resource, role_menu
 type AddOrEditRoleReq struct {
 	ID          int    `json:"id"`
 	Name        string `json:"name" binding:"required"`
 	Label       string `json:"label" binding:"required"`
 	IsDisable   bool   `json:"is_disable"`
-	ResourceIds []int  `json:"resource_ids"` // 资源 id 列表
-	MenuIds     []int  `json:"menu_ids"`     // 菜单 id 列表
+	ResourceIds []int  `json:"resource_ids"` // resource id list
+	MenuIds     []int  `json:"menu_ids"`     // menu id list
 }
 
-// @Summary 获取角色选项
-// @Description 获取角色选项
+// @Summary Get role options
+// @Description Get role options
 // @Tags role
 // @Produce json
 // @Success 0 {object} Response[model.OptionVO]
@@ -37,13 +37,13 @@ func (*Role) GetOption(c *gin.Context) {
 	ReturnSuccess(c, list)
 }
 
-// @Summary 获取角色列表
-// @Description 获取角色列表
+// @Summary Get role list
+// @Description Get role list
 // @Tags role
 // @Produce json
-// @Param keyword query string false "关键字"
-// @Param pageNum query int false "页码"
-// @Param pageSize query int false "每页数量"
+// @Param keyword query string false "Keyword"
+// @Param pageNum query int false "Page number"
+// @Param pageSize query int false "Page size"
 // @Success 0 {object} Response[PageResult[model.RoleVO]]
 // @Router /role/list [get]
 func (*Role) GetTreeList(c *gin.Context) {

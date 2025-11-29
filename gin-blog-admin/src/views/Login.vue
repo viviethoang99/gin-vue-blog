@@ -90,7 +90,7 @@ async function handleLogin() {
 </script>
 
 <template>
-  <!-- FIXME: 使用 style="background-image: url(/image/login_bg.webp);" 不生效, 需要写到 style 里的 class 中 -->
+  <!-- FIXME: Using style="background-image: url(/image/login_bg.webp);" doesn't work; set it in a CSS class instead -->
   <AppPage class="backgroundImg bg-cover">
     <div style="transform: translateY(25px)" class="m-auto max-w-[700px] min-w-[345px] flex items-center justify-center rounded-2 bg-white bg-opacity-60 p-4 shadow">
       <div class="hidden w-[380px] px-5 py-9 md:block">
@@ -120,7 +120,7 @@ async function handleLogin() {
         />
         <NCheckbox
           :checked="isRemember"
-          label="记住我"
+          label="Remember me"
           :on-update:checked="(val) => (isRemember = val)"
         />
         <NButton
@@ -129,7 +129,7 @@ async function handleLogin() {
           :loading="loading"
           @click="handleLogin"
         >
-          登录
+          Login
         </NButton>
       </div>
     </div>

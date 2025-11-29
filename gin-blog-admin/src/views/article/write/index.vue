@@ -12,6 +12,7 @@ import UploadOne from '@/components//UploadOne.vue'
 import { articleTypeOptions } from '@/assets/config'
 import { useTagStore } from '@/store'
 import api from '@/api'
+import { request, convertImgUrl } from '@/utils'
 
 defineOptions({ name: 'Publish Article' })
 
@@ -154,6 +155,29 @@ function renderTag(tag, index) {
     { default: () => tag },
   )
 }
+
+// MdEditor image upload handler
+async function handleEditorUpload(files, callback) {
+  try {
+    const urls = await Promise.all(
+      files.map(async (file) => {
+        const formData = new FormData()
+        formData.append('file', file)
+        // Backend route is /api/upload (not /api/upload/file)
+        const resp = await request.post('/upload', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        // resp.data is relative path; convert to absolute if needed
+        return convertImgUrl(resp.data)
+      }),
+    )
+    callback(urls)
+  }
+  catch (err) {
+    console.error('Image upload failed', err)
+    window.$message?.error('Image upload failed')
+  }
+}
 </script>
 
 <template>
@@ -175,12 +199,17 @@ function renderTag(tag, index) {
         <template #icon>
           <span v-if="!btnLoading" class="i-line-md:confirm-circle" />
         </template>
-        Publish Article
+        Publish
       </NButton>
     </div>
 
     <!-- TODO: File upload -->
-    <MdEditor v-model="formModel.content" style="height: calc(100vh - 245px)" />
+    <MdEditor
+      v-model="formModel.content"
+      style="height: calc(100vh - 245px)"
+      language="en-US"
+      :on-upload-img="handleEditorUpload"
+    />
 
     <CrudModal
       v-model:visible="modalVisible"

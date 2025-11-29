@@ -50,7 +50,7 @@ type ForceOfflineReq struct {
 	UserInfoId int `json:"user_info_id"`
 }
 
-// 根据 Token 获取用户信息
+// Get user info based on Token
 func (*User) GetInfo(c *gin.Context) {
 	rdb := GetRDB(c)
 
@@ -75,8 +75,8 @@ func (*User) GetInfo(c *gin.Context) {
 	ReturnSuccess(c, userInfoVO)
 }
 
-// TODO: 用户区域分布 GetUserAreas, StatisticUserAreas
-// 更新当前用户信息, 不需要传 id, 从 Token 中解析出来
+// TODO: User area distribution GetUserAreas, StatisticUserAreas
+// Update current user info: no need to pass id, parse from Token
 func (*User) UpdateCurrent(c *gin.Context) {
 	var req UpdateCurrentUserReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -94,7 +94,7 @@ func (*User) UpdateCurrent(c *gin.Context) {
 	ReturnSuccess(c, nil)
 }
 
-// 更新用户信息: 昵称 + 角色
+// Update user info: nickname + roles
 func (*User) Update(c *gin.Context) {
 	var req UpdateUserReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -110,7 +110,7 @@ func (*User) Update(c *gin.Context) {
 	ReturnSuccess(c, nil)
 }
 
-// 获取用户列表
+// Get user list
 func (*User) GetList(c *gin.Context) {
 	var query UserQuery
 	if err := c.ShouldBindQuery(&query); err != nil {
@@ -132,7 +132,7 @@ func (*User) GetList(c *gin.Context) {
 	})
 }
 
-// 修改用户禁用状态
+// Update user disable status
 func (*User) UpdateDisable(c *gin.Context) {
 	var req UpdateUserDisableReq
 
@@ -150,7 +150,7 @@ func (*User) UpdateDisable(c *gin.Context) {
 	ReturnSuccess(c, nil)
 }
 
-// 修改当前用户密码: 需要输入旧密码进行验证
+// Change current user's password: requires old password verification
 func (*User) UpdateCurrentPassword(c *gin.Context) {
 	var req UpdateCurrentPasswordReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -172,16 +172,16 @@ func (*User) UpdateCurrentPassword(c *gin.Context) {
 		return
 	}
 
-	// TODO: 修改完密码后，强制用户下线
+	// TODO: After password change, force user to log out
 
 	ReturnSuccess(c, nil)
 }
 
-// TODO: 修改普通用户密码（管理员可以直接修改）
+// TODO: Change normal user's password (admin can change directly)
 // func (*User) UpdatePassword(c *gin.Context) {
 // 	type UpdatePasswordForm struct {
-// 		Username string `json:"username" validate:"required" label:"用户名"`
-// 		Password string `json:"password" validate:"required" label:"密码"`
+// 		Username string `json:"username" validate:"required" label:"Username"`
+// 		Password string `json:"password" validate:"required" label:"Password"`
 // 	}
 
 // 	var form UpdatePasswordForm
@@ -201,12 +201,12 @@ func (*User) UpdateCurrentPassword(c *gin.Context) {
 // 		return
 // 	}
 
-// 	// TODO: 修改完密码后，强制用户下线
+// 	// TODO: After password change, force user to log out
 
 // 	ReturnSuccess(c, nil)
 // }
 
-// 查询当前在线用户
+// Query current online users
 func (*User) GetOnlineList(c *gin.Context) {
 	keyword := c.Query("keyword")
 
@@ -229,7 +229,7 @@ func (*User) GetOnlineList(c *gin.Context) {
 		onlineList = append(onlineList, auth)
 	}
 
-	// 根据上次登录时间进行排序
+	// Sort by last login time
 	sort.Slice(onlineList, func(i, j int) bool {
 		return onlineList[i].LastLoginTime.Unix() > onlineList[j].LastLoginTime.Unix()
 	})
@@ -237,7 +237,7 @@ func (*User) GetOnlineList(c *gin.Context) {
 	ReturnSuccess(c, onlineList)
 }
 
-// 强制离线
+// Force offline
 func (*User) ForceOffline(c *gin.Context) {
 	id := c.Param("id")
 	uid, err := strconv.Atoi(id)
@@ -252,7 +252,7 @@ func (*User) ForceOffline(c *gin.Context) {
 		return
 	}
 
-	// 不能离线自己
+	// Cannot force offline yourself
 	if auth.ID == uid {
 		ReturnError(c, g.ErrForceOfflineSelf, nil)
 		return
@@ -265,5 +265,5 @@ func (*User) ForceOffline(c *gin.Context) {
 	rdb.Del(rctx, onlineKey)
 	rdb.Set(rctx, offlineKey, auth, time.Hour)
 
-	ReturnSuccess(c, "强制离线成功")
+	ReturnSuccess(c, "Forced offline successfully")
 }

@@ -4,31 +4,31 @@ import { NButton, NDataTable, NSpace } from 'naive-ui'
 import { utils, writeFile } from 'xlsx'
 
 const props = defineProps({
-  /** 是否不设定列的分割线 */
+  /** Whether to not set column dividers */
   singleLine: { type: Boolean, default: false },
-  /** true: 后端分页 false: 前端分页 */
+  /** true: backend pagination false: frontend pagination */
   remote: { type: Boolean, default: true },
-  /** 是否分页 */
+  /** Whether to enable pagination */
   isPagination: { type: Boolean, default: true },
-  /** 表格内容的横向宽度 */
+  /** Horizontal width of table content */
   scrollX: { type: Number, default: 1200 },
-  /** 主键 name */
+  /** Primary key name */
   rowKey: { type: String, default: 'id' },
-  /** 需要展示的列 */
+  /** Columns to display */
   columns: { type: Array, required: true },
-  /** queryBar 中的参数 */
+  /** Parameters in queryBar */
   queryItems: {
     type: Object,
     default() { return {} },
   },
-  /** 补充参数（可选） */
+  /** Additional parameters (optional) */
   extraParams: {
     type: Object,
     default() { return {} },
   },
   /**
-   * TODO: 如果想要同时有 url 和 body, 怎么处理
-   * 获取数据的请求 API
+   * TODO: How to handle if you want both url and body at the same time
+   * Request API to get data
    */
   getData: {
     type: Function,
@@ -38,12 +38,12 @@ const props = defineProps({
 
 const emit = defineEmits(['update:queryItems', 'checked', 'dataChange', 'sorterChange'])
 
-const loading = ref(false) // 加载
-const selections = ref([]) // 多选的 rowKey
-const tableData = ref([]) // 表格数据
+const loading = ref(false) // Loading
+const selections = ref([]) // Multiple selected rowKeys
+const tableData = ref([]) // Table data
 const initQuery = { ...props.queryItems }
 
-// 分页配置
+// Pagination configuration
 const pagination = reactive({
   page: 1,
   pageSize: 10,
@@ -59,17 +59,17 @@ const pagination = reactive({
     handleQuery()
   },
   prefix({ itemCount }) {
-    return `共 ${itemCount} 条`
+    return `Total ${itemCount} items`
   },
 })
 
 async function handleQuery() {
-  selections.value = [] // 重置选中
+  selections.value = [] // Reset selection
 
   try {
     loading.value = true
     let paginationParams = {}
-    // 如果非分页模式或者使用前端分页, 则无需传分页参数
+    // If not pagination mode or using frontend pagination, no need to pass pagination parameters
     if (props.isPagination && props.remote) {
       paginationParams = {
         page_num: pagination.page,
@@ -95,18 +95,18 @@ async function handleQuery() {
 }
 
 function handleSearch() {
-  pagination.page = 1 // 回到第 1 页
+  pagination.page = 1 // Go back to page 1
   handleQuery()
 }
 
 async function handleReset() {
-  const queryItems = { ...props.queryItems } // 重置搜索参数
+  const queryItems = { ...props.queryItems } // Reset search parameters
   for (const key in queryItems) {
-    queryItems[key] = null // 注意类型
+    queryItems[key] = null // Note the type
   }
   emit('update:queryItems', { ...queryItems, ...initQuery })
   await nextTick()
-  pagination.page = 1 // 回到第 1 页
+  pagination.page = 1 // Go back to page 1
   handleQuery()
 }
 
@@ -117,7 +117,7 @@ function onPageChange(currentPage) {
 
 function onChecked(rowKeys) {
   selections.value = rowKeys
-  // 包含 selection
+  // Contains selection
   if (props.columns.some(item => item.type === 'selection')) {
     emit('checked', rowKeys)
   }
@@ -129,7 +129,7 @@ function onSorterChange(sorter) {
 
 function handleExport(columns = props.columns, data = tableData.value) {
   if (!data?.length) {
-    return window.$message.warning('没有数据')
+    return window.$message.warning('No data available')
   }
   const columnsData = columns.filter(item => !!item.title && !item.hideInExcel)
   const thKeys = columnsData.map(item => item.key)
@@ -137,8 +137,8 @@ function handleExport(columns = props.columns, data = tableData.value) {
   const trData = data.map(item => thKeys.map(key => item[key]))
   const sheet = utils.aoa_to_sheet([thData, ...trData])
   const workBook = utils.book_new()
-  utils.book_append_sheet(workBook, sheet, '数据报表')
-  writeFile(workBook, '数据报表.xlsx')
+  utils.book_append_sheet(workBook, sheet, 'Data Report')
+  writeFile(workBook, 'Data Report.xlsx')
 }
 
 defineExpose({
@@ -164,15 +164,15 @@ defineExpose({
         <template #icon>
           <i class="i-lucide:rotate-ccw" />
         </template>
-        重置
+        Reset
       </NButton>
       <NButton type="primary" @click="handleSearch">
         <template #icon>
           <i class="i-fe:search" />
         </template>
-        搜索
+        Search
       </NButton>
-      <!-- TODO: 添加额外的插槽，让用户可以自定义按钮 -->
+      <!-- TODO: Add extra slots to let users customize buttons -->
     </div>
   </div>
   <NDataTable

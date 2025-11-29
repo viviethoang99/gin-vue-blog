@@ -60,7 +60,7 @@ func GetUserList(db *gorm.DB, page, size int, loginType int8, nickname, username
 	return list, total, result.Error
 }
 
-// 更新用户昵称及角色信息
+// Update user nickname and roles
 func UpdateUserNicknameAndRole(db *gorm.DB, authId int, nickname string, roleIds []int) error {
 	userAuth, err := GetUserAuthInfoById(db, authId)
 	if err != nil {
@@ -76,12 +76,12 @@ func UpdateUserNicknameAndRole(db *gorm.DB, authId int, nickname string, roleIds
 		return result.Error
 	}
 
-	// 至少有一个角色
+	// At least one role
 	if len(roleIds) == 0 {
 		return nil
 	}
 
-	// 更新用户角色, 清空原本的 user_role 关系, 添加新的关系
+	// Update user roles: clear existing user_role relations and add new ones
 	result = db.Where(UserAuthRole{UserAuthId: userAuth.UserInfoId}).Delete(UserAuthRole{})
 	if result.Error != nil {
 		return result.Error
@@ -132,7 +132,7 @@ func UpdateUserDisable(db *gorm.DB, id int, isDisable bool) error {
 	return result.Error
 }
 
-// 更新用户登录信息
+// Update user login information
 func UpdateUserLoginInfo(db *gorm.DB, id int, ipAddress, ipSource string) error {
 	now := time.Now()
 	userAuth := UserAuth{

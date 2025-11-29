@@ -6,39 +6,39 @@ import (
 	"gorm.io/gorm"
 )
 
-// 迁移数据表，在没有数据表结构变更时候，建议注释不执行
-// 只支持创建表、增加表中没有的字段和索引
-// 为了保护数据，并不支持改变已有的字段类型或删除未被使用的字段
+// Migrate database tables. When there are no schema changes, it is recommended to comment this out.
+// Supports creating tables and adding missing fields and indexes only.
+// To protect data, it does not change existing field types or delete unused fields.
 func MakeMigrate(db *gorm.DB) error {
-	// 设置表关联
+	// Set up table associations
 	db.SetupJoinTable(&Role{}, "Menus", &RoleMenu{})
 	db.SetupJoinTable(&Role{}, "Resources", &RoleResource{})
 	db.SetupJoinTable(&Role{}, "Users", &UserAuthRole{})
 	db.SetupJoinTable(&UserAuth{}, "Roles", &UserAuthRole{})
 
 	return db.AutoMigrate(
-		&Article{},      // 文章
-		&Category{},     // 分类
-		&Tag{},          // 标签
-		&Comment{},      // 评论
-		&Message{},      // 消息
-		&FriendLink{},   // 友链
-		&Page{},         // 页面
-		&Config{},       // 网站设置
-		&OperationLog{}, // 操作日志
-		&UserInfo{},     // 用户信息
+		&Article{},      // Article
+		&Category{},     // Category
+		&Tag{},          // Tag
+		&Comment{},      // Comment
+		&Message{},      // Message
+		&FriendLink{},   // Friend Link
+		&Page{},         // Page
+		&Config{},       // Site Config
+		&OperationLog{}, // Operation Log
+		&UserInfo{},     // User Info
 
-		&UserAuth{},     // 用户验证
-		&Role{},         // 角色
-		&Menu{},         // 菜单
-		&Resource{},     // 资源（接口）
-		&RoleMenu{},     // 角色-菜单 关联
-		&RoleResource{}, // 角色-资源 关联
-		&UserAuthRole{}, // 用户-角色 关联
+		&UserAuth{},     // User Auth
+		&Role{},         // Role
+		&Menu{},         // Menu
+		&Resource{},     // Resource (API)
+		&RoleMenu{},     // Role-Menu relation
+		&RoleResource{}, // Role-Resource relation
+		&UserAuthRole{}, // User-Role relation
 	)
 }
 
-// 通用模型
+// Common model
 
 type Model struct {
 	ID        int       `gorm:"primary_key;auto_increment" json:"id"`
@@ -53,7 +53,7 @@ type OptionVO struct {
 
 // Gorm Scopes
 
-// 分页
+// Pagination scope
 func Paginate(page, size int) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
 		if page <= 0 {
@@ -71,9 +71,9 @@ func Paginate(page, size int) func(db *gorm.DB) *gorm.DB {
 	}
 }
 
-// 通用 CRUD
+// Common CRUD
 
-// 创建数据(可以创建[单条]数据, 也可[批量]创建)
+// Create data (single or batch)
 func Create[T any](db *gorm.DB, data *T) (*T, error) {
 	result := db.Create(data)
 	if result.Error != nil {
@@ -82,7 +82,7 @@ func Create[T any](db *gorm.DB, data *T) (*T, error) {
 	return data, nil
 }
 
-// [单条]数据查询
+// Query single record
 func Get[T any](db *gorm.DB, data *T, query string, args ...any) (*T, error) {
 	result := db.Where(query, args...).First(data)
 	if result.Error != nil {
@@ -91,7 +91,7 @@ func Get[T any](db *gorm.DB, data *T, query string, args ...any) (*T, error) {
 	return data, nil
 }
 
-// [单行]更新: 传入对应结构体[传递主键用] 和 带有对应更新字段值的[结构体]，结构体不更新零值
+// Update single row: pass struct with primary key and struct with updated fields; zero values are not updated
 func Update[T any](db *gorm.DB, data T, slt ...string) error {
 	db = db.Model(&data)
 	if len(slt) > 0 {
@@ -104,7 +104,7 @@ func Update[T any](db *gorm.DB, data T, slt ...string) error {
 	return nil
 }
 
-// [批量]更新: map 的字段就是要更新的字段 (map 可以更新零值), 通过条件可以实现[单行]更新
+// Batch update using map (map can update zero values); with conditions can perform single-row update
 func UpdatesMap[T any](db *gorm.DB, data *T, maps map[string]any, query string, args ...any) error {
 	result := db.Model(data).Where(query, args...).Updates(maps)
 	if result.Error != nil {
@@ -113,7 +113,7 @@ func UpdatesMap[T any](db *gorm.DB, data *T, maps map[string]any, query string, 
 	return nil
 }
 
-// [批量]更新: 结构体的属性就是要更新的字段 (结构体不更新零值), 通过条件可以实现[单行]更新
+// Batch update using struct fields (struct does not update zero values); with conditions can perform single-row update
 func Updates[T any](db *gorm.DB, data T, query string, args ...any) error {
 	result := db.Model(&data).Where(query, args...).Updates(&data)
 	if result.Error != nil {
@@ -122,7 +122,7 @@ func Updates[T any](db *gorm.DB, data T, query string, args ...any) error {
 	return nil
 }
 
-// 数据列表
+// List data
 func List[T any](db *gorm.DB, data T, slt, order, query string, args ...any) (T, error) {
 	db = db.Model(data).Select(slt).Order(order)
 	if query != "" {
@@ -135,7 +135,7 @@ func List[T any](db *gorm.DB, data T, slt, order, query string, args ...any) (T,
 	return data, nil
 }
 
-// [批量]删除数据, 通过条件控制可以删除单条数据
+// Batch delete; with conditions can delete a single record
 func Delete[T any](db *gorm.DB, data T, query string, args ...any) error {
 	result := db.Where(query, args...).Delete(&data)
 	if result.Error != nil {
@@ -144,7 +144,7 @@ func Delete[T any](db *gorm.DB, data T, query string, args ...any) error {
 	return nil
 }
 
-// 统计数量
+// Count total
 func Count[T any](db *gorm.DB, data *T, where ...any) (int, error) {
 	var total int64
 	db = db.Model(data)

@@ -7,7 +7,7 @@ export default {
   redirect: '/error-page/404',
   isHidden: true,
   meta: {
-    title: '错误页',
+    title: 'Error Page',
     icon: 'mdi:alert-circle-outline',
     order: 99,
   },

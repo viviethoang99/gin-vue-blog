@@ -176,7 +176,7 @@ gin-blog-server
 
 Frontend (brief):
 
-```
+```bash
 Common layout for gin-vue-admin / gin-vue-front
 ├── src              
 │   ├── api             -- APIs
@@ -208,7 +208,7 @@ Common layout for gin-vue-admin / gin-vue-front
 
 Deploy (brief):
 
-```
+```bash
 deploy
 ├── build      -- Image builds
 │   ├── mysql  -- MySQL image

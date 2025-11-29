@@ -17,27 +17,28 @@ import (
 
 func main() {
 	username := flag.String("username", "", "超级管理员账户")
-	password := flag.String("password", "", "超级管理员密码")
-	configPath := flag.String("c", "../../config.yml", "配置文件路径")
+	password := flag.String("password", "", "super administrator password")
+	configPath := flag.String("c", "../../config.yml", "configuration file path")
 	flag.Parse()
 
 	// 根据命令行参数读取配置文件, 其他变量的初始化依赖于配置文件对象
+	// Read configuration file based on command-line parameters; other variable initialization depends on the config object
 	conf := g.ReadConfig(*configPath)
 
-	//! 处理 sqlite3 数据库路径
+	//! Handle sqlite3 database path
 	conf.SQLite.Dsn = "../" + conf.SQLite.Dsn
 	conf.Server.DbLogMode = "silent"
 
 	db := ginblog.InitDatabase(conf)
 
 	if *username == "" || *password == "" {
-		log.Fatal("请指定超级管理员账户和密码")
+		log.Fatal("Please specify super administrator account and password")
 	}
 
 	createSuperAdmin(db, *username, *password)
 }
 
-// 创建超级管理员
+// Create super administrator
 func createSuperAdmin(db *gorm.DB, username, password string) {
 	err := db.Transaction(func(tx *gorm.DB) error {
 		var userAuth model.UserAuth
@@ -47,15 +48,15 @@ func createSuperAdmin(db *gorm.DB, username, password string) {
 		}
 
 		if userAuth.ID != 0 {
-			return errors.New(userAuth.Username + " 账户已存在")
+			return errors.New(userAuth.Username + " account already exists")
 		}
 
-		slog.Info("开始创建超级管理员")
+		slog.Info("Start creating super administrator")
 
 		// 默认生成一个 super admin 用户
 		hashPassword, err := utils.BcryptHash(password)
 		if err != nil {
-			return errors.New("密码生成失败: " + err.Error())
+			return errors.New("Password hash generation failed: " + err.Error())
 		}
 
 		userAuth = model.UserAuth{
@@ -65,7 +66,7 @@ func createSuperAdmin(db *gorm.DB, username, password string) {
 			UserInfo: &model.UserInfo{
 				Nickname: username,
 				Avatar:   "https://cdn.hahacode.cn/config/superadmin_avatar.jpg",
-				Intro:    "这个人很懒，什么都没有留下",
+				Intro:    "This person is lazy and left nothing.",
 				Website:  "https://www.hahacode.cn",
 			},
 		}
@@ -77,9 +78,9 @@ func createSuperAdmin(db *gorm.DB, username, password string) {
 	})
 
 	if err != nil {
-		slog.Error("创建超级管理员失败: " + err.Error())
+		slog.Error("Failed to create super administrator: " + err.Error())
 		os.Exit(0)
 	}
 
-	slog.Info(fmt.Sprintf("创建超级管理员成功: %s, 密码: %s\n", username, password))
+	slog.Info(fmt.Sprintf("Successfully created super administrator: %s, password: %s\n", username, password))
 }

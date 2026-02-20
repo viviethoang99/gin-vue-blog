@@ -1,0 +1,12 @@
+{$CADDY_SITE_ADDRESS} {
+    encode gzip zstd
+
+    @api path /api/*
+    handle @api {
+        reverse_proxy gvb-server:{$SERVER_PORT}
+    }
+
+    handle {
+        reverse_proxy gvb-web:80
+    }
+}

@@ -82,9 +82,33 @@ services:
       - SERVER_NAME=${SERVER_NAME} # Domain or localhost
       - BACKEND_HOST=${BACKEND_HOST} # Backend service address
       - SERVER_PORT=${SERVER_PORT} # Service port
+    networks:
+      gvb-network:
+        ipv4_address: ${FRONTEND_HOST}
+
+  gvb-caddy:
+    image: caddy:2-alpine
+    container_name: gvb-caddy
+    restart: always
+    depends_on:
+      gvb-web:
+        condition: service_started
+      gvb-server:
+        condition: service_started
+    environment:
+      - CADDY_SITE_ADDRESS=${CADDY_SITE_ADDRESS}
+      - SERVER_PORT=${SERVER_PORT}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
     ports:
       - "80:80"
       - "443:443"
     networks:
       gvb-network:
-        ipv4_address: ${FRONTEND_HOST}
+        ipv4_address: ${CADDY_HOST}
+
+volumes:
+  caddy-data:
+  caddy-config:

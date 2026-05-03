@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { NConfigProvider, darkTheme, dateViVN as dateLocale, viVN as locale } from 'naive-ui'
 import hljs from 'highlight.js/lib/core'
 import json from 'highlight.js/lib/languages/json'
@@ -10,6 +10,7 @@ import api from '@/api'
 
 hljs.registerLanguage('json', json)
 const themeStore = useThemeStore()
+const naiveThemeOverrides = computed(() => themes.naiveThemeOverrides(themeStore.darkMode))
 
 // onMounted(() => {
 //   const { accessToken } = useAuthStore()
@@ -25,7 +26,7 @@ const themeStore = useThemeStore()
   <NConfigProvider
     class="h-full w-full"
     :theme="themeStore.darkMode ? darkTheme : undefined"
-    :theme-overrides="themes.naiveThemeOverrides"
+    :theme-overrides="naiveThemeOverrides"
     :locale="locale"
     :date-locale="dateLocale"
     :hljs="hljs"

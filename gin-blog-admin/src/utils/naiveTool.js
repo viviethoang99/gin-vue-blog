@@ -107,7 +107,7 @@ export function setupNaiveDiscreteApi() {
   const themeStore = useThemeStore()
   const configProviderProps = computed(() => ({
     theme: themeStore.darkMode ? NaiveUI.darkTheme : undefined,
-    themeOverrides: themes.themeOverrides,
+    themeOverrides: themes.naiveThemeOverrides(themeStore.darkMode),
   }))
   const { message, dialog, notification, loadingBar } = NaiveUI.createDiscreteApi(
     ['message', 'dialog', 'notification', 'loadingBar'],

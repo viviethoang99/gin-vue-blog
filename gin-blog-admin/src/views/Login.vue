@@ -92,7 +92,7 @@ async function handleLogin() {
 <template>
   <!-- FIXME: Using style="background-image: url(/image/login_bg.webp);" doesn't work; set it in a CSS class instead -->
   <AppPage class="backgroundImg bg-cover">
-    <div style="transform: translateY(25px)" class="m-auto max-w-[700px] min-w-[345px] flex items-center justify-center rounded-2 bg-white bg-opacity-60 p-4 shadow">
+    <div style="transform: translateY(25px)" class="m-auto max-w-[700px] min-w-[345px] flex items-center justify-center rounded-2 bg-white bg-opacity-60 p-4 shadow dark:bg-dark dark:bg-opacity-80">
       <div class="hidden w-[380px] px-5 py-9 md:block">
         <img src="/image/login_banner.webp" class="w-full" alt="login_banner">
       </div>

@@ -1,4 +1,4 @@
-FROM golang:1.21-alpine as BUILDER
+FROM golang:1.23-alpine as BUILDER
 WORKDIR /gvb
 
 COPY go.mod go.mod

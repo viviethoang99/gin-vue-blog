@@ -50,3 +50,8 @@ Qiniu:
   SecretKey: ""
   UseHttps: false
   UseCdnDomains: false
+Aws:
+  AccessKey: ""
+  SecretKey: ""
+  Bucket: ""
+  Region: ""

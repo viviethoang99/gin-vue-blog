@@ -51,3 +51,9 @@ Qiniu:
   SecretKey: ""
   UseHttps: false
   UseCdnDomains: false
+Aws:
+  ImgPath: "" # Public image base URL
+  AccessKey: ""
+  SecretKey: ""
+  Bucket: ""
+  Region: ""

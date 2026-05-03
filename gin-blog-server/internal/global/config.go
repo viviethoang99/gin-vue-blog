@@ -53,7 +53,7 @@ type Config struct {
 		Host     string // 服务器地址, 例如 smtp.qq.com 前往要发邮件的邮箱查看其 smtp 协议
 		Port     int    // 前往要发邮件的邮箱查看其 smtp 协议端口, 大多为 465
 		SmtpPass string // 邮箱密钥 不是密码是开启smtp后给你的密钥
-		SmtpUser string // 邮箱账号 
+		SmtpUser string // 邮箱账号
 	}
 	Captcha struct {
 		SendEmail  bool // 是否通过邮箱发送验证码
@@ -73,6 +73,13 @@ type Config struct {
 		SecretKey     string // 秘钥SK
 		UseHTTPS      bool   // 是否使用https
 		UseCdnDomains bool   // 上传是否使用 CDN 上传加速
+	}
+	Aws struct {
+		ImgPath   string // 外链链接
+		Bucket    string // 存储桶名称
+		Region    string // 存储桶所在区域
+		AccessKey string // AWS访问密钥ID
+		SecretKey string // AWS秘密访问密钥
 	}
 }
 
@@ -104,7 +111,6 @@ func ReadConfig(path string) *Config {
 	log.Println("配置文件内容加载成功: ", path)
 	return Conf
 }
-
 
 // 数据库类型
 func (*Config) DbType() string {

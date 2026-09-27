@@ -1,0 +1,272 @@
+import { mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { reactive } from 'vue'
+
+import api from '@/api'
+import Comment from './Comment.vue'
+import CommentField from './CommentField.vue'
+import Paging from './Paging.vue'
+
+vi.mock('@/api', () => ({
+  default: {
+    getComments: vi.fn(),
+    getCommentReplies: vi.fn(),
+    saveComment: vi.fn().mockResolvedValue({ code: 0 }),
+    saveLikeComment: vi.fn().mockResolvedValue({ code: 0 }),
+  },
+}))
+
+// 路由可变且响应式: 站内通知点进来时 url 上会带 ?comment=xxx,
+// 已经在这篇文章上时只有 query 会变, 组件不会重建
+const route = reactive({ params: { id: '7' }, query: {} })
+vi.mock('vue-router', async importOriginal => ({
+  ...await importOriginal(),
+  useRoute: () => route,
+}))
+
+function makeComment(id, replyCount = 0) {
+  return {
+    id,
+    user_id: id * 10,
+    content: `评论 ${id}`,
+    created_at: '2026-09-01T00:00:00Z',
+    like_count: 0,
+    reply_count: replyCount,
+    reply_list: [],
+    user: { info: { nickname: `用户${id}`, avatar: '' } },
+  }
+}
+
+// 列表加载有 0.8s 的延时, 用假定时器推过去
+async function mountComment(comments) {
+  api.getComments.mockResolvedValue({
+    code: 0,
+    data: { page_data: comments, total: comments.length },
+  })
+  const wrapper = mount(Comment, { props: { type: 1 } })
+  await vi.advanceTimersByTimeAsync(900)
+  await wrapper.vm.$nextTick()
+  return wrapper
+}
+
+describe('前台评论列表', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    setActivePinia(createPinia())
+    route.query = {}
+    api.getComments.mockReset()
+    api.getCommentReplies.mockReset().mockResolvedValue({ code: 0, data: [] })
+    window.$message = { success: vi.fn(), error: vi.fn(), info: vi.fn() }
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  // 回归: 原来按 v-for 下标取模板 ref 数组, Vue 不保证顺序与源数组一致,
+  // 点第二条评论的「回复」可能打开别人的回复框
+  it('点击回复只打开这条评论的回复框, 并带上正确的父评论', async () => {
+    const wrapper = await mountComment([makeComment(1), makeComment(2)])
+
+    // 顶部的评论框始终存在, 回复框还没有
+    expect(wrapper.findAllComponents(CommentField)).toHaveLength(1)
+
+    // 第二条评论的「回复」按钮
+    await wrapper.findAll('button.color-\\#ef2f11')[1].trigger('click')
+
+    const fields = wrapper.findAllComponents(CommentField)
+    expect(fields).toHaveLength(2)
+    const reply = fields[1]
+    expect(reply.props('parentId')).toBe(2)
+    expect(reply.props('replyUserId')).toBe(20)
+    expect(reply.props('nickname')).toBe('用户2')
+  })
+
+  it('切换到另一条评论的回复框时, 上一个会关掉', async () => {
+    const wrapper = await mountComment([makeComment(1), makeComment(2)])
+    const buttons = wrapper.findAll('button.color-\\#ef2f11')
+
+    await buttons[0].trigger('click')
+    expect(wrapper.findAllComponents(CommentField)[1].props('parentId')).toBe(1)
+
+    await buttons[1].trigger('click')
+    const fields = wrapper.findAllComponents(CommentField)
+    expect(fields).toHaveLength(2) // 仍然只有一个回复框
+    expect(fields[1].props('parentId')).toBe(2)
+  })
+
+  // 回归: 原来用 checkRefs[idx].style.display 直接改 DOM
+  it('点击查看后隐藏「点击查看」并按回复数决定是否显示分页', async () => {
+    const c1 = makeComment(1, 4) // 4 条回复: 展开后不需要分页
+    const c2 = makeComment(2, 8) // 8 条回复: 展开后有分页
+    const wrapper = await mountComment([c1, c2])
+
+    expect(wrapper.findAllComponents(Paging)).toHaveLength(0)
+
+    // 展开第二条评论的回复
+    await wrapper.findAll('button.color-\\#00a1d6')[1].trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect(api.getCommentReplies).toHaveBeenCalledWith(2, { page_num: 1, page_size: 5 })
+    const pagings = wrapper.findAllComponents(Paging)
+    expect(pagings).toHaveLength(1)
+    expect(pagings[0].props('pageTotal')).toBe(2)
+    // 第二条的「点击查看」被隐藏, 第一条不受影响
+    const checks = wrapper.findAll('button.color-\\#00a1d6')
+    expect(checks[0].isVisible()).toBe(true)
+    expect(checks[1].isVisible()).toBe(false)
+  })
+
+  it('回复分页翻页带上对应评论的 id 与页码', async () => {
+    const wrapper = await mountComment([makeComment(1, 8)])
+    await wrapper.find('button.color-\\#00a1d6').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    api.getCommentReplies.mockClear()
+    wrapper.findComponent(Paging).vm.$emit('changeCurrent', 2)
+    await vi.advanceTimersByTimeAsync(0)
+    await wrapper.vm.$nextTick()
+
+    expect(api.getCommentReplies).toHaveBeenCalledWith(1, { page_num: 2, page_size: 5 })
+    expect(wrapper.findComponent(Paging).props('current')).toBe(2)
+  })
+
+  // 回归: 原来是 pageRefs.value[idx].current, 按下标取错组件就会刷到别人的回复
+  it('提交回复后按当前页重新加载这条评论的回复', async () => {
+    const wrapper = await mountComment([makeComment(1, 8)])
+    await wrapper.find('button.color-\\#00a1d6').trigger('click')
+    await wrapper.vm.$nextTick()
+    wrapper.findComponent(Paging).vm.$emit('changeCurrent', 2)
+    await vi.advanceTimersByTimeAsync(0)
+    await wrapper.vm.$nextTick()
+
+    await wrapper.findAll('button.color-\\#ef2f11')[0].trigger('click')
+    api.getCommentReplies.mockClear()
+
+    const reply = wrapper.findAllComponents(CommentField)[1]
+    reply.vm.$emit('afterSubmit')
+    await wrapper.vm.$nextTick()
+
+    expect(api.getCommentReplies).toHaveBeenCalledWith(1, { page_size: 5, page_num: 2 })
+  })
+
+  // 回归: 原来 "@名称" 取的是 reply.user(回复者自己), 于是 admin 回复别人也显示 "@admin"
+  it('回复里的 "@名称" 显示被回复者, 回复自己时不显示', async () => {
+    const root = makeComment(1, 2)
+    root.reply_list = [
+      // admin(user_id 99) 回复 guest(user_id 10)
+      {
+        id: 11,
+        user_id: 99,
+        reply_user_id: 10,
+        content: '回复内容',
+        created_at: '2026-09-01T00:00:00Z',
+        like_count: 0,
+        user: { info: { nickname: 'admin', avatar: '' } },
+        reply_user: { info: { nickname: 'guest', avatar: '' } },
+      },
+      // 自己回复自己: 不该出现 "@"
+      {
+        id: 12,
+        user_id: 99,
+        reply_user_id: 99,
+        content: '补充一下',
+        created_at: '2026-09-01T00:00:00Z',
+        like_count: 0,
+        user: { info: { nickname: 'admin', avatar: '' } },
+        reply_user: { info: { nickname: 'admin', avatar: '' } },
+      },
+    ]
+    const wrapper = await mountComment([root])
+
+    expect(wrapper.text()).toContain('@guest')
+    expect(wrapper.text()).not.toContain('@admin')
+  })
+
+  // 站内通知点进来: 目标评论可能在第二页往后, 要自动翻到它
+  it('带 ?comment= 时翻页找到那条回复, 滚过去并高亮', async () => {
+    route.query = { comment: '22' }
+    const scrollIntoView = vi.fn()
+    Element.prototype.scrollIntoView = scrollIntoView
+
+    const second = makeComment(3, 1)
+    second.reply_list = [{
+      id: 22,
+      user_id: 99,
+      reply_user_id: 30,
+      content: '通知里的那条回复',
+      created_at: '2026-09-01T00:00:00Z',
+      like_count: 0,
+      user: { info: { nickname: 'admin', avatar: '' } },
+      reply_user: { info: { nickname: 'guest', avatar: '' } },
+    }]
+
+    api.getComments
+      .mockResolvedValueOnce({ code: 0, data: { page_data: [makeComment(1), makeComment(2)], total: 3 } })
+      .mockResolvedValueOnce({ code: 0, data: { page_data: [second], total: 3 } })
+
+    // 定位靠 document.getElementById, 必须真的挂到页面上
+    const wrapper = mount(Comment, { props: { type: 1 }, attachTo: document.body })
+    await vi.advanceTimersByTimeAsync(900) // 第一页
+    await vi.advanceTimersByTimeAsync(900) // 第二页
+    await wrapper.vm.$nextTick()
+
+    expect(api.getComments).toHaveBeenCalledTimes(2)
+    expect(scrollIntoView).toHaveBeenCalled()
+    expect(wrapper.find('#comment-22').classes()).toContain('ring-primary/40')
+
+    // 高亮几秒后自己褪去, 不然一直挂着很吵
+    await vi.advanceTimersByTimeAsync(4100)
+    expect(wrapper.find('#comment-22').classes()).not.toContain('ring-primary/40')
+  })
+
+  it('目标 id 不存在时停止翻页, 不报错', async () => {
+    route.query = { comment: '999' }
+    api.getComments.mockResolvedValue({
+      code: 0,
+      data: { page_data: [makeComment(1)], total: 1 },
+    })
+
+    const wrapper = mount(Comment, { props: { type: 1 } })
+    await vi.advanceTimersByTimeAsync(900)
+    await wrapper.vm.$nextTick()
+
+    // 已经加载完全部评论, 不再继续请求
+    expect(api.getComments).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('#comment-1').classes()).not.toContain('ring-primary/40')
+  })
+
+  // 回归: 已经在这篇文章页上时点通知, 只有 query 变, 组件不会重建,
+  // 原来只在 onMounted 里定位, 表现就是"点了没反应"
+  it('已在本页时 query 变化也会重新定位', async () => {
+    const scrollIntoView = vi.fn()
+    Element.prototype.scrollIntoView = scrollIntoView
+
+    const root = makeComment(1, 1)
+    root.reply_list = [{
+      id: 33,
+      user_id: 99,
+      reply_user_id: 10,
+      content: '同一篇文章里的回复',
+      created_at: '2026-09-01T00:00:00Z',
+      like_count: 0,
+      user: { info: { nickname: 'admin', avatar: '' } },
+      reply_user: { info: { nickname: 'guest', avatar: '' } },
+    }]
+    api.getComments.mockResolvedValue({ code: 0, data: { page_data: [root], total: 1 } })
+
+    const wrapper = mount(Comment, { props: { type: 1 }, attachTo: document.body })
+    await vi.advanceTimersByTimeAsync(900)
+    await wrapper.vm.$nextTick()
+    expect(scrollIntoView).not.toHaveBeenCalled()
+
+    // 模拟点通知: 路径没变, 只加了 ?comment=33
+    route.query = { comment: '33' }
+    await vi.advanceTimersByTimeAsync(0)
+    await wrapper.vm.$nextTick()
+
+    expect(scrollIntoView).toHaveBeenCalled()
+    expect(wrapper.find('#comment-33').classes()).toContain('ring-primary/40')
+  })
+})

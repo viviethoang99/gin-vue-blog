@@ -6,19 +6,18 @@ import (
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
-	"github.com/go-redis/redis/v9"
+	"github.com/redis/go-redis/v9"
 )
 
 type Page struct{}
 
 // @Summary Get page list
-// @Description Get page list by conditions
+// @Description 获取页面列表, 优先读 Redis 缓存
 // @Tags Page
-// @Accept json
 // @Produce json
 // @Success 0 {object} Response[[]model.Page]
-// @Security ApiKeyAuth
 // @Router /page/list [get]
+// @Router /front/page [get]
 func (*Page) GetList(c *gin.Context) {
 	db := GetDB(c)
 	rdb := GetRDB(c)
@@ -55,12 +54,12 @@ func (*Page) GetList(c *gin.Context) {
 	ReturnSuccess(c, data)
 }
 
-// @Summary Add or edit page
-// @Description Add or edit page
+// @Summary 新增或编辑页面
+// @Description 新增或编辑页面, 同时清除 Redis 缓存
 // @Tags Page
-// @Param form body AddOrEditPageReq true "Add or edit page"
 // @Accept json
 // @Produce json
+// @Param form body model.Page true "新增或编辑页面"
 // @Success 0 {object} Response[model.Page]
 // @Security ApiKeyAuth
 // @Router /page [post]
@@ -89,13 +88,13 @@ func (*Page) SaveOrUpdate(c *gin.Context) {
 	ReturnSuccess(c, page)
 }
 
-// @Summary Delete pages
-// @Description Delete pages by ID array
+// @Summary 删除页面（批量）
+// @Description 根据 ID 数组删除页面, 同时清除 Redis 缓存
 // @Tags Page
-// @Param ids body []int true "Page ID array"
 // @Accept json
 // @Produce json
-// @Success 0 {object} Response[int]
+// @Param ids body []int true "Page ID array"
+// @Success 0 {object} Response[int64]
 // @Security ApiKeyAuth
 // @Router /page [delete]
 func (*Page) Delete(c *gin.Context) {

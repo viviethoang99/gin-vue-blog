@@ -1,0 +1,109 @@
+# 快速开始
+
+三个子项目：`gin-blog-server`（后端）、`gin-blog-front`（博客前台）、`gin-blog-admin`（博客后台）。
+
+前台和后台都内置 Mock 模式，只想看前端效果的话不需要启动后端。
+
+| 项目 | 地址 | 说明 |
+| --- | --- | --- |
+| 博客前台 | http://localhost:8888 | |
+| 博客后台 | http://localhost:8889 | 默认账号 `admin / 123456` |
+| 后端接口 | http://localhost:8765/api | Swagger: http://localhost:8765/swagger/index.html |
+
+## 方式一：一键启动（联调推荐）
+
+前置依赖：Go 1.26+、pnpm、Redis（没装的话脚本会用 docker 起一个）。数据库默认 SQLite，无需额外安装。
+
+```bash
+./dev.sh            # 启动 Redis + 后端 + 前台 + 后台
+./dev.sh restart    # 改完代码重启
+./dev.sh fresh      # 从零开始: 旧库备份成 gvb.db.bak, 清 Redis, 重新建表灌基础数据
+./dev.sh fresh --demo  # 同上, 并额外灌一批样例文章/评论/留言/友链
+./dev.sh stop
+./dev.sh status
+./dev.sh logs server   # server | front | admin | redis
+./dev.sh seed          # 单独重新灌一次基础数据
+./dev.sh seed --demo   # 往空内容的库里补一批样例内容
+```
+
+几个实现上的点：
+
+- 两个前端的 `VITE_USE_MOCK` 由脚本在命令行覆盖为 `false`（vite 里 shell 环境变量优先级高于 `.env` 文件），所以不用改文件就能打到真后端。
+- Redis：端口上已经有就直接复用；否则优先本机 `redis-server`，都没有则用 docker 起 `redis:7.0-alpine`，`stop` 时一并清掉。
+- 首次启动（检测不到 `gin-blog-server/cmd/gvb.db`）会先执行一次 `generate_data.sh`，它自己会 AutoMigrate 建表，再正式启动。
+- `--demo` 在基础数据之外再灌一批样例内容（3 个分类、6 个标签、15 篇文章、评论与回复、留言、友链），可以加在 `start` / `fresh` / `seed` 后面。文章刻意超过前台每页 9 条并跨多个月份，分页、归档分组、标签云、评论回复这些必须有数据才看得出问题的地方才验证得到；库里只要已经有文章就跳过，不会灌重复。
+- `fresh` 用来从零验证一遍流程：把旧库改名成 `gvb.db.bak`（不是删除，测试数据攒久了手一抖就没了）、清掉 Redis 的 DB 7、然后走首次启动。要恢复就把 `.bak` 改回来。上传的图片不动。
+- 后端是先 `go build` 再跑二进制，记录的 pid 就是服务进程本身；前端用独立进程组启动，`stop` 整组杀，不会留下孤儿占端口。
+- 端口被别的进程占着会直接报错退出，不会让 vite 悄悄换到 8890。
+- 日志和 pid 在 `.dev/` 下（已 gitignore）。
+
+## 方式二：只启动前端（Mock 模式）
+
+不需要 Go、MySQL、Redis。
+
+博客前台：
+
+```bash
+cd gin-blog-front
+pnpm install
+# .env.development 中设置 VITE_USE_MOCK = true
+pnpm dev
+```
+
+博客后台：
+
+```bash
+cd gin-blog-admin
+pnpm install
+# .env.development 中设置 VITE_USE_MOCK = true
+pnpm dev
+```
+
+Mock 模式下数据来自各项目的 `src/mock/`，增删改会写入内存、刷新浏览器后重置；后台登录不校验账号密码。
+
+## 方式三：完整启动（前端 + 后端，手动）
+
+和方式一等价，只是每步自己敲。前置依赖：Go 1.26+、Redis（默认 `127.0.0.1:6379`，用 DB 7）。数据库默认用 SQLite，无需额外安装。
+
+1. 启动后端：
+
+```bash
+cd gin-blog-server
+go mod tidy
+
+cd cmd
+go run main.go
+```
+
+2. 首次启动后初始化基础数据（菜单、资源、角色、默认用户、网站配置、页面封面）：
+
+```bash
+cd gin-blog-server/cmd
+sh generate_data.sh
+```
+
+生成默认用户 `admin` 和 `guest`，密码都是 `123456`。脚本可重复执行，已存在的数据会跳过。
+
+3. 启动前端（把 `.env.development` 中的 `VITE_USE_MOCK` 设为 `false`）：
+
+```bash
+cd gin-blog-front && pnpm install && pnpm dev
+cd gin-blog-admin && pnpm install && pnpm dev
+```
+
+`/api` 请求由 vite 代理到后端 `:8765`，前端不需要配置跨域。
+
+## 常见问题
+
+- **修改 `.env*` 没生效**：vite 不会热更环境变量，必须重启 dev server。注意 `pnpm dev` 只读 `.env` 和 `.env.development`，改 `.env.production` 对开发模式无效。
+- **`pnpm install` 报 `ERR_PNPM_IGNORED_BUILDS`**：pnpm 10+ 默认禁止依赖执行安装脚本，两个前端项目已在 `pnpm-workspace.yaml` 的 `allowBuilds` 中批准，如仍报错执行 `pnpm approve-builds` 并把选项全部设为 `true`。
+- **前台页面空白、没有文章**：`generate_data.sh` 只生成系统基础数据，不含文章/分类/标签等内容数据。要么在后台自行添加，要么灌一批样例内容：`./dev.sh seed --demo`，或直接 `cd gin-blog-server/cmd/generate-data && go run main.go -t demo`。
+- **注册用户要不要配邮箱**：不用。`config.yml` 的 `Captcha.SendEmail` 默认 `false`，注册请求直接把用户建出来。想改成邮箱验证注册，把它设为 `true` 并把 `Email` 段（`Host` / `Port` / `From` / `SmtpPass` / `SmtpUser`）配全，否则注册会返回 `6101 发送邮件失败`。另外注意环境里若存在 `EMAIL` 变量会让整个 `Email` 段读不到（见 `code_audit.md` F12）。
+- **启动日志出现 `[警告] JWT.Secret 还是仓库里的示例值`**：本地开发可以忽略。`Server.Mode: release` 时这两项（`JWT.Secret` / `Session.Salt`）为空或仍是示例值会直接拒绝启动，用环境变量 `JWT_SECRET` / `SESSION_SALT` 注入即可；Docker 部署由 `deploy/bootstrap.sh` 自动生成。
+- **改了数据库但接口仍返回旧数据**：`page` / `config`（含「关于我」）在 Redis 里有 10 分钟读穿缓存。走后台接口改动会立即失效；直接改库或跑 `generate-data` 灌种子不会触发失效，等 TTL 到期即可，急的话 `redis-cli -n 7 del page config`。
+- **浏览器控制台报 CORS 被拦**：后端只放行 `config.yml` 里 `server.allowed-origins` 列出的来源，留空时退回「只放行本机与内网」。部署到公网域名后要把域名写进去（如 `allowed-origins: ["https://blog.example.com"]`），否则前端请求拿不到 `Access-Control-Allow-Origin`。同源部署（compose 里 nginx 转发 `/api`）不涉及跨域，不用配。
+- **登录日志 / 访客统计里的 IP 都是同一个**：后端只在直连对端落在 `server.trusted-proxies` 网段时才采信 `X-Real-IP` / `X-Forwarded-For`，留空默认只信任内网。如果反向代理不在内网网段，把它的地址写进这个列表，否则记下来的会是代理的 IP。
+- **仪表盘的「访问量」和「访问趋势」对不上**：不是一个口径。累计的访问量统计「来过多少人」（按 IP + 浏览器 + 系统的指纹去重，同一访客只算一次）；趋势统计「每天来了多少次」（每打开一次前台算一次，不去重），所以趋势加起来通常大于累计值。趋势数据只存在 Redis 里 30 天（键形如 `view_count:2026-09-07`），过期即丢，清 Redis 会归零。
+- **点赞数 / 阅读量会不会因为清 Redis 而丢**：不会归零到底。这几个计数只在 Redis 里累加（数据库没有对应字段），但后端每 10 分钟、以及收到退出信号时会把它们抄一份进 `counter_snapshot` 表，启动时把 Redis 里缺的键补回去。所以最坏情况是丢掉最后一个周期的增量（`kill -9` 时），而不是全部。注意回填**只补 Redis 里没有的键**，Redis 里还有数据时不会被旧备份覆盖。
+
+更多细节见各子项目的 README。

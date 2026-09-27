@@ -50,7 +50,14 @@ type ForceOfflineReq struct {
 	UserInfoId int `json:"user_info_id"`
 }
 
-// Get user info based on Token
+// @Summary 获取当前用户信息
+// @Description 根据 Token 获取用户信息与点赞记录
+// @Tags User
+// @Produce json
+// @Success 0 {object} Response[model.UserInfoVO]
+// @Security ApiKeyAuth
+// @Router /user/info [get]
+// @Router /front/user/info [get]
 func (*User) GetInfo(c *gin.Context) {
 	rdb := GetRDB(c)
 
@@ -76,7 +83,16 @@ func (*User) GetInfo(c *gin.Context) {
 }
 
 // TODO: User area distribution GetUserAreas, StatisticUserAreas
-// Update current user info: no need to pass id, parse from Token
+// @Summary 修改当前用户信息
+// @Description 修改昵称/头像/简介/网站, 用户 ID 从 Token 中解析
+// @Tags User
+// @Accept json
+// @Produce json
+// @Param form body UpdateCurrentUserReq true "修改当前用户信息"
+// @Success 0 {object} Response[any]
+// @Security ApiKeyAuth
+// @Router /user/current [put]
+// @Router /front/user/info [put]
 func (*User) UpdateCurrent(c *gin.Context) {
 	var req UpdateCurrentUserReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -84,7 +100,10 @@ func (*User) UpdateCurrent(c *gin.Context) {
 		return
 	}
 
-	auth, _ := CurrentUserAuth(c)
+	auth, ok := MustCurrentUserAuth(c)
+	if !ok {
+		return
+	}
 	err := model.UpdateUserInfo(GetDB(c), auth.UserInfoId, req.Nickname, req.Avatar, req.Intro, req.Website)
 	if err != nil {
 		ReturnError(c, g.ErrDbOp, err)
@@ -94,7 +113,15 @@ func (*User) UpdateCurrent(c *gin.Context) {
 	ReturnSuccess(c, nil)
 }
 
-// Update user info: nickname + roles
+// @Summary 修改用户信息
+// @Description 修改指定用户的昵称与角色
+// @Tags User
+// @Accept json
+// @Produce json
+// @Param form body UpdateUserReq true "修改用户信息"
+// @Success 0 {object} Response[any]
+// @Security ApiKeyAuth
+// @Router /user [put]
 func (*User) Update(c *gin.Context) {
 	var req UpdateUserReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -110,7 +137,18 @@ func (*User) Update(c *gin.Context) {
 	ReturnSuccess(c, nil)
 }
 
-// Get user list
+// @Summary 条件查询用户列表
+// @Description 支持按登录类型/用户名/昵称过滤
+// @Tags User
+// @Produce json
+// @Param login_type query int false "登录类型"
+// @Param username query string false "Username"
+// @Param nickname query string false "昵称"
+// @Param page_num query int false "页码"
+// @Param page_size query int false "每页数量"
+// @Success 0 {object} Response[PageResult[model.UserAuth]]
+// @Security ApiKeyAuth
+// @Router /user/list [get]
 func (*User) GetList(c *gin.Context) {
 	var query UserQuery
 	if err := c.ShouldBindQuery(&query); err != nil {
@@ -132,7 +170,15 @@ func (*User) GetList(c *gin.Context) {
 	})
 }
 
-// Update user disable status
+// @Summary 修改用户禁用状态
+// @Description 禁用或启用用户
+// @Tags User
+// @Accept json
+// @Produce json
+// @Param form body UpdateUserDisableReq true "修改禁用状态"
+// @Success 0 {object} Response[any]
+// @Security ApiKeyAuth
+// @Router /user/disable [put]
 func (*User) UpdateDisable(c *gin.Context) {
 	var req UpdateUserDisableReq
 
@@ -150,7 +196,15 @@ func (*User) UpdateDisable(c *gin.Context) {
 	ReturnSuccess(c, nil)
 }
 
-// Change current user's password: requires old password verification
+// @Summary 修改当前用户密码
+// @Description 需要提供旧密码进行验证
+// @Tags User
+// @Accept json
+// @Produce json
+// @Param form body UpdateCurrentPasswordReq true "修改密码"
+// @Success 0 {object} Response[any]
+// @Security ApiKeyAuth
+// @Router /user/current/password [put]
 func (*User) UpdateCurrentPassword(c *gin.Context) {
 	var req UpdateCurrentPasswordReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -158,16 +212,24 @@ func (*User) UpdateCurrentPassword(c *gin.Context) {
 		return
 	}
 
-	auth, _ := CurrentUserAuth(c)
+	auth, ok := MustCurrentUserAuth(c)
+	if !ok {
+		return
+	}
 
 	if !utils.BcryptCheck(req.OldPassword, auth.Password) {
 		ReturnError(c, g.ErrOldPassword, nil)
 		return
 	}
 
-	hashPassword, _ := utils.BcryptHash(req.NewPassword)
-	err := model.UpdateUserPassword(GetDB(c), auth.ID, hashPassword)
+	// 不能忽略这里的 error: 写入空 hash 会让 BcryptCheck 永远不匹配, 账号被锁死
+	hashPassword, err := utils.BcryptHash(req.NewPassword)
 	if err != nil {
+		ReturnError(c, g.FailResult, err)
+		return
+	}
+
+	if err := model.UpdateUserPassword(GetDB(c), auth.ID, hashPassword); err != nil {
 		ReturnError(c, g.ErrDbOp, err)
 		return
 	}
@@ -180,8 +242,8 @@ func (*User) UpdateCurrentPassword(c *gin.Context) {
 // TODO: Change normal user's password (admin can change directly)
 // func (*User) UpdatePassword(c *gin.Context) {
 // 	type UpdatePasswordForm struct {
-// 		Username string `json:"username" validate:"required" label:"Username"`
-// 		Password string `json:"password" validate:"required" label:"Password"`
+// 		Username string `json:"username" binding:"required"`
+// 		Password string `json:"password" binding:"required"`
 // 	}
 
 // 	var form UpdatePasswordForm
@@ -206,7 +268,14 @@ func (*User) UpdateCurrentPassword(c *gin.Context) {
 // 	ReturnSuccess(c, nil)
 // }
 
-// Query current online users
+// @Summary 获取在线用户列表
+// @Description 从 Redis 中读取在线用户, 按上次登录时间倒序
+// @Tags User
+// @Produce json
+// @Param keyword query string false "用户名或昵称关键字"
+// @Success 0 {object} Response[[]model.UserAuth]
+// @Security ApiKeyAuth
+// @Router /user/online [get]
 func (*User) GetOnlineList(c *gin.Context) {
 	keyword := c.Query("keyword")
 
@@ -237,7 +306,14 @@ func (*User) GetOnlineList(c *gin.Context) {
 	ReturnSuccess(c, onlineList)
 }
 
-// Force offline
+// @Summary 强制用户下线
+// @Description 强制指定用户下线, 不能强制自己下线
+// @Tags User
+// @Produce json
+// @Param id path int true "用户 ID"
+// @Success 0 {object} Response[string]
+// @Security ApiKeyAuth
+// @Router /user/offline/{id} [post]
 func (*User) ForceOffline(c *gin.Context) {
 	id := c.Param("id")
 	uid, err := strconv.Atoi(id)

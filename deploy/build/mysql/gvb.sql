@@ -76,7 +76,7 @@ CREATE TABLE `category`  (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `created_at` datetime(3) NULL DEFAULT NULL,
   `updated_at` datetime(3) NULL DEFAULT NULL,
-  `name` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `name` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `name`(`name` ASC) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 5 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
@@ -136,7 +136,7 @@ INSERT INTO `config` VALUES (3, '2023-12-27 22:40:22.813', '2023-12-27 23:01:35.
 INSERT INTO `config` VALUES (4, '2023-12-27 22:40:22.813', '2023-12-27 23:01:35.023', '', 'website_intro', 'Let the past go with the wind', 'Website Introduction');
 INSERT INTO `config` VALUES (5, '2023-12-27 22:40:22.813', '2023-12-27 23:01:35.038', '', 'website_notice', 'Welcome to Zhenyu personal blog, the project is still in development...', 'Website Notice');
 INSERT INTO `config` VALUES (6, '2023-12-27 22:40:22.813', '2023-12-27 23:01:35.031', '', 'website_createtime', '2023-12-27 22:40:22', 'Website Creation Date');
-INSERT INTO `config` VALUES (7, '2023-12-27 22:40:22.813', '2023-12-27 23:01:35.011', '', 'website_record', '粤ICP备2021032312号', 'Website Registration Number');
+INSERT INTO `config` VALUES (7, '2023-12-27 22:40:22.813', '2023-12-27 23:01:35.011', '', 'website_record', '粤ICP备2021032312号', '网站备案号');
 INSERT INTO `config` VALUES (8, '2023-12-27 22:40:22.813', '2023-12-27 23:01:35.008', '', 'qq', '123456789', 'QQ');
 INSERT INTO `config` VALUES (9, '2023-12-27 22:40:22.813', '2023-12-27 23:01:35.015', '', 'github', 'https://github.com/szluyu99', 'github');
 INSERT INTO `config` VALUES (10, '2023-12-27 22:40:22.813', '2023-12-27 23:01:35.025', '', 'gitee', 'https://gitee.com/szluyu99', 'gitee');
@@ -155,7 +155,7 @@ CREATE TABLE `friend_link`  (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `created_at` datetime(3) NULL DEFAULT NULL,
   `updated_at` datetime(3) NULL DEFAULT NULL,
-  `name` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
   `avatar` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
   `address` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
   `intro` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
@@ -164,62 +164,7 @@ CREATE TABLE `friend_link`  (
 
 -- ----------------------------
 -- Records of friend_link
--- ----------------------------
 
--- ----------------------------
--- Table structure for menu
--- ----------------------------
-DROP TABLE IF EXISTS `menu`;
-CREATE TABLE `menu`  (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(3) NULL DEFAULT NULL,
-  `updated_at` datetime(3) NULL DEFAULT NULL,
-  `parent_id` bigint NULL DEFAULT NULL,
-  `name` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
-  `path` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
-  `component` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
-  `icon` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
-  `order_num` tinyint NULL DEFAULT NULL,
-  `redirect` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
-  `catalogue` tinyint(1) NULL DEFAULT NULL,
-  `hidden` tinyint(1) NULL DEFAULT NULL,
-  `keep_alive` tinyint(1) NULL DEFAULT NULL,
-  `external` tinyint(1) NULL DEFAULT NULL,
-  `external_link` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
-  PRIMARY KEY (`id`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 49 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
-
--- ----------------------------
--- Records of menu
--- ----------------------------
-INSERT INTO `menu` VALUES (2, '2022-10-31 09:41:03.000', '2023-12-27 23:26:43.807', 0, 'Article Management', '/article', 'Layout', 'ic:twotone-article', 1, '/article/list', 0, 0, 1, 0, NULL);
-INSERT INTO `menu` VALUES (3, '2022-10-31 09:41:03.000', '2023-12-24 23:33:34.013', 0, 'Message Management', '/message', 'Layout', 'ic:twotone-email', 2, '/message/comment	', 0, 0, 1, 0, NULL);
-INSERT INTO `menu` VALUES (4, '2022-10-31 09:41:03.000', '2023-12-24 23:32:35.177', 0, 'User Management', '/user', 'Layout', 'ph:user-list-bold', 4, '/user/list', 0, 0, 0, 0, NULL);
-INSERT INTO `menu` VALUES (5, '2022-10-31 09:41:03.000', '2023-12-24 23:32:34.788', 0, 'System Management', '/setting', 'Layout', 'ion:md-settings', 5, '/setting/website', 0, 0, 0, 0, NULL);
-INSERT INTO `menu` VALUES (6, '2022-10-31 09:41:03.000', '2023-12-24 23:22:29.519', 2, 'Publish Article', 'write', '/article/write', 'icon-park-outline:write', 1, '', 0, 0, 1, 0, NULL);
-INSERT INTO `menu` VALUES (8, '2022-10-31 09:41:03.000', '2023-12-21 20:58:29.873', 2, 'Article List', 'list', '/article/list', 'material-symbols:format-list-bulleted', 2, '', 0, 0, 0, 0, NULL);
-INSERT INTO `menu` VALUES (9, '2022-10-31 09:41:03.000', '2022-11-01 01:18:30.931', 2, 'Category Management', 'category', '/article/category', 'tabler:category', 3, '', 0, 0, 1, 0, NULL);
-INSERT INTO `menu` VALUES (10, '2022-10-31 09:41:03.000', '2022-11-01 01:18:35.502', 2, 'Tag Management', 'tag', '/article/tag', 'tabler:tag', 4, '', 0, 0, 1, 0, NULL);
-INSERT INTO `menu` VALUES (16, '2022-10-31 09:41:03.000', '2022-11-01 10:11:23.195', 0, 'Permission Management', '/auth', 'Layout', 'cib:adguard', 3, '/auth/menu', 0, 0, 1, 0, NULL);
-INSERT INTO `menu` VALUES (17, '2022-10-31 09:41:03.000', NULL, 16, 'Menu Management', 'menu', '/auth/menu', 'ic:twotone-menu-book', 1, NULL, 0, 0, 1, 0, NULL);
-INSERT INTO `menu` VALUES (23, '2022-10-31 09:41:03.000', NULL, 16, 'API Management', 'resource', '/auth/resource', 'mdi:api', 2, NULL, 0, 0, 1, 0, NULL);
-INSERT INTO `menu` VALUES (24, '2022-10-31 09:41:03.000', '2022-10-31 10:09:18.913', 16, 'Role Management', 'role', '/auth/role', 'carbon:user-role', 3, NULL, 0, 0, 1, 0, NULL);
-INSERT INTO `menu` VALUES (25, '2022-10-31 10:11:09.232', '2022-11-01 01:29:48.520', 3, 'Comment Management', 'comment', '/message/comment', 'ic:twotone-comment', 1, '', 0, 0, 1, 0, NULL);
-INSERT INTO `menu` VALUES (26, '2022-10-31 10:12:01.546', '2022-11-01 01:29:54.130', 3, 'Message Management', 'leave-msg', '/message/leave-msg', 'ic:twotone-message', 2, '', 0, 0, 1, 0, NULL);
-INSERT INTO `menu` VALUES (27, '2022-10-31 10:54:03.201', '2022-11-01 01:30:06.901', 4, 'User List', 'list', '/user/list', 'mdi:account', 1, '', 0, 0, 1, 0, NULL);
-INSERT INTO `menu` VALUES (28, '2022-10-31 10:54:34.167', '2022-11-01 01:30:13.400', 4, 'Online Users', 'online', '/user/online', 'ic:outline-online-prediction', 2, '', 0, 0, 1, 0, NULL);
-INSERT INTO `menu` VALUES (29, '2022-10-31 10:59:33.255', '2022-11-01 01:30:20.688', 5, 'Website Management', 'website', '/setting/website', 'el:website', 1, '', 0, 0, 1, 0, NULL);
-INSERT INTO `menu` VALUES (30, '2022-10-31 11:00:09.997', '2022-11-01 01:30:24.097', 5, 'Page Management', 'page', '/setting/page', 'iconoir:journal-page', 2, '', 0, 0, 1, 0, NULL);
-INSERT INTO `menu` VALUES (31, '2022-10-31 11:00:33.543', '2022-11-01 01:30:28.497', 5, 'Friend Link Management', 'link', '/setting/link', 'mdi:telegram', 3, '', 0, 0, 1, 0, NULL);
-INSERT INTO `menu` VALUES (32, '2022-10-31 11:01:00.444', '2022-11-01 01:30:33.186', 5, 'About Me', 'about', '/setting/about', 'cib:about-me', 4, '', 0, 0, 1, 0, NULL);
-INSERT INTO `menu` VALUES (33, '2022-11-01 01:43:10.142', '2023-12-27 23:26:41.553', 0, 'Home', '/home', '/home', 'ic:sharp-home', 0, '', 1, 0, 1, 0, NULL);
-INSERT INTO `menu` VALUES (34, '2022-11-01 09:54:36.252', '2022-11-01 10:07:00.254', 2, 'Edit Article', 'write/:id', '/article/write', 'icon-park-outline:write', 1, '', 0, 0, 1, 0, NULL);
-INSERT INTO `menu` VALUES (36, '2022-11-04 15:50:45.993', '2023-12-24 23:32:33.538', 0, 'Log Management', '/log', 'Layout', 'material-symbols:receipt-long-outline-rounded', 6, '/log/operation', 0, 0, 0, 0, NULL);
-INSERT INTO `menu` VALUES (37, '2022-11-04 15:53:00.251', '2023-12-24 23:15:22.034', 36, 'Operation Log', 'operation', '/log/operation', 'mdi:book-open-page-variant-outline', 1, '', 0, 0, 1, 0, NULL);
-INSERT INTO `menu` VALUES (38, '2022-11-04 16:02:42.306', '2022-11-04 16:05:35.761', 36, 'Login Log', 'login', '/log/login', 'material-symbols:login', 2, '', 0, 0, 1, 0, NULL);
-INSERT INTO `menu` VALUES (39, '2022-12-07 20:47:08.349', '2023-12-24 23:33:35.701', 0, 'Personal Center', '/profile', '/profile', 'mdi:account', 7, '', 1, 0, 0, 0, NULL);
-INSERT INTO `menu` VALUES (47, '2023-12-24 20:26:14.173', '2023-12-24 23:33:36.247', 0, 'Test Level 1 Menu', '/testone', 'Layout', '', 88, '', 0, 0, 0, 1, NULL);
-INSERT INTO `menu` VALUES (48, '2023-12-24 23:26:19.441', '2023-12-24 23:26:27.704', 0, 'Test External Link', 'https://www.baidu.com', 'Layout', 'mdi-fan-speed-3', 66, '', 1, 0, 0, 1, '');
 
 -- ----------------------------
 -- Table structure for message
@@ -278,7 +223,7 @@ CREATE TABLE `page`  (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `created_at` datetime(3) NULL DEFAULT NULL,
   `updated_at` datetime(3) NULL DEFAULT NULL,
-  `name` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `name` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
   `label` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
   `cover` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
   PRIMARY KEY (`id`) USING BTREE,
@@ -301,354 +246,6 @@ INSERT INTO `page` VALUES (9, '2022-12-16 23:54:52.650', '2023-12-28 14:54:42.34
 INSERT INTO `page` VALUES (10, '2022-12-16 23:55:36.059', '2023-12-28 14:55:09.345', 'Error Page', '404', 'https://cdn.hahacode.cn/page/404.jpg');
 INSERT INTO `page` VALUES (11, '2022-12-16 23:56:17.917', '2023-12-28 16:33:16.644', 'Article List', 'article_list', 'https://cdn.hahacode.cn/page/article_list.jpg');
 
--- ----------------------------
--- Table structure for resource
--- ----------------------------
-DROP TABLE IF EXISTS `resource`;
-CREATE TABLE `resource`  (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(3) NULL DEFAULT NULL,
-  `updated_at` datetime(3) NULL DEFAULT NULL,
-  `parent_id` bigint NULL DEFAULT NULL,
-  `url` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
-  `method` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
-  `name` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
-  `anonymous` tinyint(1) NULL DEFAULT NULL,
-  PRIMARY KEY (`id`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 117 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
-
--- ----------------------------
--- Records of resource
--- ----------------------------
-INSERT INTO `resource` VALUES (3, '2022-10-20 22:42:00.664', '2022-10-20 22:42:00.664', 0, '', '', 'Article Module', 0);
-INSERT INTO `resource` VALUES (6, '2022-10-20 22:42:23.349', '2022-10-20 22:42:23.349', 0, '', '', 'Message Module', 0);
-INSERT INTO `resource` VALUES (7, '2022-10-20 22:42:28.550', '2022-10-20 22:42:28.550', 0, '', '', 'Menu Module', 0);
-INSERT INTO `resource` VALUES (8, '2022-10-20 22:42:31.623', '2022-10-20 22:42:31.623', 0, '', '', 'Role Module', 0);
-INSERT INTO `resource` VALUES (9, '2022-10-20 22:42:36.262', '2022-10-20 22:42:36.262', 0, '', '', 'Comment Module', 0);
-INSERT INTO `resource` VALUES (10, '2022-10-20 22:42:40.700', '2022-10-20 22:42:40.700', 0, '', '', 'Resource Module', 0);
-INSERT INTO `resource` VALUES (11, '2022-10-20 22:42:51.023', '2022-10-20 22:42:51.023', 0, '', '', 'Blog Info Module', 0);
-INSERT INTO `resource` VALUES (23, '2022-10-22 22:13:12.455', '2022-10-26 11:15:23.546', 10, '/resource/anonymous', 'PUT', 'Modify Resource Anonymous Access', 0);
-INSERT INTO `resource` VALUES (34, '2022-10-31 17:14:11.708', '2022-10-31 17:14:11.708', 10, '/resource', 'POST', 'Add/Edit Resource', 0);
-INSERT INTO `resource` VALUES (35, '2022-10-31 17:14:42.320', '2022-10-31 17:18:52.508', 10, '/resource/list', 'GET', 'Resource List', 0);
-INSERT INTO `resource` VALUES (36, '2022-10-31 17:15:14.999', '2022-10-31 17:19:01.460', 10, '/resource/option', 'GET', 'Resource Option List (Tree)', 0);
-INSERT INTO `resource` VALUES (37, '2022-10-31 17:16:56.830', '2022-10-31 17:16:56.830', 10, '/resource/:id', 'DELETE', 'Delete Resource', 0);
-INSERT INTO `resource` VALUES (38, '2022-10-31 17:19:28.905', '2022-10-31 17:19:28.905', 7, '/menu/list', 'GET', 'Menu List', 0);
-INSERT INTO `resource` VALUES (39, '2022-10-31 18:46:33.051', '2022-10-31 18:46:33.051', 7, '/menu', 'POST', 'Add/Edit Menu', 0);
-INSERT INTO `resource` VALUES (40, '2022-10-31 18:46:53.804', '2022-10-31 18:46:53.804', 7, '/menu/:id', 'DELETE', 'Delete Menu', 0);
-INSERT INTO `resource` VALUES (41, '2022-10-31 18:47:17.272', '2022-10-31 18:47:28.130', 7, '/menu/option', 'GET', 'Menu Option List (Tree)', 0);
-INSERT INTO `resource` VALUES (42, '2022-10-31 18:48:04.780', '2022-10-31 18:48:04.780', 7, '/menu/user/list', 'GET', 'Get Current User Menu', 0);
-INSERT INTO `resource` VALUES (43, '2022-10-31 19:20:35.427', '2023-12-27 23:21:22.669', 3, '/article/list', 'GET', 'Article List', 0);
-INSERT INTO `resource` VALUES (44, '2022-10-31 19:21:02.096', '2023-12-27 22:07:57.702', 3, '/article/:id', 'GET', 'Article Details', 0);
-INSERT INTO `resource` VALUES (45, '2022-10-31 19:26:04.763', '2022-10-31 19:26:09.709', 3, '/article', 'POST', 'Add/Edit Article', 0);
-INSERT INTO `resource` VALUES (46, '2022-10-31 19:26:36.453', '2022-10-31 19:26:36.453', 3, '/article/soft-delete', 'PUT', 'Soft Delete Article', 0);
-INSERT INTO `resource` VALUES (47, '2022-10-31 19:26:52.344', '2022-10-31 19:26:52.344', 3, '/article', 'DELETE', 'Delete Article', 0);
-INSERT INTO `resource` VALUES (48, '2022-10-31 19:27:07.731', '2022-10-31 19:27:07.731', 3, '/article/top', 'PUT', 'Modify Article Top', 0);
-INSERT INTO `resource` VALUES (49, '2022-10-31 20:19:55.588', '2022-10-31 20:19:55.588', 0, '', '', 'Category Module', 0);
-INSERT INTO `resource` VALUES (50, '2022-10-31 20:20:03.400', '2022-10-31 20:20:03.400', 0, '', '', 'Tag Module', 0);
-INSERT INTO `resource` VALUES (51, '2022-10-31 20:22:03.799', '2022-10-31 20:22:03.799', 49, '/category/list', 'GET', 'Category List', 0);
-INSERT INTO `resource` VALUES (52, '2022-10-31 20:22:28.840', '2022-10-31 20:22:28.840', 49, '/category', 'POST', 'Add/Edit Category', 0);
-INSERT INTO `resource` VALUES (53, '2022-10-31 20:31:04.577', '2022-10-31 20:31:04.577', 49, '/category', 'DELETE', 'Delete Category', 0);
-INSERT INTO `resource` VALUES (54, '2022-10-31 20:31:36.612', '2022-10-31 20:31:36.612', 49, '/category/option', 'GET', 'Category Option List', 0);
-INSERT INTO `resource` VALUES (55, '2022-10-31 20:32:57.112', '2022-10-31 20:33:13.261', 50, '/tag/list', 'GET', 'Tag List', 0);
-INSERT INTO `resource` VALUES (56, '2022-10-31 20:33:29.080', '2022-10-31 20:33:29.080', 50, '/tag', 'POST', 'Add/Edit Tag', 0);
-INSERT INTO `resource` VALUES (57, '2022-10-31 20:33:39.992', '2022-10-31 20:33:39.992', 50, '/tag', 'DELETE', 'Delete Tag', 0);
-INSERT INTO `resource` VALUES (58, '2022-10-31 20:33:53.962', '2022-10-31 20:33:53.962', 50, '/tag/option', 'GET', 'Tag Option List', 0);
-INSERT INTO `resource` VALUES (59, '2022-10-31 20:35:05.647', '2022-10-31 20:35:05.647', 6, '/message/list', 'GET', 'Message List', 0);
-INSERT INTO `resource` VALUES (60, '2022-10-31 20:35:25.551', '2022-10-31 20:35:25.551', 6, '/message', 'DELETE', 'Delete Message', 0);
-INSERT INTO `resource` VALUES (61, '2022-10-31 20:36:20.587', '2022-10-31 20:36:20.587', 6, '/message/review', 'PUT', 'Modify Message Review', 0);
-INSERT INTO `resource` VALUES (62, '2022-10-31 20:37:04.637', '2022-10-31 20:37:04.637', 9, '/comment/list', 'GET', 'Comment List', 0);
-INSERT INTO `resource` VALUES (63, '2022-10-31 20:37:29.779', '2022-10-31 20:37:29.779', 9, '/comment', 'DELETE', 'Delete Comment', 0);
-INSERT INTO `resource` VALUES (64, '2022-10-31 20:37:40.317', '2022-10-31 20:37:40.317', 9, '/comment/review', 'PUT', 'Modify Comment Review', 0);
-INSERT INTO `resource` VALUES (65, '2022-10-31 20:38:30.506', '2022-10-31 20:38:30.506', 8, '/role/list', 'GET', 'Role List', 0);
-INSERT INTO `resource` VALUES (66, '2022-10-31 20:38:50.606', '2022-10-31 20:38:50.606', 8, '/role', 'POST', 'Add/Edit Role', 0);
-INSERT INTO `resource` VALUES (67, '2022-10-31 20:39:03.752', '2022-10-31 20:39:03.752', 8, '/role', 'DELETE', 'Delete Role', 0);
-INSERT INTO `resource` VALUES (68, '2022-10-31 20:39:28.232', '2022-10-31 20:39:28.232', 8, '/role/option', 'GET', 'Role Options', 0);
-INSERT INTO `resource` VALUES (69, '2022-10-31 20:44:22.622', '2022-10-31 20:44:22.622', 0, '', '', 'Friend Link Module', 0);
-INSERT INTO `resource` VALUES (70, '2022-10-31 20:44:41.334', '2022-10-31 20:44:41.334', 69, '/link/list', 'GET', 'Friend Link List', 0);
-INSERT INTO `resource` VALUES (71, '2022-10-31 20:45:01.150', '2022-10-31 20:45:01.150', 69, '/link', 'POST', 'Add/Edit Friend Link', 0);
-INSERT INTO `resource` VALUES (72, '2022-10-31 20:45:12.406', '2022-10-31 20:45:12.406', 69, '/link', 'DELETE', 'Delete Friend Link', 0);
-INSERT INTO `resource` VALUES (74, '2022-10-31 20:46:48.330', '2022-10-31 20:47:01.505', 0, '', '', 'User Info Module', 0);
-INSERT INTO `resource` VALUES (78, '2022-10-31 20:51:15.607', '2022-10-31 20:51:15.607', 74, '/user/list', 'GET', 'User List', 0);
-INSERT INTO `resource` VALUES (79, '2022-10-31 20:55:15.496', '2022-10-31 20:55:15.496', 11, '/setting/blog-config', 'GET', 'Get Blog Settings', 0);
-INSERT INTO `resource` VALUES (80, '2022-10-31 20:55:48.257', '2022-10-31 20:55:48.257', 11, '/setting/about', 'GET', 'Get About Me', 0);
-INSERT INTO `resource` VALUES (81, '2022-10-31 20:56:21.722', '2022-10-31 20:56:21.722', 11, '/setting/blog-config', 'PUT', 'Modify Blog Settings', 0);
-INSERT INTO `resource` VALUES (82, '2022-10-31 21:57:30.021', '2022-10-31 21:57:30.021', 74, '/user/info', 'GET', 'Get Current User Info', 0);
-INSERT INTO `resource` VALUES (84, '2022-10-31 22:06:18.348', '2022-10-31 22:07:38.004', 74, '/user', 'PUT', 'Modify User Info', 0);
-INSERT INTO `resource` VALUES (85, '2022-11-02 11:55:05.395', '2022-11-02 11:55:05.395', 11, '/setting/about', 'PUT', 'Modify About Me', 0);
-INSERT INTO `resource` VALUES (86, '2022-11-02 13:20:09.485', '2022-11-02 13:20:09.485', 74, '/user/online', 'GET', 'Get Online User List', 0);
-INSERT INTO `resource` VALUES (91, '2022-11-03 16:42:31.558', '2022-11-03 16:42:31.558', 0, '', '', 'Operation Log Module', 0);
-INSERT INTO `resource` VALUES (92, '2022-11-03 16:42:49.681', '2022-11-03 16:42:49.681', 91, '/operation/log/list', 'GET', 'Get Operation Log List', 0);
-INSERT INTO `resource` VALUES (93, '2022-11-03 16:43:04.906', '2022-11-03 16:43:04.906', 91, '/operation/log', 'DELETE', 'Delete Operation Log', 0);
-INSERT INTO `resource` VALUES (95, '2022-11-05 14:22:48.240', '2022-11-05 14:22:48.240', 11, '/home', 'GET', 'Get Admin Dashboard Info', 0);
-INSERT INTO `resource` VALUES (98, '2022-11-29 23:35:42.865', '2022-11-29 23:35:42.865', 74, '/user/offline', 'DELETE', 'Force User Offline', 0);
-INSERT INTO `resource` VALUES (99, '2022-12-07 20:48:05.939', '2022-12-07 20:48:05.939', 74, '/user/current/password', 'PUT', 'Modify Current User Password', 0);
-INSERT INTO `resource` VALUES (100, '2022-12-07 20:48:35.511', '2022-12-07 20:48:35.511', 74, '/user/current', 'PUT', 'Modify Current User Info', 0);
-INSERT INTO `resource` VALUES (101, '2022-12-07 20:55:08.271', '2022-12-07 20:55:08.271', 74, '/user/disable', 'PUT', 'Modify User Disable Status', 0);
-INSERT INTO `resource` VALUES (102, '2022-12-08 15:43:15.421', '2022-12-08 15:43:15.421', 0, '', '', 'Page Module', 0);
-INSERT INTO `resource` VALUES (103, '2022-12-08 15:43:26.009', '2022-12-08 15:43:26.009', 102, '/page/list', 'GET', 'Page List', 0);
-INSERT INTO `resource` VALUES (104, '2022-12-08 15:43:38.570', '2022-12-08 15:43:38.570', 102, '/page', 'POST', 'Add/Edit Page', 0);
-INSERT INTO `resource` VALUES (105, '2022-12-08 15:43:50.879', '2022-12-08 15:43:50.879', 102, '/page', 'DELETE', 'Delete Page', 0);
-INSERT INTO `resource` VALUES (106, '2022-12-16 11:53:57.989', '2022-12-16 11:53:57.989', 0, '', '', 'File Module', 0);
-INSERT INTO `resource` VALUES (107, '2022-12-16 11:54:20.891', '2022-12-16 11:54:20.891', 106, '/upload', 'POST', 'File Upload', 0);
-INSERT INTO `resource` VALUES (108, '2022-12-18 01:34:47.800', '2022-12-18 01:34:47.800', 3, '/article/export', 'POST', 'Export Article', 0);
-INSERT INTO `resource` VALUES (109, '2022-12-18 01:34:59.255', '2022-12-18 01:34:59.255', 3, '/article/import', 'POST', 'Import Article', 0);
-
--- ----------------------------
--- Table structure for role
--- ----------------------------
-DROP TABLE IF EXISTS `role`;
-CREATE TABLE `role`  (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `created_at` datetime(3) NULL DEFAULT NULL,
-  `updated_at` datetime(3) NULL DEFAULT NULL,
-  `name` varchar(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
-  `label` varchar(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
-  `is_disable` tinyint(1) NULL DEFAULT NULL,
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE INDEX `name`(`name` ASC) USING BTREE,
-  UNIQUE INDEX `label`(`label` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 4 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
-
--- ----------------------------
--- Records of role
--- ----------------------------
-INSERT INTO `role` VALUES (1, '2023-12-27 23:16:38.105', '2023-12-27 23:34:10.830', 'Administrator', 'admin', 0);
-INSERT INTO `role` VALUES (2, '2023-12-27 23:16:50.687', '2023-12-29 23:13:46.460', 'Regular User', 'user', 0);
-INSERT INTO `role` VALUES (3, '2023-12-27 23:17:00.263', '2023-12-27 23:38:15.697', 'test', 'Test User', 0);
-
--- ----------------------------
--- Table structure for role_menu
--- ----------------------------
-DROP TABLE IF EXISTS `role_menu`;
-CREATE TABLE `role_menu`  (
-  `menu_id` bigint NOT NULL,
-  `role_id` bigint NOT NULL,
-  PRIMARY KEY (`menu_id`, `role_id`) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
-
--- ----------------------------
--- Records of role_menu
--- ----------------------------
-INSERT INTO `role_menu` VALUES (2, 1);
-INSERT INTO `role_menu` VALUES (2, 2);
-INSERT INTO `role_menu` VALUES (2, 3);
-INSERT INTO `role_menu` VALUES (3, 1);
-INSERT INTO `role_menu` VALUES (3, 2);
-INSERT INTO `role_menu` VALUES (3, 3);
-INSERT INTO `role_menu` VALUES (4, 1);
-INSERT INTO `role_menu` VALUES (4, 2);
-INSERT INTO `role_menu` VALUES (4, 3);
-INSERT INTO `role_menu` VALUES (5, 1);
-INSERT INTO `role_menu` VALUES (5, 2);
-INSERT INTO `role_menu` VALUES (5, 3);
-INSERT INTO `role_menu` VALUES (6, 1);
-INSERT INTO `role_menu` VALUES (6, 2);
-INSERT INTO `role_menu` VALUES (6, 3);
-INSERT INTO `role_menu` VALUES (8, 1);
-INSERT INTO `role_menu` VALUES (8, 2);
-INSERT INTO `role_menu` VALUES (8, 3);
-INSERT INTO `role_menu` VALUES (9, 1);
-INSERT INTO `role_menu` VALUES (9, 2);
-INSERT INTO `role_menu` VALUES (9, 3);
-INSERT INTO `role_menu` VALUES (10, 1);
-INSERT INTO `role_menu` VALUES (10, 2);
-INSERT INTO `role_menu` VALUES (10, 3);
-INSERT INTO `role_menu` VALUES (16, 1);
-INSERT INTO `role_menu` VALUES (16, 2);
-INSERT INTO `role_menu` VALUES (16, 3);
-INSERT INTO `role_menu` VALUES (17, 1);
-INSERT INTO `role_menu` VALUES (17, 2);
-INSERT INTO `role_menu` VALUES (17, 3);
-INSERT INTO `role_menu` VALUES (23, 1);
-INSERT INTO `role_menu` VALUES (23, 2);
-INSERT INTO `role_menu` VALUES (23, 3);
-INSERT INTO `role_menu` VALUES (24, 1);
-INSERT INTO `role_menu` VALUES (24, 2);
-INSERT INTO `role_menu` VALUES (24, 3);
-INSERT INTO `role_menu` VALUES (25, 1);
-INSERT INTO `role_menu` VALUES (25, 2);
-INSERT INTO `role_menu` VALUES (25, 3);
-INSERT INTO `role_menu` VALUES (26, 1);
-INSERT INTO `role_menu` VALUES (26, 2);
-INSERT INTO `role_menu` VALUES (26, 3);
-INSERT INTO `role_menu` VALUES (27, 1);
-INSERT INTO `role_menu` VALUES (27, 2);
-INSERT INTO `role_menu` VALUES (27, 3);
-INSERT INTO `role_menu` VALUES (28, 1);
-INSERT INTO `role_menu` VALUES (28, 2);
-INSERT INTO `role_menu` VALUES (28, 3);
-INSERT INTO `role_menu` VALUES (29, 1);
-INSERT INTO `role_menu` VALUES (29, 2);
-INSERT INTO `role_menu` VALUES (29, 3);
-INSERT INTO `role_menu` VALUES (30, 1);
-INSERT INTO `role_menu` VALUES (30, 2);
-INSERT INTO `role_menu` VALUES (30, 3);
-INSERT INTO `role_menu` VALUES (31, 1);
-INSERT INTO `role_menu` VALUES (31, 2);
-INSERT INTO `role_menu` VALUES (31, 3);
-INSERT INTO `role_menu` VALUES (32, 1);
-INSERT INTO `role_menu` VALUES (32, 2);
-INSERT INTO `role_menu` VALUES (32, 3);
-INSERT INTO `role_menu` VALUES (33, 1);
-INSERT INTO `role_menu` VALUES (33, 2);
-INSERT INTO `role_menu` VALUES (33, 3);
-INSERT INTO `role_menu` VALUES (34, 1);
-INSERT INTO `role_menu` VALUES (34, 2);
-INSERT INTO `role_menu` VALUES (34, 3);
-INSERT INTO `role_menu` VALUES (36, 1);
-INSERT INTO `role_menu` VALUES (36, 2);
-INSERT INTO `role_menu` VALUES (36, 3);
-INSERT INTO `role_menu` VALUES (37, 1);
-INSERT INTO `role_menu` VALUES (37, 2);
-INSERT INTO `role_menu` VALUES (37, 3);
-INSERT INTO `role_menu` VALUES (38, 1);
-INSERT INTO `role_menu` VALUES (38, 2);
-INSERT INTO `role_menu` VALUES (38, 3);
-INSERT INTO `role_menu` VALUES (39, 1);
-INSERT INTO `role_menu` VALUES (39, 2);
-INSERT INTO `role_menu` VALUES (39, 3);
-INSERT INTO `role_menu` VALUES (47, 1);
-INSERT INTO `role_menu` VALUES (48, 1);
-
--- ----------------------------
--- Table structure for role_resource
--- ----------------------------
-DROP TABLE IF EXISTS `role_resource`;
-CREATE TABLE `role_resource`  (
-  `resource_id` bigint NOT NULL,
-  `role_id` bigint NOT NULL,
-  PRIMARY KEY (`resource_id`, `role_id`) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
-
--- ----------------------------
--- Records of role_resource
--- ----------------------------
-INSERT INTO `role_resource` VALUES (3, 1);
-INSERT INTO `role_resource` VALUES (6, 1);
-INSERT INTO `role_resource` VALUES (7, 1);
-INSERT INTO `role_resource` VALUES (8, 1);
-INSERT INTO `role_resource` VALUES (9, 1);
-INSERT INTO `role_resource` VALUES (10, 1);
-INSERT INTO `role_resource` VALUES (11, 1);
-INSERT INTO `role_resource` VALUES (23, 1);
-INSERT INTO `role_resource` VALUES (34, 1);
-INSERT INTO `role_resource` VALUES (35, 1);
-INSERT INTO `role_resource` VALUES (35, 2);
-INSERT INTO `role_resource` VALUES (35, 3);
-INSERT INTO `role_resource` VALUES (36, 1);
-INSERT INTO `role_resource` VALUES (36, 2);
-INSERT INTO `role_resource` VALUES (36, 3);
-INSERT INTO `role_resource` VALUES (37, 1);
-INSERT INTO `role_resource` VALUES (38, 1);
-INSERT INTO `role_resource` VALUES (38, 2);
-INSERT INTO `role_resource` VALUES (38, 3);
-INSERT INTO `role_resource` VALUES (39, 1);
-INSERT INTO `role_resource` VALUES (40, 1);
-INSERT INTO `role_resource` VALUES (41, 1);
-INSERT INTO `role_resource` VALUES (41, 2);
-INSERT INTO `role_resource` VALUES (41, 3);
-INSERT INTO `role_resource` VALUES (42, 1);
-INSERT INTO `role_resource` VALUES (42, 2);
-INSERT INTO `role_resource` VALUES (42, 3);
-INSERT INTO `role_resource` VALUES (43, 1);
-INSERT INTO `role_resource` VALUES (43, 2);
-INSERT INTO `role_resource` VALUES (43, 3);
-INSERT INTO `role_resource` VALUES (44, 1);
-INSERT INTO `role_resource` VALUES (44, 2);
-INSERT INTO `role_resource` VALUES (44, 3);
-INSERT INTO `role_resource` VALUES (45, 1);
-INSERT INTO `role_resource` VALUES (46, 1);
-INSERT INTO `role_resource` VALUES (47, 1);
-INSERT INTO `role_resource` VALUES (48, 1);
-INSERT INTO `role_resource` VALUES (48, 2);
-INSERT INTO `role_resource` VALUES (48, 3);
-INSERT INTO `role_resource` VALUES (49, 1);
-INSERT INTO `role_resource` VALUES (50, 1);
-INSERT INTO `role_resource` VALUES (51, 1);
-INSERT INTO `role_resource` VALUES (51, 2);
-INSERT INTO `role_resource` VALUES (51, 3);
-INSERT INTO `role_resource` VALUES (52, 1);
-INSERT INTO `role_resource` VALUES (53, 1);
-INSERT INTO `role_resource` VALUES (54, 1);
-INSERT INTO `role_resource` VALUES (54, 2);
-INSERT INTO `role_resource` VALUES (54, 3);
-INSERT INTO `role_resource` VALUES (55, 1);
-INSERT INTO `role_resource` VALUES (55, 2);
-INSERT INTO `role_resource` VALUES (55, 3);
-INSERT INTO `role_resource` VALUES (56, 1);
-INSERT INTO `role_resource` VALUES (57, 1);
-INSERT INTO `role_resource` VALUES (58, 1);
-INSERT INTO `role_resource` VALUES (58, 2);
-INSERT INTO `role_resource` VALUES (58, 3);
-INSERT INTO `role_resource` VALUES (59, 1);
-INSERT INTO `role_resource` VALUES (59, 2);
-INSERT INTO `role_resource` VALUES (59, 3);
-INSERT INTO `role_resource` VALUES (60, 1);
-INSERT INTO `role_resource` VALUES (61, 1);
-INSERT INTO `role_resource` VALUES (61, 2);
-INSERT INTO `role_resource` VALUES (62, 1);
-INSERT INTO `role_resource` VALUES (62, 2);
-INSERT INTO `role_resource` VALUES (62, 3);
-INSERT INTO `role_resource` VALUES (63, 1);
-INSERT INTO `role_resource` VALUES (64, 1);
-INSERT INTO `role_resource` VALUES (64, 2);
-INSERT INTO `role_resource` VALUES (65, 1);
-INSERT INTO `role_resource` VALUES (65, 2);
-INSERT INTO `role_resource` VALUES (65, 3);
-INSERT INTO `role_resource` VALUES (66, 1);
-INSERT INTO `role_resource` VALUES (67, 1);
-INSERT INTO `role_resource` VALUES (68, 1);
-INSERT INTO `role_resource` VALUES (68, 2);
-INSERT INTO `role_resource` VALUES (68, 3);
-INSERT INTO `role_resource` VALUES (69, 1);
-INSERT INTO `role_resource` VALUES (70, 1);
-INSERT INTO `role_resource` VALUES (70, 2);
-INSERT INTO `role_resource` VALUES (70, 3);
-INSERT INTO `role_resource` VALUES (71, 1);
-INSERT INTO `role_resource` VALUES (72, 1);
-INSERT INTO `role_resource` VALUES (74, 1);
-INSERT INTO `role_resource` VALUES (78, 1);
-INSERT INTO `role_resource` VALUES (78, 2);
-INSERT INTO `role_resource` VALUES (78, 3);
-INSERT INTO `role_resource` VALUES (79, 1);
-INSERT INTO `role_resource` VALUES (79, 2);
-INSERT INTO `role_resource` VALUES (79, 3);
-INSERT INTO `role_resource` VALUES (80, 1);
-INSERT INTO `role_resource` VALUES (80, 2);
-INSERT INTO `role_resource` VALUES (80, 3);
-INSERT INTO `role_resource` VALUES (81, 1);
-INSERT INTO `role_resource` VALUES (82, 1);
-INSERT INTO `role_resource` VALUES (82, 2);
-INSERT INTO `role_resource` VALUES (82, 3);
-INSERT INTO `role_resource` VALUES (84, 1);
-INSERT INTO `role_resource` VALUES (85, 1);
-INSERT INTO `role_resource` VALUES (86, 1);
-INSERT INTO `role_resource` VALUES (86, 2);
-INSERT INTO `role_resource` VALUES (86, 3);
-INSERT INTO `role_resource` VALUES (91, 1);
-INSERT INTO `role_resource` VALUES (92, 1);
-INSERT INTO `role_resource` VALUES (92, 2);
-INSERT INTO `role_resource` VALUES (92, 3);
-INSERT INTO `role_resource` VALUES (93, 1);
-INSERT INTO `role_resource` VALUES (95, 1);
-INSERT INTO `role_resource` VALUES (95, 2);
-INSERT INTO `role_resource` VALUES (95, 3);
-INSERT INTO `role_resource` VALUES (98, 1);
-INSERT INTO `role_resource` VALUES (99, 1);
-INSERT INTO `role_resource` VALUES (100, 1);
-INSERT INTO `role_resource` VALUES (101, 1);
-INSERT INTO `role_resource` VALUES (102, 1);
-INSERT INTO `role_resource` VALUES (103, 1);
-INSERT INTO `role_resource` VALUES (103, 2);
-INSERT INTO `role_resource` VALUES (103, 3);
-INSERT INTO `role_resource` VALUES (104, 1);
-INSERT INTO `role_resource` VALUES (105, 1);
-INSERT INTO `role_resource` VALUES (106, 1);
-INSERT INTO `role_resource` VALUES (107, 1);
-INSERT INTO `role_resource` VALUES (108, 1);
-INSERT INTO `role_resource` VALUES (108, 2);
-INSERT INTO `role_resource` VALUES (108, 3);
-INSERT INTO `role_resource` VALUES (109, 1);
 
 -- ----------------------------
 -- Table structure for tag
@@ -658,7 +255,7 @@ CREATE TABLE `tag`  (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `created_at` datetime(3) NULL DEFAULT NULL,
   `updated_at` datetime(3) NULL DEFAULT NULL,
-  `name` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `name` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `name`(`name` ASC) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 4 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
@@ -682,7 +279,7 @@ CREATE TABLE `user_auth`  (
   `password` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
   `login_type` tinyint(1) NULL DEFAULT NULL COMMENT 'Login type',
   `ip_address` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT 'Login IP address',
-  `ip_source` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT 'IP Source',
+  `ip_source` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT 'IP Source',
   `last_login_time` datetime(3) NULL DEFAULT NULL,
   `is_disable` tinyint(1) NULL DEFAULT NULL,
   `is_super` tinyint(1) NULL DEFAULT NULL,
@@ -699,22 +296,6 @@ INSERT INTO `user_auth` VALUES (2, '2022-10-31 21:54:11.040', '2023-12-27 23:44:
 INSERT INTO `user_auth` VALUES (3, '2022-11-01 10:41:13.300', '2023-12-29 23:04:48.284', 'test@qq.com', '$2a$10$FmU4jxwDlibSL9pdt.AsuODkbB4gLp3IyyXeoMmW/XALtT/HdwTsi', 1, '172.18.45.12', 'Intranet IP', '2023-12-29 23:04:48.284', 0, 0, 3);
 INSERT INTO `user_auth` VALUES (4, '2022-10-19 22:31:26.805', '2023-12-26 21:10:35.334', 'user', '$2a$10$9vHpoeT7sF4j9beiZfPsOe0jJ67gOceO2WKJzJtHRZCjNJajl7Fhq', 1, '172.12.0.6:48716', '', '2022-12-24 12:13:52.494', 0, 0, 4);
 
--- ----------------------------
--- Table structure for user_auth_role
--- ----------------------------
-DROP TABLE IF EXISTS `user_auth_role`;
-CREATE TABLE `user_auth_role`  (
-  `user_auth_id` bigint NOT NULL,
-  `role_id` bigint NOT NULL,
-  PRIMARY KEY (`user_auth_id`, `role_id`) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
-
--- ----------------------------
--- Records of user_auth_role
--- ----------------------------
-INSERT INTO `user_auth_role` VALUES (2, 1);
-INSERT INTO `user_auth_role` VALUES (3, 2);
-INSERT INTO `user_auth_role` VALUES (4, 3);
 
 -- ----------------------------
 -- Table structure for user_info

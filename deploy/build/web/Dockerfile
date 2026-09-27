@@ -1,4 +1,5 @@
-FROM nginx:1.25.3-alpine
+# 与根目录 Dockerfile 使用同一个 nginx 版本
+FROM nginx:1.24.0-alpine
 # Dockerfile for building the image from local static assets
 
 # Copy Nginx config templates into container

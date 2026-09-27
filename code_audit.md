@@ -1,0 +1,899 @@
+# 代码审查记录
+
+针对 `gin-blog-server` 的一次全量审查（handle / model / middleware / utils / global），
+以及针对 `gin-blog-admin` 的一次全量审查（views / components / store / utils / layout）。
+每条给出文件与行号、问题原因、当前状态。行号以审查时的代码为准，后续改动可能偏移。
+
+状态说明：`待处理` / `已修复` / `暂缓`（明确决定先不做）/ `潜在`（当前代码路径打不到）。
+
+当前进度：server 功能 BUG F1–F13 全部已修复；server 安全 S1、S2、S3、S4、S5、S8 已修复，
+S6、S7 暂缓（都只在启用邮件注册时才成立，当前 `Captcha.SendEmail: false`）；潜在问题 P1 已修复。
+admin 的 A1–A21 已全部修复。
+front 的 FE1–FE7 已修复。
+
+## 安全
+
+剩下的 S6、S7 都挂在邮件注册链路上，当前配置没启用；其余已经修完。
+
+### S1 JWT 密钥与 Session 盐是仓库里的固定值，启动不校验 — 已修复
+
+`config.yml:8` `Secret: "abc123321"`、`config.yml:26` `Salt: "salt"`，`config.docker.yml` 相同。
+`internal/global/config.go` 的 `ReadConfig` 没有任何校验。
+
+签名链路：`internal/utils/jwt/jwt.go:36` `token.SignedString([]byte(secret))`，
+验签链路：`internal/middleware/auth.go:73` `jwt.ParseToken(g.Conf.JWT.Secret, parts[1])`。
+
+任何人都能用仓库里的密钥给 `user_id: 1` 签一个 token，`PermissionCheck` 读到 `IsSuper` 直接放行。
+Session cookie 同理，`internal/handle/base.go` 的 `CurrentUserAuth` 信任 session uid，
+伪造 cookie 即可通过所有 `/api/front/*`（走的是 `JWTAuth(false)`）。
+
+修法：启动时若这两个值为空或等于仓库默认值，直接 fatal。
+
+已改为：
+
+- `internal/global/config.go` 新增 `CheckSecrets`，在 `ReadConfig` 反序列化后调用。
+  `Server.Mode == "release"` 时空值或示例值直接 panic；debug 模式只打 `[警告]`，
+  不打断本地开发（仓库自带的 `config.yml` 就是示例值）。
+- `envBindings` 增加 `jwt.secret` → `JWT_SECRET`、`session.salt` → `SESSION_SALT`，
+  部署时不必改源码里的配置文件。CI 的 Docker 冒烟测试也要注入这两个（它用的是
+  `config.docker.yml`，release 模式）。
+- `deploy/bootstrap.sh` 首次运行时生成 `deploy/start/.env.secrets`（两个 32 字节随机
+  hex），已加入 `deploy/.gitignore`；`docker-compose.yml` 的 `gvb-server` 用 `env_file`
+  引入。`config.docker.yml` 是 release 模式，所以不跑 bootstrap 直接 `docker compose up`
+  会因为缺这个文件报错——这是刻意的，避免用示例密钥上线。
+
+测试：`internal/global/config_test.go`（release 下四种弱密钥组合都 panic、真实密钥通过、
+debug 只告警）。端到端：release 配置 + 示例密钥启动 panic，注入环境变量后正常启动；
+本机 debug 启动打出两条 `[警告]`。
+
+### S2 X-Real-IP 可伪造，登录锁定被绕过 — 已修复
+
+`cmd/main.go:37` `r.SetTrustedProxies([]string{"*"})`，
+`internal/utils/ip.go:26` 直接 `c.Request.Header.Get("X-Real-IP")`，不判断来源是否可信。
+
+`internal/handle/handle_auth.go:88` 的失败计数键是
+`g.LOGIN_FAIL + utils.MD5(req.Username+"|"+clientIP(c))`，
+轮换这个请求头即可对同一账号无限次尝试密码。同时污染 `user_auth.ip_address` 与访客地域统计。
+
+已改为：
+
+- `GetIpAddress` 换成 `c.ClientIP()`：gin 会先判断直连对端是否落在可信代理名单里，
+  只有可信时才读 `X-Forwarded-For` / `X-Real-IP`。原来手写的一串
+  `Proxy-Client-IP` / `WL-Proxy-Client-IP` 兜底一并删掉——这几个头本项目的部署里没人会设，
+  留着只是多几个可伪造的入口
+- 可信名单走配置 `server.trusted-proxies`，留空时默认只信任内网
+  （`127.0.0.1/8`、`10/8`、`172.16/12`、`192.168/16`、`::1`、`fc00::/7`）：
+  反向代理通常和后端同机或同一 docker 网络，公网访客伪造请求头不会被采信。
+  名单写错时启动直接失败，不静默退回全放行
+- 顺带修掉：返回值不再带端口。原来没有转发头时直接返回 `RemoteAddr`（`1.2.3.4:54321`），
+  端口每次请求都变，`handle/base.go` 的 `clientIP` 虽然会剥，但绕过它的调用点
+  （`user_auth.ip_address`、操作日志）存的是带端口的地址
+
+回归测试：`TestGetIpAddressTrustsProxyHeader`、`TestGetIpAddressIgnoresSpoofedHeader`、
+`TestGetIpAddressHasNoPort`。端到端：把 `trusted-proxies` 改成一个不含本机的网段后，
+带 `X-Real-IP: 8.8.8.8` 的上报落库 IP 是本机地址而不是 8.8.8.8；改回默认（信任内网）则采信。
+
+### S3 CORS 放行所有来源且允许携带凭证 — 已修复
+
+`internal/middleware/base.go:54` `AllowOriginFunc` 恒 `return true` + `AllowCredentials: true`。
+上方注释说明了为何不能用 `AllowOrigins: ["*"]`（那个判断是对的：`*` 与凭证请求冲突），
+但"全放行 + 回显 Origin"在安全上等价。
+
+`WithCookieStore`（`internal/middleware/base.go:62`）的 `sessions.Options` 只设了 `Path` 与 `MaxAge`，
+没有 `SameSite` / `Secure` / `HttpOnly`。任意第三方站点可带访客凭证调用评论、留言、上传、改资料。
+
+已改为：
+
+- 来源白名单走配置 `server.allowed-origins`（精确匹配，忽略大小写与末尾斜杠）。
+  留空时退回「只放行本机与内网来源」：开发和内网自用场景照旧能跨域，
+  公网站点一律拿不到 `Access-Control-Allow-Origin`。启动时会告警提醒没配白名单
+- session cookie 补上 `HttpOnly`（XSS 读不到会话）与 `SameSite=Lax`（第三方站点发起的请求不带它）；
+  `Secure` 走配置 `session.secure`，默认关——本地 http 调试下置 true 浏览器会直接丢掉 cookie
+- `WithCookieStore` 与 `WithMemStore` 共用同一份 `sessionOptions()`，避免两处漂移
+
+回归测试：`TestCORSRejectsForeignOrigin`、`TestOriginAllowed`（白名单命中/不命中、
+留空时内网放行公网拒绝）、`TestCookieStoreOptions`。端到端：
+`Origin: https://evil.example.com` 拿不到跨域头，`Origin: http://localhost:8888` 正常回显。
+
+### S4 `is_disable` 只写不读，封禁功能是空的 — 已修复
+
+写入：`internal/handle/handle_user.go:190` → `internal/model/user.go:132`。
+全仓库没有任何读取处：`handle_auth.go` 的 `Login` 与 `middleware/auth.go` 都不查。
+被禁用的用户照样登录，旧 token 照样有效。角色的 `is_disable`（`handle_role.go:19`）
+同样从未进入 `PermissionCheck`。
+
+已改为：
+
+- 新增业务码 `ErrUserDisabled = 1209`（`internal/global/result.go`）。
+- `Login` 在密码校验通过后拒绝 `IsDisable` 的账号。
+- `JWTAuth` 取到用户后同样拒绝，已签发的 token 立即失效（不必等过期）。
+- `PermissionCheck` 跳过 `IsDisable` 的角色，只靠该角色拿到的权限会被收回。
+- 前端把 1209 归入「踢下线」分支：admin `utils/http.js` 走 `forceOffline`，
+  front `utils/http.js` 走 `resetLoginState`。
+
+回归测试：`TestAuthLoginDisabledUser`、`TestJWTAuthRejectsDisabledUser`、
+`TestJWTAuthOptionalLoginRejectsDisabledUser`、`TestPermissionCheckSkipsDisabledRole`。
+
+### S5 操作日志把请求体原文永久落库，含明文密码 — 已修复
+
+`internal/middleware/operation_log.go:83` `body, _ := io.ReadAll(c.Request.Body)` →
+`RequestParam: string(body)`，`:104` 还存了响应体。
+
+`internal/manager.go:68` 把该中间件挂在整个 `auth` 组上，
+而 `manager.go:88` 的 `PUT /user/current/password` 就在这个组里，
+所以旧密码与新密码明文写入 `operation_log.request_param`（`longtext`）。
+
+已改为：请求体和响应体都过一遍 `maskSensitive`，按字段名（`password` / `token` / `secret` /
+`access_key` / `captcha`，小写子串匹配）把值换成 `******`。三种情况：
+
+- 不含敏感字段：**原样返回，不重新序列化**。否则字段顺序会变，日志详情看着和实际请求对不上
+- 合法 JSON 且命中：只替换那几个值，其余保留，日志仍然有排查价值
+- 不是合法 JSON 却带敏感字样（如表单编码的 `password=xxx`）：整体丢弃。
+  宁可少记一条日志，也不能把明文密码留在库里
+
+选按字段名而不是按路由白名单：路由会新增，漏登记就又泄一次；字段名是跟着数据走的。
+
+回归测试：`TestOperationLogMasksPassword`、`TestMaskSensitive`。已验证「去掉修复就会失败」。
+端到端：调 `PUT /user/current/password` 后查操作日志列表，
+`request_param` 是 `{"new_password":"******","old_password":"******"}`，
+同期的 `/api/talk`、`/api/setting/about` 两条记录内容完整未受影响。
+
+### S6 注册链接携带明文密码，且该串直接作为 Redis key — 暂缓
+
+`internal/utils/email.go:56` `Encode(email + "|" + password + "|" + code)` 仅 base64（可逆），
+`:86` 拼进验证 URL 发邮件，`internal/handle/cache.go:130` 又把这个 blob 当 Redis 键名。
+密码可从收件箱、邮件服务商日志、浏览器历史 / Referer、`KEYS *` 还原。
+
+另外 `ParseEmailVerificationInfo`（`email.go:74`）只取 `str[0]`、`str[1]`，
+拼进去的随机 `code` 取出来没被使用，只起了让 blob 唯一的作用。
+
+### S7 邮件模块两处 — 暂缓（邮件功能当前不启用）
+
+- `internal/utils/email.go:129` `slog.Info("User:" + User + "  Pass:" + Pass + ...)` 把 SMTP 密码打进日志
+- `internal/utils/email.go:160` `d.TLSConfig = &tls.Config{InsecureSkipVerify: true}`，SMTP 凭证可被中间人截获
+
+### S8 登录查用户用 `LIKE` 而非 `=` — 已修复
+
+`internal/model/user.go:34` `db.Model(&userauth).Where("username LIKE ?", name).First(&userauth)`。
+`Login`（`handle_auth.go:97`）与注册查重（`:244`）都走它。
+
+`_` 与 `%` 是 SQL 通配符：提交 `%` 会命中主键最小的用户（`First` 按主键排序，通常是 admin）；
+含下划线的合法邮箱可能命中另一个账号，然后用那个账号的 hash 去校验密码。
+密码仍需匹配，所以不是直接绕过，但这是认证路径上的错误运算符，也让"邮箱已注册"判断不准。
+
+已改为等值匹配 `Where("username = ?", name)`。测试：
+`internal/model/user_update_test.go` 的 `TestGetUserAuthInfoByNameIsExactMatch`
+（`admi_` / `adm%` / `%` / `_____` 都必须查不到 admin，回退成 LIKE 后四条全红）。
+端到端：这四个用户名登录都返回 1004，`admin` 正常登录。
+
+## 功能 BUG
+
+### F1 后台文章列表零结果时返回假的数据库错误 — 已修复
+
+`internal/handle/handle_article.go:263`
+
+```go
+list, total, err := model.GetArticleList(...)
+if err != nil || list == nil {
+    ReturnError(c, g.ErrDbOp, err) // err 此时是 nil
+    return
+}
+```
+
+`model.GetArticleList`（`internal/model/article.go:115`）中 `var list []Article` 配 `Find(&list)`，
+GORM 零行时 slice 保持 `nil`。因此任何筛不到数据的条件（如标题搜索未命中）都会返回
+`ErrDbOp` 且 error 为空串，而不是一个空列表。
+
+修复：`GetArticleList` 里把 `list` 初始化成空切片，handler 只判断 `err != nil`。
+`TestArticleList` 原来的 `{"?title=不存在", 0}` 用例只断言了 `page.Total`，
+而错误响应解码后 `total` 也是 0，所以没抓住这个 BUG，一并补上了业务码断言。
+回归测试：`TestArticleListEmptyResultIsNotError`。
+
+### F2 `validate:` tag 全部失效，评论入参没有校验 — 已修复
+
+全仓库搜不到 `binding.Validator` / `validator.New` / `SetTagName` / `RegisterValidation`，
+Gin 的 `ShouldBind` 系列只认 `binding` tag。
+
+`internal/handle/handle_front.go:47-53`
+
+```go
+Content  string `json:"content" form:"content"`
+Type     int    `json:"type" form:"type" validate:"required,min=1,max=3" label:"评论类型"`
+```
+
+`type` 可以是 0、99、负数，`content` 可以是空串。
+对照 `handle_article.go:28` 的 `AddOrEditArticleReq` 用的是正确的 `binding:"required,min=1,max=3"`。
+全仓库 21 处用 `binding`、3 处用 `validate`。
+
+修复：`FAddCommentReq` 的 `Type` 与 `Content` 改用 `binding`，
+`handle_user.go` 里注释掉的那段示例代码也一起改了，避免以后被复制。
+回归测试：`TestFrontSaveCommentValidatesInput`。
+
+### F3 前台列表被 `Paginate` 静默截到 100 条 — 已修复
+
+`internal/handle/handle_front.go:109,124,140,155` 都传 `size = 1000`：
+
+```go
+list, _, err := model.GetTagList(GetDB(c), 1, 1000, "")
+```
+
+但 `internal/model/z_base.go` 的 `Paginate` 里有 `case size > 100: size = 100`。
+标签、分类、留言、友链超过 100 条的部分在前台直接消失，
+且这几个接口不返回 total、前端也没有分页。
+
+修复：新增 `model.PageSizeAll = -1`，`Paginate` 遇到它就不加 `Offset/Limit`，
+四个前台 handler 改传这个常量。同时给 `PageQuery.Size` 加了 `binding:"omitempty,min=1"`，
+防止请求参数直接传 -1 变成全表查询。
+回归测试：`model.TestPaginate`、`TestFrontSimpleListsReturnMoreThan100`。
+
+### F4 改密码忽略 bcrypt 错误 — 已修复
+
+`internal/handle/handle_user.go:225` `hashPassword, _ := utils.BcryptHash(req.NewPassword)`。
+哈希失败会把空串写进库，之后 `BcryptCheck` 永不匹配，账号被永久锁死。
+
+修复：改为接收并返回 error。没有加测试——`bcrypt.GenerateFromPassword` 只在密码超过 72 字节
+或随机源出错时才失败，在 handler 层不好稳定构造。
+
+### F5 删除评论不清 Redis 计数、不删子回复 — 已修复
+
+`internal/handle/handle_comment.go:35` 只做了 `GetDB(c).Delete(model.Comment{}, "id in ?", ids)`。
+
+文章删除路径是特意清理过 Redis 的（`handle_article.go:160` 调 `cleanCommentCounters`，
+注释写明"新行复用 id 会继承旧计数"），这里没跟上：
+`COMMENT_LIKE_COUNT` 与 `comment_user_like:*` 会残留；
+`parent_id` 指向已删评论的回复仍留在库里，且仍会被 `GetCommentReplyList` 查出来。
+
+修复：新增 `model.DeleteComments`，在事务里先把回复的 id 查出来一起删，
+返回全部被删 id 交给 handler 调 `cleanCommentCounters`。
+回归测试：`TestCommentDeleteCleansRepliesAndRedis`（同时验证别的评论及其回复没被误删）。
+
+### F6 新建角色时丢弃资源与菜单关联 — 已修复
+
+`internal/handle/handle_role.go:100`
+
+```go
+if req.ID == 0 {
+    err := model.SaveRole(db, req.Name, req.Label) // ResourceIds / MenuIds 被丢掉
+} else {
+    err := model.UpdateRole(db, req.ID, req.Name, req.Label, req.IsDisable, req.ResourceIds, req.MenuIds)
+}
+```
+
+请求体里带了 `resource_ids` / `menu_ids`，Swagger 注释也写着"同时维护角色的资源与菜单关联"。
+
+修复：`SaveRole` 增加这两个参数，并把关联写入抽成 `replaceRoleRelations`
+供新增和更新共用（顺便把原来循环里逐条 `Create` 改成批量插入）。
+回归测试：`model.TestSaveRoleWithResourceAndMenu`、`TestRoleCreateKeepsRelations`。
+
+### F7 菜单 / 资源删除的占用检查 fail-open — 已修复
+
+`internal/handle/handle_menu.go:114,133`、`internal/handle/handle_resource.go:174,193`
+
+```go
+use, _ := model.CheckMenuInUse(db, menuId)
+if use { ... }
+```
+
+查询报错时 `use` 为 false，于是删掉了仍被角色引用的菜单 / 资源。
+
+修复：四处都改成接收 error 并返回 `ErrDbOp`。没有加测试——要让这个 `Count` 查询失败
+得注入一个坏的 `*gorm.DB`，测试脚手架目前没有这个能力，成本大于收益。
+
+### F8 前台评论列表里回复的点赞数恒为 0 — 已修复
+
+`internal/handle/handle_front.go:279-289` 只用顶层评论的 id 去 `hashCounts`，
+并且只给 `data[i].LikeCount` 赋值，嵌套的 `ReplyList` 从未填充。
+而 `GetReplyListByCommentId`（`:334`）是填的，所以同一条回复在"展开更多"之后
+点赞数会从 0 突然变成真实值。
+
+修复：把截断后的回复 id 一起收进 `hashCounts` 的入参，回填时给 `ReplyList` 也赋值。
+回归测试：`TestFrontCommentListFillsReplyLikeCount`。
+
+### F9 文章导入接口 — 已修复
+
+`internal/handle/handle_article.go:376`
+
+```go
+fileName := fileHeader.Filename
+title := fileName[:len(fileName)-3]
+```
+
+- 文件名短于 3 字节（如 `ab`）时切片下界为负，直接 panic → 500；
+  它还假设扩展名恰好 3 个字符，`.markdown` 会被砍掉一截
+- 该接口对文件类型与大小**完全没有校验**（`/upload` 是有的），任何文件都会被整体读入内存当作正文
+- `:385` 传的是 `auth.ID`（`user_auth` 主键），而正常新建走的是 `auth.UserInfoId`（`:101`），
+  两个 id 空间不一致时作者归属错误
+- 分类与标签硬编码成 `"学习"` / `"Golang"`，且 `ImportArticle` 里用 `FirstOrCreate`，
+  等于每次导入都可能凭空建出这两条分类标签
+
+修复：
+
+- 标题改用 `strings.TrimSuffix(name, path.Ext(name))`，去掉后为空则返回 `ErrRequest`
+- 新增 `allowedImportExt`（`.md` / `.markdown`）与 `maxImportSize = 5 << 20`，
+  并新增业务码 `g.ErrImportType = 9104`（`ErrFileType` 的文案是"只支持上传图片"，不适用于导入）
+- 作者改用 `auth.UserInfoId`
+- **分类标签方案：不建。** `model.ImportArticle` 去掉这两个参数，导入后是草稿、
+  分类标签留空，由用户在后台编辑时补。相应地它现在返回创建出来的 `*Article`，
+  handler 也把文章返回给前端
+
+回归测试：`TestArticleImport`（故意让 `auth.ID` 与 `UserInfoId` 错开，断言作者用的是后者，
+并断言没有凭空创建分类标签）、`TestArticleImportFileName`（`a.md` / `ab.md` /
+`文章.markdown` / `带.点.的.名字.md`）、`TestArticleImportRejectsBadFile`（非法后缀、
+只有扩展名、超过大小上限，且都不写库）、`model.TestImportArticle`。
+
+### F10 注册流程：验证 token 先删、建用户无事务 — 已修复
+
+`internal/handle/handle_auth.go:303`
+
+```go
+DeleteMailInfo(GetRDB(c), code)
+...
+_, _, _, err = model.CreateNewUser(GetDB(c), username, password)
+```
+
+一次性 token 先被删掉，`CreateNewUser` 失败则该链接作废，用户只能重新注册。
+
+`internal/model/auth.go:371` 的 `CreateNewUser` 连做三次 insert
+（`user_info`、`user_auth`、`user_auth_role`）**没有事务**，
+第 2 或第 3 步失败会留下孤儿 `user_info`，或一个没有角色的用户。
+昵称按 `Count` 生成"游客N"，并发注册会重名，且那次 `Count` 的 error 只打了日志。
+
+修复：
+
+- `VerifyCode` 里把 `DeleteMailInfo` 挪到 `CreateNewUser` 成功之后。
+  删 token 本身失败最多导致链接可重复点，而重复点会被下面的查重挡住，比现在直接废掉链接好
+- `CreateNewUser` 整体包进 `db.Transaction`
+- 昵称改用插入后拿到的 `userinfo.ID`（先 insert 再 update 昵称和简介），并发不会重名
+- 事务内加一次 `username = ?` 的存在性检查，避免同一邮箱的两封未过期邮件都点导致建出两个账号；
+  命中时返回新的 sentinel error `model.ErrUsernameTaken`
+- `BcryptHash` 的 error 不再忽略
+
+回归测试：`model.TestCreateNewUser`（断言昵称按 id 生成）、
+`model.TestCreateNewUserRejectsDuplicate`、`model.TestCreateNewUserRollsBackOnFailure`
+（删掉 `user_auth_role` 表制造第三步失败，断言前两张表都回滚）、
+`TestAuthVerifyCodeKeepsTokenWhenCreateFails`（断言建用户失败后验证链接仍然有效、库里没有半个用户）。
+
+### F13 `UpdateUserInfo` 会把零值写库 — 已修复
+
+`internal/model/user.go` 原来是 `Select("nickname","avatar","intro","website").Updates(userInfo)`。
+显式 `Select` 会让 GORM 把零值一起写进去，所以调用方漏传一个字段就等于把它清空。
+这是 FE1 那次数据丢失的后端一半：前台表单没同步时只改昵称提交，头像/简介/网站全被清成空串。
+
+修复：只把非空字段放进 map 更新，全空时直接返回不发 SQL。
+
+测试：`internal/model/user_update_test.go` 的 `TestUpdateUserInfoKeepsEmptyFields`。
+接口级验证（`PUT /front/user/info`）：先写满四个字段，再只传 nickname、其余留空，
+返回 `code 0` 且 `GET` 读回来头像/简介/网站都还在。
+
+### F14 评论审核开关的名字是反的（行为是对的）— 已澄清
+
+原判断是「语义反了，开启审核反而让评论直接可见」。把整条链读完后结论要改：
+**行为是自洽的，反的只有名字和描述。**
+
+`internal/handle/handle_front.go` 的 `SaveComment` 把配置值直接当 `Comment.IsReview` 写库：
+
+```go
+isReview := model.GetConfigBool(db, g.CONFIG_IS_COMMENT_REVIEW)
+comment, err = model.AddComment(db, auth.ID, req.Type, req.TopicId, req.Content, isReview)
+```
+
+核实过的四个点：
+
+- 前台查询 `GetCommentVOList` / `GetCommentReplyList` 都是 `WHERE is_review = true`，即 true = 已过审可见
+- 后台评论管理（`views/message/comment/index.vue`）把 `is_review` 渲染成「通过 / 审核中」，「通过」按钮置 true
+- 后台设置页（`views/setting/website/index.vue`）的单选把 **`value="true"` 标成「关闭」**，即 true = 关闭审核
+- 种子数据默认 `true`，也就是默认不审核
+
+所以 `is_comment_review = true` 的真实含义是「**免**审核，新评论直接展示」，上下游一致；
+只有 key 名和 Desc「评论默认审核」读起来像「需要审核」。留言（`is_message_review`）完全同构。
+
+照名字取反是这里最容易犯的错，代价是把所有新评论藏起来。所以没动行为，只让它不再误导：
+
+- `SaveComment` 上方写明语义，并点出「别照名字取反」
+- 种子 Desc 改成「评论免审核(true 新评论直接展示, false 需后台通过)」（`cmd/generate-data/main.go`；
+  已建库的旧数据不受影响，Desc 只是给人看的）
+- 后台设置页选项改成「关闭(新评论直接展示) / 开启(需在评论管理里通过)」，不再只写「关闭 / 开启」
+- `TestFrontSaveComment` 补两条断言钉住语义：无配置 → `IsReview=false`；配置 `true` → `IsReview=true`。
+  验证过把 handler 改成 `!GetConfigBool(...)` 这两条会红
+
+没有改 key 名：要改就得迁移已有部署的配置行，收益只是名字好看，不值得。
+
+## 组件测试
+
+2026-09-03 两个前端都接入了 `@vue/test-utils@2.5.0`。此前只有 store 和 utils 有测试，
+组件内部的状态问题（表单快照没同步、模板 ref 拿错、render 函数空指针）全靠读代码推断，
+浏览器行为也无法自测（playwright 在本机起不来，见 `project_env_docker` 记忆）。
+
+已覆盖的回归点（每条都验证过：把修复回退后测试会红）：
+
+- `gin-blog-admin/src/components/crud/CrudTable.spec.js` — A6 翻页只发一次请求、
+  `pagination` 上不再挂 `onChange`、请求失败清空数据
+- `gin-blog-admin/src/views/article/list/index.spec.js` — A1 分类为 null 不崩表且展示「无」、
+  A3 `updateOrDeleteArticles` 返回 Promise
+- `gin-blog-admin/src/views/article/write/index.spec.js` — A5 新建时 `tag_names` 是数组、
+  编辑导入草稿（无分类无标签）不崩
+- `gin-blog-front/src/views/user/UploadOne.spec.js` — FE1 `props.preview` 后到也能显示、
+  FE4 根相对路径
+- `gin-blog-front/src/views/user/index.spec.js` — FE1 表单在 `getUserInfo` 后同步、
+  FE2 提交发原始相对路径、未登录跳首页
+- `gin-blog-admin/src/views/Login.spec.js` — A8 不勾选「记住我」不保存账号密码、勾选则保存、
+  登录失败时 loading 复位且不产生未捕获 rejection、账号密码为空直接提示
+- `gin-blog-admin/src/views/auth/role/index.spec.js` — A11 新建时预取两个选项、
+  `menu_ids`/`resource_ids` 是数组、勾选的权限会一起提交、选项不重复请求；
+  A15 禁用开关按布尔值渲染、切换时带上原有资源与菜单权限、失败不改本地状态
+- `gin-blog-admin/src/views/message/comment/index.spec.js` — A16 评论类型只有一列、
+  未知类型不抛异常、「回复对象」列 key 指向真实字段、审核失败不误报成功也不刷新列表
+- `gin-blog-admin/src/views/article/list/index.spec.js` — 另含 A20 导入放行 `.md` / `.markdown`
+- `gin-blog-admin/src/views/setting/website/index.spec.js` — 配置拉取后填充表单、
+  后端返回空配置时保留默认值(以前直接赋值会把表单清空)、拉取失败不产生未捕获 rejection、
+  保存提交当前表单、保存失败不误报成功
+- `gin-blog-admin/src/views/auth/menu/index.spec.js` — 顶部新增(父 id 0/目录/Layout)与
+  行内新增子菜单(父 id 为该行/非目录/组件路径清空)互不污染、保活与隐藏开关失败回滚、
+  目录行不展示跳转与组件路径
+- `gin-blog-admin/src/views/auth/resource/index.spec.js` — 模块保存成功才关弹窗并刷新、
+  失败不关不误报成功、编辑模块带上原数据、匿名开关失败回滚、模块行不展示路径/请求方式/开关
+- `gin-blog-admin/src/views/setting/link/index.spec.js` — 头像列走 `convertImgUrl`
+  (本地上传的友链头像是相对路径, 以前直接给 img 会裂图)、点击地址复制到剪贴板、
+  删除确认文案(原来复制自分类页写的是「该分类」)、编辑带上原行数据
+- `gin-blog-admin/src/views/user/list/index.spec.js` — 角色选项拉取失败不抛、
+  编辑把 roles 映射成 role_ids、没有角色的用户点编辑不抛异常(以前直接 `.map`)、
+  禁用开关失败回滚
+- `gin-blog-admin/src/views/setting/page/index.spec.js` — 列表渲染、拉取失败与空数据
+  都不让 pageList 变成 undefined、下拉菜单编辑/删除、弹窗未打开时刷新预览图不抛异常
+- `gin-blog-admin/src/views/profile/index.spec.js` — 挂载后同步表单、A12 表单里的头像是
+  原始相对路径而非展示地址、保存失败不提示成功、改密码成功后清空表单、失败不清空
+- `gin-blog-admin/src/views/log/operation/index.spec.js` — A4 复制的是格式化后的 JSON、
+  空串与非 JSON 内容不抛异常、请求方式标签颜色映射(未知方法退回 info)、查看与删除
+- `gin-blog-admin/src/views/message/leave-msg/index.spec.js` — 头像走 `convertImgUrl`、
+  空选中不发请求、审核成功后刷新、审核失败不误报成功也不刷新(与评论页 A16 同类)、
+  标签页切换改查询参数
+- `gin-blog-admin/src/views/setting/about/index.spec.js` — 内容填充、拉取失败与 null
+  都不让内容变成 null、保存提交当前内容、失败不提示成功且 loading 复位
+- `gin-blog-admin/src/views/article/category/index.spec.js` — 新增走空表单、编辑带原数据、
+  行内删除不弹二次确认、批量删除空选中只提示、保存失败不提示成功(结构与标签页一致)
+- `gin-blog-admin/src/views/home/index.spec.js` — 统计数据填充、接口失败与空数据都不让
+  homeInfo 变成 null、用户信息后到也能显示在问候语里(原来解构 store 失去响应性)、
+  一言接口挂了走兜底文案
+- `gin-blog-admin/src/views/article/tag/index.spec.js` — 与分类页同构的 CRUD 回归:
+  新增走空表单、编辑带原数据、删除文案、批量删除空选中、保存失败不提示成功
+- `gin-blog-front/src/views/article/list/index.spec.js` — 卡片渲染与图片转换、
+  分类为 null 不崩、接口失败时 loading 复位(以前只在成功路径复位, 失败页面卡在加载态)、
+  空数据不让列表变成 null
+- `gin-blog-front/src/views/discover/archive/index.spec.js` — 按页拉取与切页重新拉取、
+  接口失败 loading 复位、空数据不抛(以前直接取 `resp.data.page_data`)
+- `gin-blog-front/src/views/link/index.spec.js` — 列表渲染、失败时 loading 复位、
+  空数据不给 LinkList 传 null(它内部直接取 `linkList.length`)
+- `gin-blog-front/src/views/home/index.spec.js` — 首屏加载与摘要去 Markdown 记号、
+  首屏失败时 loading 复位(无限加载靠 `!loading` 才继续请求, 停在 true 等于首页不再加载)、
+  无限加载的三条分支(有数据/空数据完成/失败), 返回 null 也算完成
+- `gin-blog-front/src/views/article/detail/index.spec.js` — markdown 解析、封面转换与
+  无封面兜底、可空字段(tags/category/上下篇/推荐)为 null 时退化成默认值、
+  接口失败与空数据都不破坏默认结构
+- `gin-blog-front/src/views/discover/category/index.spec.js` 与 `.../tag/index.spec.js` —
+  列表与数量渲染、接口失败时 loading 复位(两页原来都只在成功路径复位)、
+  空数据不让列表变成 null(模板里直接取 `.length`)、标签页的随机字号与颜色范围
+- `gin-blog-front/src/views/about/index.spec.js` — markdown 解析、接口失败与空内容
+  都不抛(以前 `marked.parse(null)` 会抛)、站点配置后到也能更新头像
+  (原来 `const { blogConfig } = useAppStore()` 解构 getter, store 整体重新赋值后拿到的是旧对象)
+- `gin-blog-front/src/views/message/index.spec.js` — 默认弹幕 + 接口留言、空数据只留默认、
+  空内容不发请求、发送成功推入弹幕并清空输入框、发送失败不清空也不推入(以前裸 await)、
+  留言页封面兜底与配置生效
+- `gin-blog-front/src/views/article/detail/components/BannerInfo.spec.js` — 字数统计去掉
+  HTML 标签、按 400 字/分钟估算阅读时间、正文为空或缺失时不抛异常(以前直接对
+  `article.content` 调 replace)
+- 一言(hitokoto)保留为运行时外部请求, 但兜底改成从内置文案里随机取一句(原来固定一句):
+  front 在 `utils/index.js` 的 `getOneSentence` 内部兜底(`FALLBACK_SENTENCES` /
+  `getRandomSentence`), `HomeBanner` 与 `TalkingCarousel` 不再各自写死文案;
+  admin 后台首页同样恢复请求 + 随机兜底。
+  测试: front `utils/index.spec.js` 5 条(接口正常/失败/返回空/一次加载只请求一次/随机文案
+  来自内置列表), admin `views/home/index.spec.js` 3 条
+- `gin-blog-front/src/views/article/detail/components/Catalogue.spec.js` — 按标题层级生成
+  缩进、只有二三级标题时缩进从 0 开始、重名标题生成不同 id 并写回 DOM、空标题不进目录
+  (原来层级用过滤后的列表算但循环用未过滤的, 空标题会占一行空白)、`previewRef` 为 null
+  不抛、点击目录项滚动且找不到元素时直接返回。
+  注意: 原实现用 `innerText`, jsdom 不支持(返回 undefined), 所以这个组件在测试环境里
+  只能改用 `textContent` 才跑得起来 —— 这也是「回退后 6 条红」里大部分红的原因,
+  不代表原代码在浏览器里有 6 个 bug
+- `gin-blog-front/src/components/comment/Comment.spec.js` — 评论回复重构后的行为：
+  点回复只打开该评论的回复框且带上正确的父评论、切换评论时上一个关掉、
+  「点击查看」只隐藏自己那一条并按回复数决定分页、翻页与提交后重载都带对应评论 id 与当前页
+- `gin-blog-admin/src/layout/tags/index.spec.js` — A21 滚动定位取的是激活标签自己的元素
+  （按 path 存元素, 与渲染顺序无关）、标签移除后不再持有它的元素、
+  关闭当前标签跳左边、关闭第一个标签跳第二个
+
+写这类测试的两个坑：
+
+- `vi.mock('vue-router', ...)` 不能整个模块替换，`src/router/index.js` 里的 `createRouter`
+  会变成 undefined。要 `async importOriginal => ({ ...await importOriginal(), useRoute, useRouter })`
+- naive-ui 组件用 `findComponent({ name: 'NDataTable' })` 找不到，要直接传组件引用
+  `findComponent(NDataTable)`
+- `vi.mock` 的工厂会被提升到文件顶部，工厂里引用的 `vi.fn()` 必须用
+  `const { push } = vi.hoisted(() => ({ push: vi.fn() }))`，否则报
+  `Cannot access 'push' before initialization`
+- `store/modules/tag.js` 用的是 `@/router` 导出的 `router` 实例，不是 `useRouter()`，
+  测跳转要 mock `@/router`
+- `layout/tags/index.vue` 模板里同时用了 `useRoute()` 和全局属性 `$route`，
+  不装 router 插件时后者是 undefined，要 `global.mocks.$route`
+- `<script setup>` 的绑定在测试里可以从 `wrapper.vm` 访问，且 ref 已自动解包
+  （`wrapper.vm.isRemember = false`，不要写 `.value`）
+- mock 的 api 函数要在 `beforeEach` 里 `mockReset()` 再重新设实现，
+  否则调用次数会跨用例累计
+
+## 潜在问题（当前打不到）
+### F11 注册强依赖邮件，`Captcha.SendEmail` 是死开关 — 已修复
+
+现象：博客前台注册用户提示「发送邮件失败」（`6101`）。两层原因：
+
+1. `config.yml` 的 `Email.From` / `SmtpPass` / `SmtpUser` 都是空串，没有可用的 SMTP 凭据。
+2. `Captcha.SendEmail` 这个开关只在 `internal/global/config.go:59` 定义过，**全仓库没有任何地方读它**，
+   `handle_auth.go` 的 `Register` 无条件调用 `utils.SendEmail`，所以改成 false 也不会跳过发邮件。
+
+修复：让开关真正生效。`Register` 在查重之后加一个分支，`Captcha.SendEmail` 为 false 时直接
+`model.CreateNewUser` 建号并返回成功，不写 Redis 验证 token、不发邮件；为 true 时保持原来的
+邮箱验证流程。`config.yml` 与 `config.docker.yml` 都改为 `SendEmail: false`。
+前台 `RegisterModal.vue` 的提示从「邮件已发送」改成「注册成功, 请登录」并自动切到登录弹窗，
+同时给 `api.register` 补上 `catch`（原来是裸 await，失败会产生 unhandled rejection）。
+
+测试：`TestAuthRegisterWithoutEmail`（注册即建号、Redis 里没有验证 token、重复注册被挡）。
+`testenv_test.go` 的 `newTestEnv` 现在会初始化 `g.Conf`，注意它不能直接覆盖 —— `withJWTConf` /
+`withUploadConf` 可能已经在同一个测试里设过，覆盖会让 `TestAuthLogin` 拿不到 JWT 密钥。
+
+顺带修正 `config.docker.yml` 的 Email 段键名：原来写的 `IsSSL` / `Secret` / `Nickname` 和
+`g.Config.Email` 的字段对不上（结构体要的是 `SmtpPass` / `SmtpUser`），即使填了也绑定不上。
+
+### F12 `AutomaticEnv` 让同名环境变量吃掉整段配置 — 已修复
+
+`internal/global/config.go:93` 的 `v.AutomaticEnv()` 会让 viper 在解析每个 key 时先查环境变量。
+如果环境里存在和某个顶层配置段同名的变量，`Get("Email")` 返回的是那个**字符串**而不是 yaml 里的
+map，于是整段反序列化成零值。
+
+实测（本机环境里有 `EMAIL=xxx@xxx.com`，Linux 上 git 相关工具常设）：
+
+```
+有 EMAIL 环境变量:  Email = {From: Host: Port:0 SmtpPass: SmtpUser:}
+env -u EMAIL:      Email = {From: Host:smtp.qq.com Port:465 SmtpPass: SmtpUser:}
+```
+
+后果是 SMTP 拨号变成 `dial tcp :0: connect: connection refused`，报错完全指不到原因。
+`Server` / `Captcha` 这些没有同名环境变量的段不受影响，所以只有邮件这一处发作。
+
+这不只影响邮件：任何一段配置只要撞上同名环境变量都会被静默吃掉。
+
+修复：去掉 `AutomaticEnv()` 与 `SetEnvKeyReplacer`，改成 `envBindings` 白名单显式 `BindEnv`，
+只绑定 `deploy/start/docker-compose.yml` 里实际用到的 8 个 key（`SERVER_PORT`、`MYSQL_HOST`、
+`MYSQL_PORT`、`MYSQL_DBNAME`、`MYSQL_USERNAME`、`MYSQL_PASSWORD`、`REDIS_ADDR`、
+`REDIS_PASSWORD`）。这样父路径遮蔽消失，compose 的变量名也不用改。
+
+补充（发现于 CI）：白名单化之后 CI 的 Docker 冒烟测试挂了 —— 它靠
+`-e SERVER_DBTYPE=sqlite` 让后端不连 MySQL，而这个 key 没在白名单里，`AutomaticEnv`
+一去掉就失效，容器起来后一直去连 `127.0.0.1:3306`。白名单补了
+`SERVER_DBTYPE` 与 `SQLITE_DSN`。教训：改成白名单时要把仓库里所有传环境变量的地方
+（compose、CI、脚本）都过一遍，不能只看 compose。
+
+验证（临时探针，跑完已删）：
+
+```
+EMAIL=someone@example.com 时  Email = {From: Host:smtp.qq.com Port:465 ...}   不再被吃掉
+REDIS_ADDR=1.2.3.4:6379 时    Redis.Addr = "1.2.3.4:6379"                     覆盖仍生效
+```
+
+## 潜在问题（当前打不到）
+### P1 本地上传的路径穿越防护恒真 — 已修复
+
+`internal/utils/upload/local.go:60`
+
+```go
+p := g.GetConfig().Upload.StorePath + "/" + key
+if strings.Contains(p, g.GetConfig().Upload.StorePath) {
+```
+
+`p` 由拼接而来，必然包含 `StorePath`，`key` 传 `../../config.yml` 也能通过。
+目前 `DeleteFile` 全仓库没有调用方，只在 `upload/oss.go:11` 的接口里声明，所以一直是潜在问题。
+
+修复：改成 `filepath.Abs` 规整后判断是否仍在 `StorePath` 之内，前缀比较带上路径分隔符
+（避免 `/data/uploaded-evil` 混过去），越界直接返回错误而不是静默跳过。
+测试 `internal/utils/upload/local_delete_test.go`：`../outside.txt` 被拒且文件仍在、
+`../uploaded-evil/x.jpg` 被拒、正常 key 能删。
+
+注意 `local.go` 的 `UploadFile` 里有个局部变量叫 `filepath`，会在该函数内遮蔽新导入的
+`path/filepath` 包，以后在那个函数里用 `filepath.Xxx` 要留意。
+
+## 排查过但不是问题的
+
+记录下来避免重复排查。
+
+- `internal/utils/ip.go:135` 的 `ipSource[2]`：曾怀疑 `GetIpSource` 返回 `""` 时会越界 panic。
+  实测（xdb 缺失、非法 IP 串）都在 `ipSource[0] != "中国" && ipSource[0] != "0"` 这一步提前返回，
+  不会走到下标 2，**不会 panic**。
+- 带 `Group(...)` 的链上调用 `Count(&total)`（`model/tag.go:36`、`model/category.go:33`、
+  `model/article.go:141`）是正确的：GORM 的 `Count` 在检测到 `GROUP BY` 时会回退成行数。
+- `...Count(&total).…Find(&list)` 这种链式复用是安全的：GORM 每次 `Execute` 结束会
+  `stmt.SQL.Reset()`，第二个 finisher 会重建 SQL。
+- `db.Updates(category)` 传值而非指针仍然会带上主键 `WHERE`（GORM 在 `!CanAddr()` 时补主键条件），
+  `SaveOrUpdateCategory` / `SaveOrUpdateTag` / `UpdateUserInfo` 不会变成全表更新。
+- 评论与留言内容在入库前已做 HTML 转义（`handle_front.go:185`、`:228` 的
+  `template.HTMLEscapeString`），前台用 `v-html` 渲染不构成存储型 XSS。
+
+## 顺手记下的清理项（不是 BUG）
+
+- `internal/model/auth.go` 的 `SaveOrUpdateRole` 只被 `auth_extra_test.go:137` 调用，
+  生产代码里没有调用方。要删得连测试一起改，价值不高，先留着。
+- `internal/handle/handle_front.go` 的 `GetTagList` / `GetCategoryList` / `GetMessageList` /
+  `GetLinkList` 都不返回 total，前端也没有分页。数据量大了之后一次全量返回会变慢，
+  届时要么加分页要么加缓存。
+
+## gin-blog-front
+
+### FE1 个人中心头像与资料显示为默认值, 只改昵称会清空其他字段 — 已修复
+
+现象：前台登录后在个人中心上传头像，接口返回 `code 0` 且文件正常落盘、URL 直接访问是
+`200 image/jpeg`，但页面刷新后头像仍是默认图，四个输入框也是空的。
+
+原因是两层「拷贝一次」：
+
+1. `views/user/index.vue:14-20` 在 setup 阶段用 `reactive({ avatar: userStore.avatar, ... })`
+   把 store 的值拷成快照，而 `getUserInfo()` 是在 `onMounted` 里异步取的，此刻 store 还是默认值。
+2. `views/user/UploadOne.vue:14` 又 `ref(props.preview)` 拷一次，且没有 `watch` props
+   （admin 的同名组件 `:23` 有），所以父组件后来拿到真实头像也传不进来。
+
+上传后能看到正确的 src，是因为 `previewImg.value = responseJSON.data` 是组件内部直接赋值，
+那条路径本来是通的；一刷新就回到默认值。
+
+连带的数据丢失路径（已实测）：表单没同步时四个框都是空的，全空提交会被
+`UpdateCurrentUserReq.Nickname` 的 `binding:"required"` 挡住（`9001`），但只要只填昵称就提交，
+`model.UpdateUserInfo` 用的是 `Select("nickname","avatar","intro","website").Updates(...)`，
+显式 `Select` 会把零值一起写进去：
+
+```
+PUT /front/user/info {"nickname":"只改昵称","avatar":"","intro":"","website":""} → code 0
+DB: (3, '只改昵称', '', '', '')   ← 头像/简介/网站被清空
+```
+
+修复：`onMounted` 里 `getUserInfo()` 返回后 `Object.assign(form, ...)` 重新同步；
+`UploadOne.vue` 补 `watch(() => props.preview, ...)`。
+
+### FE2 store 存的是绝对头像 URL, 会被写回库 — 已修复
+
+`store/user.js:55` 原来存 `convertImgUrl(data.avatar)`，即 `http://localhost:8765/...`。
+个人中心把它当表单初值，点「修改」就把带域名的绝对地址写回数据库——换域名或换环境就全失效。
+这是 admin A12 的前台孪生。
+
+修复：store 只存原始相对路径，转成可访问地址留给展示层的 `convertImgUrl`。已确认所有 img src
+都已经套了 `convertImgUrl`（`AppHeader.vue:144`、`CommentField.vue:83`、`Comment.vue:194,229`、
+`LinkList.vue:29`、`message/index.vue:126`），所以改成相对路径不影响显示。
+`avatar` getter 的默认值判断从 `??` 改成 `||`：头像为空串时也要退回默认图，
+否则 `convertImgUrl('')` 会给出已失效的 `dummyimage.com` 占位图。
+
+测试：`store/user.spec.js` 原来断言的是「相对路径会被拼上后端地址」，即旧的错误行为，
+已改为断言存原始路径，并新增「后端头像为空时退回默认图」。
+
+### FE4 图片地址拼 localhost, 远程访问必然裂图 — 已修复
+
+这是「上传头像不显示」的真正原因，前面 FE1/FE2 只是同一个页面上的另外两个问题。
+
+`convertImgUrl` 原来把 `VITE_BACKEND_URL`（前台）/ `VITE_SERVER_URL`（后台）拼进图片地址，
+而这两个变量在 `.env.development` 里写的是 `http://localhost:8765`。从服务器本机以外的浏览器
+访问页面时，`localhost` 指的是浏览器所在的机器，图片必然加载失败。
+
+排查时的教训：在服务器上 `curl http://localhost:8765/public/uploaded/xxx.jpg` 得到
+`200 image/jpeg`，据此判断链路正常是错的 —— curl 跑在服务器本机，`localhost` 恰好指对了。
+故障环境是远程浏览器，验证环境必须一致。
+
+修法不是把 localhost 换成具体 IP（换 IP 或上域名又会失效），而是改成根相对路径：
+`deploy/build/web/default.conf.template:20` 的 nginx 本来就有 `location /public/uploaded`
+转发到后端，生产环境的设计就是根相对，只有 dev 模式漏了这条代理才被迫拼绝对地址。
+
+- 两个 `utils/index.js` 的 `convertImgUrl` 返回 `/public/uploaded/xxx.jpg`，并归一化前导 `/`；
+  `http` 开头的外链仍原样返回
+- 两个 `vite.config.js` 各加一条 `/public` 代理，target 沿用原来的后端地址
+- `VITE_BACKEND_URL` / `VITE_SERVER_URL` 现在只作为代理目标，不再进入页面里的 URL
+
+验证：经两个 dev server 代理取图都是 `200 image/jpeg 35217`。
+测试里四处断言旧行为的地方已改（`front/utils/index.spec.js`、`front/store/app.spec.js` 两条、
+`admin/utils/index.spec.js`）。
+
+### FE3 头像尺寸只在 lg 断点生效 — 已修复
+`views/user/UploadOne.vue:58` 的 `class="lg:h-[160px] lg:w-[160px]"` 在 1024px 以下不生效，
+图片按原始尺寸撑开（父容器只有 `max-w-[300px]`），布局会炸。改成
+`h-[160px] w-[160px] object-cover`。注意这一条不是上面那次故障的原因——
+报告时是 1920×1080 最大化窗口，`lg:` 是生效的。
+
+### FE5 评论回复靠 v-for 模板 ref 下标操作，顺序不保证 — 已修复
+
+`components/comment/Comment.vue` 原来有三组按下标访问的模板 ref：
+`replyFieldRefs`（回复框，`setReply` + 直接改子组件的 `data`）、
+`pageRefs`（分页，`setShow` + 读 `current`）、`checkRefs`（「点击查看」，
+`checkRefs.value[idx].style.display = 'none'` 直接改 DOM）。
+
+Vue 不保证 `v-for` 的模板 ref 数组顺序与源数组一致，文件里那段
+`watch(commentList)` → `refresh = false` → `nextTick` 重建整个列表就是给它打的补丁。
+
+改成按评论 id 记状态，模板 ref 全部去掉：
+
+- `activeReply`（`{ commentId, nickname, replyUserId, parentId }`）决定哪条评论下渲染回复框，
+  同一时刻只有一个；回复对象通过 props 传给 `CommentField`，不再由父组件改子组件内部状态
+- `expandedIds`（Set）记录已展开的评论，替代 `style.display` 的 DOM 操作
+- `replyPages`（id → 页码）持有回复列表当前页，`Paging` 改成受控组件
+  （`current` 由 props 传入，只 `emit('changeCurrent', page)`），不再持有 `show` / `current`
+- `CommentField` 不再 `defineExpose({ data, setReply })`，改为 props 入参 + `emit('cancel')`
+- 顺带修掉一个旧 bug：`replyComment` 原来取 `obj.nickname`，而昵称在 `user.info.nickname` 下，
+  所以回复框一直没有「回复 @xxx」提示也没有取消按钮
+- 三个 `getCommentReplies` 调用补上了 `catch`
+
+测试见「组件测试」一节的 `Comment.spec.js`（5 条，回退到重构前全红）。
+端到端只验到接口层（发评论 → 发 7 条回复 → 分页两页取回 5 + 2 条 → 删除清理），
+浏览器交互本机无法自测（playwright 起不来）。
+
+### FE6 移动端顶栏三个按钮点不到，等于手机上没有导航 — 已修复
+
+`components/layout/AppHeader.vue:109-117` 的主题切换 / 搜索 / 菜单三个按钮里只有一个图标 span，
+`button` 本身不是 flex 容器。而 `presetIcons` 生成的规则只有 `width` / `height` / `mask`，
+**没有 `display`** —— 图标 span 在非 flex 父元素里仍是 `inline`，inline 元素不吃 width/height，
+盒子塌成 0×0。元素在 DOM 里、计算样式也是 24px，但既看不见也点不到，
+所以手机上打不开侧边栏，整个导航等于消失（浏览器实测：Playwright 点击那个按钮报
+`element is not visible`，`getBoundingClientRect()` 全 0）。
+
+桌面端同样的写法没暴露，是因为那些图标的父元素是 `flex items-center`，flex 子元素会被 blockify。
+
+修法不是给这三处补 `inline-block`，而是在 `uno.config.js` 的 `presetIcons` 里加
+`extraProperties: { display: 'inline-block' }`：这类「图标静默变成不可见元素」的坑
+在 `roadmap.md` 里已经记过一次，逐处补 class 只能治当下这三个。
+
+回归测试：`src/utils/uno-icons.spec.js` 直接跑 UnoCSS 生成器，断言三个图标类的规则里都有
+`display:inline-block`（去掉配置就变红，已验证）。
+端到端：手机视口下三个按钮的盒子从 0×0 变成 24×32，点菜单能拉出侧边栏并看到
+首页/归档/分类/标签/说说/相册/友链/关于/留言全部入口；
+另外扫了 6 个页面 × 手机/桌面两种视口，已无「应该显示却塌成 0」的图标。
+
+### FE7 手机上封面图与内容之间空得太多 — 已修复
+
+`views/home/index.vue` 的内容区原来写死 `style="margin-top: calc(100vh + 30px)"`
+（要跳过整屏高的封面，封面是 `absolute` 不占文档流）。桌面端 30px 合适，
+手机上封面正文只占屏幕中间一小条、底部本来就空着一大片，再加 30px 看着像内容掉队了。
+
+改成 `mt-[calc(100vh_+_12px)] lg:mt-[calc(100vh_+_30px)]`，顺手把内联 style 换成类，
+和文件里其它响应式写法一致。实测手机视口间距 12px、桌面仍是 30px。
+
+## gin-blog-admin
+后台管理端的全量审查。A1–A6 是「当前就会坏」的，已修复；A7 之后待处理。
+
+### A1 文章列表分类为 null 导致整表 render 抛异常 — 已修复
+
+`src/views/article/list/index.vue:86` 原为 `h('div', row.category.name || '无')`。
+后端 `model.Article.Category` 是指针，`category_id = 0` 时序列化为 `null`。
+这条以前打不到，但 F9（导入文章为草稿、不建分类和标签）之后必然产生这种数据，
+只要导入过一篇，整张表格的 render 就会抛异常。改为 `row.category?.name`。
+
+同一个根因还有 `src/views/article/write/index.vue:84`：编辑页 `category.name` 和
+`tags.map(...)` 都没有守卫，打开一篇导入生成的草稿会直接白屏。已改为
+`tags?.map(e => e.name) ?? []` 和 `category?.name ?? ''`。
+
+### A2 后台批量导入文章不带 Authorization，必然 401 — 已修复
+
+`src/views/article/list/index.vue` 的 `<NUpload action="/api/article/import">` 没有带
+认证头，而 `/article/import` 挂在 `JWTAuth(true)` 下，非 mock 构建 100% 失败。
+参照 `components/UploadOne.vue` 补 `:headers="{ Authorization: \`Bearer ${authStore.token}\` }"`。
+注意这里用 `useAuthStore()` 实例而不是解构出 `token`，否则重新登录后拿到的是旧值
+（`UploadOne.vue:20` 就是解构的，属于 A13，未处理）。
+
+顺带修了 `afterUpload` 里裸的 `JSON.parse(event.target.response)`：鉴权失败或被网关
+拦截时响应不是 JSON，会抛在 naive-ui 的 `@finish` 回调里。现在走 `utils/parseJson`。
+
+### A3 删除文章不提示成功、失败无法捕获 — 已修复
+
+`src/views/article/list/index.vue:214` 的 `updateOrDeleteArticles` 少一个 `return`。
+`composables/useCRUD.js:110` 里 `data = await doDelete(...)` 拿到 `undefined`，于是
+`data?.code === 0` 不成立，删成功也不弹提示；失败时因为 promise 没被 await，
+外层 `try/catch` 兜不住，变成 unhandled rejection，同时 `refresh()` 照跑当成功。
+
+### A4 操作日志详情弹窗 `JSON.parse('')` 抛在 render 里 — 已修复
+
+`src/views/log/operation/index.vue:228,237,147` 三处 `JSON.stringify(JSON.parse(x), null, 2)`。
+`request_param` 对 `POST /user/offline/:id`、`DELETE /menu/:id`、`DELETE /resource/:id`
+是空串，点开详情即崩。新增 `utils/formatJson`（解析不了就原样返回），三处都换过去。
+
+### A5 写文章页新建时 `tag_names` 为 undefined — 已修复
+
+`src/views/article/write/index.vue:73` 新建分支重置成
+`{ status: 1, is_top: false, title: '', type: 1 }`，漏了 `tag_names`；
+`:63-65` 的 watcher 紧接着 `newVal.includes(...)` → TypeError。
+现在重置对象补齐 `tag_names: []` 和 `category_name: ''`。
+
+### A6 CrudTable 每次翻页发两次请求 — 已修复
+
+`src/components/crud/CrudTable.vue` 里 `pagination.onChange` 调 `handleQuery()`，
+模板上的 `@update:page="onPageChange"` 又调一次。对照装好的 naive-ui 源码
+`es/data-table/src/use-table-data.mjs:166-181`：`mergedOnUpdatePage` 先
+`call(onChange, page)`，再 `doUpdatePage(page)` 触发组件的 `onUpdate:page`，所以两个
+回调每次翻页都会各发一次请求；两个请求没有排序或取消，慢的那个能覆盖新的。
+`onUpdatePageSize` 没有双绑，不受影响。
+修法是删掉 `pagination.onChange`，只留 `@update:page` 一个入口
+（`onPageChange` 里有 `props.remote &&` 判断，前端分页模式下不会多发请求）。
+
+### 测试
+
+`src/utils/index.spec.js` 新增 `parseJson` / `formatJson` 的 9 个断言，覆盖 A4 与 A2 的
+空串、非法 JSON、HTML 响应场景。A1/A3/A5/A6 在组件内部，当时还没接入 `@vue/test-utils`，
+只靠 `pnpm build` + 人工点检；后来（2026-09-03）两个前端都接入了组件测试，
+这四条各自的回归用例见上面「组件测试」一节。
+
+### 待处理
+
+P1（特定路径下会坏）：
+
+- **A7（已修复）** `src/utils/http.js:59-67`：`code === 1201` 与 `1202/1203/1207` 两个分支直接
+  `return`，等于 `Promise.resolve(undefined)`，导致 `CrudTable.vue:78` 的
+  `const { data } = await ...`、`Login.vue:55` 的 `resp.data.token`、
+  `permission.js:24` 的 `buildRoutes(resp.data)` 二次抛错。应 `return Promise.reject(responseData)`。
+  1201 分支还没清 token。
+- **A8（已修复）** `src/views/Login.vue:39,60`：`const isRemember = useStorage('isRemember', false)` 是
+  Ref，恒为真，取消勾选也会把用户名密码写进 localStorage，`removeLocal` 分支永远走不到。
+  少一个 `.value`。（`local.js:47` 只是 base64，不是加密。）
+- **A9（已修复）** `src/store/modules/auth.js:36-41` + `layout/header/components/UserAvatar.vue:32`：
+  `logout` 既不 await 也不 catch，`/logout` 失败时 token 留在 localStorage、不跳转、不提示。
+- **A10（已修复）** `src/layout/index.vue:18-22`：`computed(() => router.getRoutes()...)` 没有响应式
+  依赖，永久缓存首次结果；登录后动态添加的路由不在 `<KeepAlive :include>` 里，刷新才生效。
+- **A11（已修复）** `src/views/auth/role/index.vue`：菜单 / 资源权限树原来只在
+  `modalAction === 'edit'` 下渲染，option 预取还被注释着，F6 之后后端 `model.SaveRole`
+  已支持新建时一并写入，只剩前端在逼用户走「先建角色再编辑权限」两趟。
+  现在新建入口改为 `handleAddRole()`：先并发拉取两个选项（已拉过则跳过），再打开弹窗，
+  弹窗在 `modalAction === 'add'` 时同时给出两棵树；编辑流程保持原样（按入口按钮只展示对应那棵）。
+  `initForm` 也补齐成 `{ name: '', label: '', menu_ids: [], resource_ids: [] }`，
+  避免 `NTree` 的 `checked-keys` 拿到 undefined。
+  测试 `src/views/auth/role/index.spec.js` 4 条；接口级验证：新建角色带
+  `menu_ids:[1,2] / resource_ids:[1]`，`role_menu` 与 `role_resource` 均正确写入，
+  删除角色后关联无残留。
+- **A12（已修复）** `src/views/profile/index.vue:14,22-27,33`：`infoForm.avatar = userStore.avatar` 是
+  跑过 `convertImgUrl` 的展示地址，再 `api.updateCurrent` 存回库。FE4 之后它不再是带域名的
+  绝对地址（改成了根相对路径），但仍会多出前导 `/`，头像为空时还会把占位图
+  `http://dummyimage.com/400x400` 写进库。应发原始 `userInfo.avatar`。
+  另外 F13 之后后端已不再把空值写库，所以这条的破坏面比原来小了。
+- **A13（已修复）** `src/components/UploadOne.vue:20,26-28`：`const { token } = useAuthStore()` 解构后
+  失去响应性；`JSON.parse(respStr)` 无保护（可用新加的 `parseJson`）。
+- **A14（已修复）** `src/components/common/ScrollX.vue:33,51`：用了废弃的 `e.wheelDelta`，Firefox 下
+  为 undefined，`translateX` 变 `NaN`，横向滚动失效。应换 `e.deltaY`。
+
+P2（展示问题 / 潜在 / 清理）：
+
+- **A15（已修复）** `src/views/auth/role/index.vue:93-97`：`value: row.is_disable` 配
+  `checkedValue: 1, uncheckedValue: 0`，后端字段是 `bool`，开关永远显示关闭。
+  目前只是展示，`onUpdateValue` 只弹「这个功能暂时还不支持~」。与 S4 一起处理。
+  已去掉 `checkedValue/uncheckedValue`，`onUpdateValue` 调 `saveOrUpdateRole` 真正落库。
+  注意提交时必须带上 `resource_ids` / `menu_ids`：后端 `UpdateRole` 会整体替换角色的
+  资源与菜单关联，不传就等于清空该角色的全部权限。
+- **A16（已修复）** `src/views/message/comment/index.vue`：`:81` 列 key 还是老的 `reply_nick_name`
+  （render 函数正常，只有接上 `handleExport` 才会导出空列，`CrudTable.vue:136` 按
+  `item[key]` 取值）；`:132` `commentTypeMap[row.type].tag` 没守卫；`:63-78`「评论类型」
+  和 `:124-136`「来源」是同一字段渲染两遍且前者 `key: ''`；`:275` typo `filterablec`；
+  `handleUpdateReview` 无 try/catch。已删掉重复的「评论类型」列、key 改 `reply_user`、
+  类型映射取不到时退化成「未知」、typo 修正、审核失败不再误报成功。
+- **A17（已修复）** `.then()` 无 `.catch`：`views/article/list/index.vue:45-46`、
+  `views/article/write/index.vue:39,42`、`views/user/list/index.vue:40`。
+  拦截器已弹过错误提示，只剩控制台的 unhandled rejection 噪音。四处都补了 `.catch`。
+- **A18（已修复）** `src/assets/config.js` 里导出的 `config` 对象（原作者的 QQ / 微博 APP_ID、
+  腾讯验证码 ID）全仓库无引用，已删。**注意同文件的 `loginTypeMap` / `articleTypeMap` /
+  `commentTypeMap` 及对应 Options 被 4 个页面引用，不是死代码**（和 front 那份不同）。
+- **A19（已修复）** `views/article/list/index.vue:302` 自己实现了一份 `downloadFile`，
+  `utils/index.js:40` 已有同名导出，重复。已删掉局部实现，改为从 `@/utils` 引入。
+- **A20（已修复）** `views/article/list/index.vue:281` 的 `beforeUpload` 只放行 `.md`，
+  后端 F9 之后同时接受 `.md` 和 `.markdown`，两边不一致（偏严，不影响正确性）。
+  已改为两种后缀都放行且忽略大小写。
+- **A21（已修复）** `src/layout/tags/index.vue:16,42` 的 `v-for` 模板 ref 数组顺序没有保证，
+  `tabRefs.value[activeIndex]` 可能取错元素。后果只是激活标签滚动位置偶尔不对。
+  改成函数式 ref 按 `path` 存元素（`tabEls` Map），watch 从 `activeIndex` 换成 `activeTag`，
+  与渲染顺序无关；标签卸载时从 Map 中删掉。顺带把模板里的全局 `$route` 换成
+  `useRoute()` 拿到的 `route`（同一个东西原来两种写法混用）。
+  测试：`layout/tags/index.spec.js` 用桩 ScrollX + 手造几何值，断言滚动用的是激活标签
+  自己的元素、标签移除后不再持有它（回退到旧实现两条都红）。
+
+### admin 排查过但不是问题的
+
+- `src/store/modules/tag.js:66-77` `removeTag` 的负数索引：进入该分支的前提是
+  `path === this.activeTag`，而 `path` 必然来自 `tags` 中的某一项，所以 `activeIndex >= 0`。
+  sessionStorage 只持久化 `tags`（`pick: ['tags']`），刷新后 `activeTag === ''`，此时
+  `if` 不成立也不会崩。`ContextMenu.vue:30` 还额外用 `tags.length <= 1` 禁用了「关闭」。
+- 后台评论列表不显示点赞 / 回复数，不依赖 `CommentVO.LikeCount`，F8 与 admin 无关。
+- `Paginate` 的 100 条上限在 admin 里打不到，`CrudTable` 的 `pageSizes` 是 `[5, 10, 20]`。
+- `api.deleteArticle(ids)` 收到的是 `JSON.stringify(array)` 字符串而 `softDeleteArticle`
+  收到的是数组，两边不对称但都能用：`handle_article.go:159` 的 `ShouldBindJSON` 不看
+  Content-Type，`"[1,2]"` 作为请求体也能正确解析成 `[]int`。

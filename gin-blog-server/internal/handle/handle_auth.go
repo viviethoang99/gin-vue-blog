@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
 
@@ -26,7 +27,6 @@ type LoginReq struct {
 type RegisterReq struct {
 	Username string `json:"email" binding:"required"`
 	Password string `json:"password" binding:"required,min=4,max=20"`
-	
 }
 
 type LoginVO struct {
@@ -38,13 +38,69 @@ type LoginVO struct {
 	Token          string   `json:"token"`
 }
 
+const (
+	loginMaxFail    = 5                // 同一 用户名+IP 允许的连续失败次数
+	loginFailWindow = 15 * time.Minute // 失败计数的有效期, 也就是达到上限后的冷却时长
+)
+
+// 是否已经达到失败上限
+func loginLocked(rdb *redis.Client, failKey string) (bool, error) {
+	fails, err := rdb.Get(rctx, failKey).Int()
+	if errors.Is(err, redis.Nil) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return fails >= loginMaxFail, nil
+}
+
+// 记一次登录失败: 每次失败都会重置有效期, 也就是持续尝试会一直被锁住
+func recordLoginFail(rdb *redis.Client, failKey string) {
+	if err := rdb.Incr(rctx, failKey).Err(); err != nil {
+		slog.Warn("累加登录失败次数出错", "err", err)
+		return
+	}
+	if err := rdb.Expire(rctx, failKey, loginFailWindow).Err(); err != nil {
+		slog.Warn("设置登录失败次数有效期出错", "err", err)
+	}
+}
+
+// 记一条登录日志
+//
+// message 为空表示登录成功。失败时 userAuth 可能是 nil(用户不存在或被锁定),
+// 这时只有请求里带的用户名可用。写日志失败不能影响登录本身, 只告警。
+func saveLoginLog(c *gin.Context, db *gorm.DB, userAuth *model.UserAuth, username, nickname, message string) {
+	ipAddress := utils.IP.GetIpAddress(c)
+
+	log := model.LoginLog{
+		Username:  username,
+		IpAddress: ipAddress,
+		IpSource:  utils.IP.GetIpSourceSimpleIdle(ipAddress),
+		Status:    model.LOGIN_SUCCESS,
+		Message:   message,
+	}
+	if message != "" {
+		log.Status = model.LOGIN_FAIL
+	}
+	if userAuth != nil {
+		log.UserId = userAuth.ID
+	}
+	// GetUserAuthInfoByName 没有 Preload UserInfo, 昵称只有成功路径上拿到 userInfo 后才有
+	log.Nickname = nickname
+
+	if err := model.AddLoginLog(db, &log); err != nil {
+		slog.Warn("写登录日志失败", "username", username, "err", err)
+	}
+}
+
 // @Summary Login
-// @Description Login
+// @Description 用户名密码登录, 成功后返回 JWT Token; 同一 用户名+IP 连续失败 5 次后锁定 15 分钟
 // @Tags UserAuth
-// @Param form body LoginReq true "Login"
 // @Accept json
 // @Produce json
-// @Success 0 {object} Response[model.LoginVO]
+// @Param form body LoginReq true "Login"
+// @Success 0 {object} Response[LoginVO]
 // @Router /login [post]
 func (*UserAuth) Login(c *gin.Context) {
 	var req LoginReq
@@ -56,10 +112,24 @@ func (*UserAuth) Login(c *gin.Context) {
 	db := GetDB(c)
 	rdb := GetRDB(c)
 
+	// 同一 用户名+IP 连续失败太多次就先拒掉, 挡住暴力撞库
+	failKey := g.LOGIN_FAIL + utils.MD5(req.Username+"|"+clientIP(c))
+	if locked, err := loginLocked(rdb, failKey); err != nil {
+		slog.Warn("读取登录失败次数出错, 本次跳过限制", "err", err)
+	} else if locked {
+		slog.Warn("登录失败次数过多, 暂时拒绝", "username", req.Username, "ip", clientIP(c))
+		saveLoginLog(c, db, nil, req.Username, "", "登录失败次数过多")
+		ReturnError(c, g.ErrLoginLocked, nil)
+		return
+	}
+
 	userAuth, err := model.GetUserAuthInfoByName(db, req.Username)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			ReturnError(c, g.ErrUserNotExist, nil)
+			// 不能返回"用户不存在", 否则错误码本身就是一个用户名枚举接口
+			recordLoginFail(rdb, failKey)
+			saveLoginLog(c, db, nil, req.Username, "", "用户名或密码错误")
+			ReturnError(c, g.ErrLoginFail, nil)
 			return
 		}
 		ReturnError(c, g.ErrDbOp, err)
@@ -68,8 +138,22 @@ func (*UserAuth) Login(c *gin.Context) {
 
 	// Check whether password is correct
 	if !utils.BcryptCheck(req.Password, userAuth.Password) {
-		ReturnError(c, g.ErrPassword, nil)
+		recordLoginFail(rdb, failKey)
+		saveLoginLog(c, db, userAuth, req.Username, "", "用户名或密码错误")
+		ReturnError(c, g.ErrLoginFail, nil)
 		return
+	}
+
+	// 被禁用的账号不允许登录: 以前 is_disable 只有写入没有读取, 后台的禁用开关等于没生效
+	if userAuth.IsDisable {
+		saveLoginLog(c, db, userAuth, req.Username, "", "账号已被禁用")
+		ReturnError(c, g.ErrUserDisabled, nil)
+		return
+	}
+
+	// 登录成功, 清掉失败计数
+	if err := rdb.Del(rctx, failKey).Err(); err != nil {
+		slog.Warn("清理登录失败次数出错", "err", err)
 	}
 
 	// Get IP related info
@@ -128,6 +212,7 @@ func (*UserAuth) Login(c *gin.Context) {
 	}
 
 	slog.Info("User login success: " + userAuth.Username)
+	saveLoginLog(c, db, userAuth, req.Username, userInfo.Nickname, "")
 
 	session := sessions.Default(c)
 	session.Set(g.CTX_USER_AUTH, userAuth.ID)
@@ -146,17 +231,15 @@ func (*UserAuth) Login(c *gin.Context) {
 	})
 }
 
-
 // @Summary Logout
-// @Description Logout
+// @Description 清除 session 与 Redis 中的在线状态
 // @Tags UserAuth
-// @Accept json
 // @Produce json
-// @Success 0 {object} string
-// @Router /logout [post]
+// @Success 0 {object} Response[any]
+// @Router /logout [get]
 func (*UserAuth) Logout(c *gin.Context) {
 	c.Set(g.CTX_USER_AUTH, nil)
-	
+
 	// Already logged out
 	auth, _ := CurrentUserAuth(c)
 	if auth == nil {
@@ -167,7 +250,7 @@ func (*UserAuth) Logout(c *gin.Context) {
 	session := sessions.Default(c)
 	session.Delete(g.CTX_USER_AUTH)
 	session.Save()
-	
+
 	// Remove online status from Redis
 	rdb := GetRDB(c)
 	onlineKey := g.ONLINE_USER + strconv.Itoa(auth.ID)
@@ -179,92 +262,125 @@ func (*UserAuth) Logout(c *gin.Context) {
 // Complete registration flow
 // First check whether the username exists to avoid duplicate registration; then store encrypted info in Redis waiting for verification
 // Errors: 1) Email already registered 2) Invalid email causing send failure
+// @Summary 注册
+// @Description 校验邮箱是否已注册; Captcha.SendEmail 为 false 时直接创建用户, 为 true 时发送验证邮件, 待验证后才创建
+// @Tags UserAuth
+// @Accept json
+// @Produce json
+// @Param form body RegisterReq true "注册"
+// @Success 0 {object} Response[any]
+// @Router /register [post]
 func (*UserAuth) Register(c *gin.Context) {
 	var regreq RegisterReq
 	if err := c.ShouldBindJSON(&regreq); err != nil {
-		ReturnError(c,g.ErrRequest,err)
+		ReturnError(c, g.ErrRequest, err)
 		return
 	}
 	// Normalize username
 	regreq.Username = utils.Format(regreq.Username)
 
 	// Check whether username exists to avoid duplicate registration
-	auth,err := model.GetUserAuthInfoByName(GetDB(c),regreq.Username)
+	auth, err := model.GetUserAuthInfoByName(GetDB(c), regreq.Username)
 	if err != nil {
 		var flag bool = false
-		if errors.Is(err,gorm.ErrRecordNotFound) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			flag = true
 		}
-		if !flag{
-			ReturnError(c,g.ErrDbOp,err)
+		if !flag {
+			ReturnError(c, g.ErrDbOp, err)
 			return
 		}
 	}
 
 	if auth != nil {
-		ReturnError(c,g.ErrUserExist,err)
+		ReturnError(c, g.ErrUserExist, err)
 		return
 	}
-	
+
+	// Captcha.SendEmail 为 false 时不走邮箱验证, 直接建用户
+	// 这个开关以前是死配置(定义了但没人读), 现在让它真正生效:
+	// 本地开发和自部署不必配 SMTP 也能注册
+	if !g.GetConfig().Captcha.SendEmail {
+		if _, _, _, err := model.CreateNewUser(GetDB(c), regreq.Username, regreq.Password); err != nil {
+			if errors.Is(err, model.ErrUsernameTaken) {
+				ReturnError(c, g.ErrUserExist, err)
+				return
+			}
+			ReturnError(c, g.ErrDbOp, err)
+			return
+		}
+		ReturnSuccess(c, nil)
+		return
+	}
 
 	// Verify via email
-	info := utils.GenEmailVerificationInfo(regreq.Username,regreq.Password)
-	SetMailInfo(GetRDB(c),info,15*time.Minute) // expires in 15 minutes
-	EmailData := utils.GetEmailData(regreq.Username,info)
-	err = utils.SendEmail(regreq.Username,EmailData)
+	info := utils.GenEmailVerificationInfo(regreq.Username, regreq.Password)
+	SetMailInfo(GetRDB(c), info, 15*time.Minute) // 15分钟过期
+	EmailData := utils.GetEmailData(regreq.Username, info)
+	err = utils.SendEmail(regreq.Username, EmailData)
 	if err != nil {
-		ReturnError(c,g.ErrSendEmail,err)
+		ReturnError(c, g.ErrSendEmail, err)
 		return
 	}
 
-	ReturnSuccess(c,nil)
+	ReturnSuccess(c, nil)
 }
 
 // Email verification
 // When the user clicks the link in the email, it sends info (encrypted username/password) to this endpoint.
 // Verify checks whether info exists in Redis; if present, verification succeeds and registration completes.
 // Errors: 1) Missing info in request 2) Info not in Redis (expired) 3) Failed to create user
+// @Summary 邮箱验证
+// @Description 点击邮件中的链接完成注册, 返回 HTML 页面
+// @Tags UserAuth
+// @Produce html
+// @Param info query string true "注册信息(加密后的帐号密码)"
+// @Success 200 {string} string "注册结果页面"
+// @Router /email/verify [get]
 func (*UserAuth) VerifyCode(c *gin.Context) {
-    var code string
-    if code = c.Query("info"); code == "" {
-        returnErrorPage(c)
-        return
-    }
+	var code string
+	if code = c.Query("info"); code == "" {
+		returnErrorPage(c)
+		return
+	}
 
-	// Verify code exists in Redis
-    ifExist, err := GetMailInfo(GetRDB(c), code)
-    if err != nil {
-        returnErrorPage(c)
-        return
-    }
-    if !ifExist {
-        returnErrorPage(c)
-        return
-    }
+	// 验证是否有code在数据库中
+	ifExist, err := GetMailInfo(GetRDB(c), code)
+	if err != nil {
+		returnErrorPage(c)
+		return
+	}
+	if !ifExist {
+		returnErrorPage(c)
+		return
+	}
 
-    DeleteMailInfo(GetRDB(c), code)
+	username, password, err := utils.ParseEmailVerificationInfo(code)
+	if err != nil {
+		returnErrorPage(c)
+		return
+	}
 
-    username, password, err := utils.ParseEmailVerificationInfo(code)
-    if err != nil {
-        returnErrorPage(c)
-        return
-    }
+	// 注册用户
+	// 注意顺序: 以前是先 DeleteMailInfo 再建用户, 建用户失败这个一次性链接就废了,
+	// 用户只能重新走一遍注册。改成建成功之后再删。
+	_, _, _, err = model.CreateNewUser(GetDB(c), username, password)
+	if err != nil {
+		returnErrorPage(c)
+		return
+	}
 
-	// Register user
-      _,_,_,err = model.CreateNewUser(GetDB(c), username, password)
-    if err != nil {
-        returnErrorPage(c)
-        return
-    }
+	// 删 token 失败最多导致链接可以重复点, 而重复点会被 CreateNewUser 里的查重挡住
+	DeleteMailInfo(GetRDB(c), code)
 
-	// Registration success: return success page
-    c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(`
+	// 注册成功，返回成功页面
+	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(`
         <!DOCTYPE html>
-		<html lang="en">
+        <html lang="zh-CN">
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-			<title>Registration Successful</title>
+            <title>注册成功</title>
             <style>
                 body {
                     font-family: Arial, sans-serif;
@@ -292,8 +408,8 @@ func (*UserAuth) VerifyCode(c *gin.Context) {
         </head>
         <body>
             <div class="container">
-				<h1>Registration Successful</h1>
-				<p>Congratulations, registration succeeded!</p>
+                <h1>注册成功</h1>
+                <p>恭喜您，注册成功！</p>
             </div>
         </body>
         </html>
@@ -301,13 +417,13 @@ func (*UserAuth) VerifyCode(c *gin.Context) {
 }
 
 func returnErrorPage(c *gin.Context) {
-    c.Data(http.StatusInternalServerError, "text/html; charset=utf-8", []byte(`
+	c.Data(http.StatusInternalServerError, "text/html; charset=utf-8", []byte(`
         <!DOCTYPE html>
-		<html lang="en">
+        <html lang="zh-CN">
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-			<title>Registration Failed</title>
+            <title>注册失败</title>
             <style>
                 body {
                     font-family: Arial, sans-serif;
@@ -335,8 +451,8 @@ func returnErrorPage(c *gin.Context) {
         </head>
         <body>
             <div class="container">
-				<h1>Registration Failed</h1>
-				<p>Please try again.</p>
+                <h1>注册失败</h1>
+                <p>请重试。</p>
             </div>
         </body>
         </html>

@@ -1,9 +1,9 @@
 cd generate-data
 
-# all | config | auth | page | resource
+# all | config | auth | page | demo
 # all Generate all information
 # config Generate configuration information
-# auth Generate default roles admin, guest, and corresponding default users admin, guest
+# auth 生成默认角色 admin, guest, 以及对应的默认用户 admin, guest (资源与菜单一起灌)
 # page Generate default page information
-# resource Generate default resource information
+# demo 生成本地测试用的样例内容(分类/标签/文章/评论/留言/友链), 库里已有文章则跳过
 go run main.go -t "all"

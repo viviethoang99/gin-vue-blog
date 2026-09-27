@@ -28,15 +28,20 @@ func GetUserInfoById(db *gorm.DB, id int) (*UserInfo, error) {
 	return &userInfo, result.Error
 }
 
-func GetUserAuthInfoByName(db *gorm.DB,name string) (*UserAuth,error){
+// 按用户名精确查询用户认证信息
+//
+// 这里必须是等值匹配: 原来写的 `username LIKE ?`, 虽然没拼 %,
+// 但 MySQL 下 LIKE 的模式串里 `%` / `_` 仍然是通配符, 注册一个含 `_` 的
+// 用户名(如 `admi_`)就能匹配到别人(`admin`), 登录时拿到的是别人的记录
+func GetUserAuthInfoByName(db *gorm.DB, name string) (*UserAuth, error) {
 	var userauth UserAuth
-	
-	result := db.Model(&userauth).Where("username LIKE ?",name).First(&userauth)
-	if result.Error != nil && errors.Is(result.Error,gorm.ErrRecordNotFound){
-		return nil,result.Error
+
+	result := db.Model(&userauth).Where("username = ?", name).First(&userauth)
+	if result.Error != nil && errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return nil, result.Error
 	}
-	
-	return &userauth,result.Error
+
+	return &userauth, result.Error
 }
 
 func GetUserList(db *gorm.DB, page, size int, loginType int8, nickname, username string) (list []UserAuth, total int64, err error) {
@@ -82,7 +87,8 @@ func UpdateUserNicknameAndRole(db *gorm.DB, authId int, nickname string, roleIds
 	}
 
 	// Update user roles: clear existing user_role relations and add new ones
-	result = db.Where(UserAuthRole{UserAuthId: userAuth.UserInfoId}).Delete(UserAuthRole{})
+	// 注意这里是 user_auth_id, 用 UserInfoId 会删掉别人的角色并留下自己的旧角色
+	result = db.Where(UserAuthRole{UserAuthId: userAuth.ID}).Delete(UserAuthRole{})
 	if result.Error != nil {
 		return result.Error
 	}
@@ -108,18 +114,28 @@ func UpdateUserPassword(db *gorm.DB, id int, password string) error {
 	return result.Error
 }
 
+// 更新用户资料
+//
+// 只更新传进来的非空字段: 原来是 Select("nickname","avatar","intro","website").Updates(...),
+// 显式 Select 会把零值一起写库, 调用方漏传一个字段就等于把它清空
+// (前台个人中心表单没同步时, 只改昵称提交会把头像/简介/网站全清掉)
 func UpdateUserInfo(db *gorm.DB, id int, nickname, avatar, intro, website string) error {
-	userInfo := UserInfo{
-		Model:    Model{ID: id},
-		Nickname: nickname,
-		Avatar:   avatar,
-		Intro:    intro,
-		Website:  website,
+	updates := map[string]any{}
+	for column, value := range map[string]string{
+		"nickname": nickname,
+		"avatar":   avatar,
+		"intro":    intro,
+		"website":  website,
+	} {
+		if value != "" {
+			updates[column] = value
+		}
+	}
+	if len(updates) == 0 {
+		return nil
 	}
 
-	result := db.
-		Select("nickname", "avatar", "intro", "website").
-		Updates(userInfo)
+	result := db.Model(&UserInfo{Model: Model{ID: id}}).Updates(updates)
 	return result.Error
 }
 

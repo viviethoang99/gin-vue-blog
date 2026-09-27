@@ -1,20 +1,31 @@
+// vue
+import { createApp } from 'vue'
+import App from './App.vue'
+import { router } from './router'
+
+import { pinia } from './store'
+import { useAppStore } from './store/app'
+import { setupErrorReport } from './utils/error-report'
+import { setupMock } from './utils/http'
 // custom style
 import './styles/index.css'
-import './styles/common.css'
-import './styles/animate.css'
 
+import './styles/common.css'
+
+import './styles/animate.css'
 // unocss
 import 'uno.css'
 import '@unocss/reset/tailwind.css'
 
-// vue
-import { createApp } from 'vue'
+async function bootstrap() {
+  await setupMock() // mock 模式下需要在发出请求前装上适配器
+  setupErrorReport('front') // 越早挂越好, 启动过程里的异常也要收得到
 
-import { router } from './router'
-import { pinia } from './store'
-import App from './App.vue'
+  const app = createApp(App)
+  app.use(router)
+  app.use(pinia)
+  useAppStore(pinia).initTheme() // index.html 已经加过 class, 这里把 store 状态对齐
+  app.mount('#app')
+}
 
-const app = createApp(App)
-app.use(router)
-app.use(pinia)
-app.mount('#app')
+bootstrap()

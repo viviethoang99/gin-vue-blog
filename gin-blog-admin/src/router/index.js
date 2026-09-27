@@ -1,12 +1,15 @@
-import { createRouter, createWebHistory } from 'vue-router'
-
-import { basicRoutes } from './routes'
-import { setupRouterGuard } from './guard'
+import { createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
 
 import { useAuthStore, usePermissionStore, useUserStore } from '@/store'
+import { setupRouterGuard } from './guard'
+
+import { basicRoutes } from './routes'
 
 export const router = createRouter({
-  history: createWebHistory(import.meta.env.VITE_PUBLIC_PATH), // '/admin'
+  // 静态托管（如 GitHub Pages）下直接访问子路径会 404, 故 mock 构建走 hash 路由
+  history: import.meta.env.VITE_USE_HASH_ROUTER === 'true'
+    ? createWebHashHistory()
+    : createWebHistory(import.meta.env.VITE_PUBLIC_PATH), // '/admin'
   routes: basicRoutes,
   scrollBehavior: () => ({ left: 0, top: 0 }),
 })
@@ -45,7 +48,7 @@ export async function addDynamicRoutes() {
     const accessRoutes = JSON.parse(import.meta.env.VITE_BACK_ROUTER)
       ? await permissionStore.generateRoutesBack()
       : permissionStore.generateRoutesFront(['admin'])
-  console.log(accessRoutes)
+
     // Check for duplicate route names and add routes
     const addedNames = new Set()
 
@@ -64,7 +67,7 @@ export async function addDynamicRoutes() {
         router.addRoute(route)
       }
       catch (e) {
-        console.warn(`Failed to add route ${routeName}:`, e.message)
+        console.warn(`添加路由 ${routeName} 失败:`, e.message)
       }
     }
 

@@ -1,22 +1,25 @@
 <script setup>
+import { NButton, NImage, NInput, NPopconfirm, NSelect, NSwitch, NTabPane, NTabs, NTag, NUpload } from 'naive-ui'
 import { defineOptions, h, onActivated, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NButton, NImage, NInput, NPopconfirm, NSelect, NSwitch, NTabPane, NTabs, NTag, NUpload } from 'naive-ui'
 
-import CommonPage from '@/components/common/CommonPage.vue'
-import QueryItem from '@/components/crud/QueryItem.vue'
-import CrudTable from '@/components/crud/CrudTable.vue'
-
-import { convertImgUrl, formatDate } from '@/utils'
-import { useCRUD } from '@/composables'
-import { articleTypeMap, articleTypeOptions } from '@/assets/config'
 import api from '@/api'
+import { articleTypeMap, articleTypeOptions } from '@/assets/config'
+import CommonPage from '@/components/common/CommonPage.vue'
+
+import CrudTable from '@/components/crud/CrudTable.vue'
+import QueryItem from '@/components/crud/QueryItem.vue'
+import { useCRUD } from '@/composables'
+import { useAuthStore } from '@/store'
+import { convertImgUrl, downloadFile, formatDate, IMG_PLACEHOLDER, parseJson } from '@/utils'
 
 // KeepAlive requires name attribute that corresponds to name in router
 defineOptions({ name: 'Article List' })
 
 const route = useRoute()
 const router = useRouter()
+// 不解构, 否则重新登录后拿到的还是旧 token
+const authStore = useAuthStore()
 
 const categoryOptions = ref([])
 const tagOptions = ref([])
@@ -42,8 +45,9 @@ const { handleDelete } = useCRUD({
 })
 
 onMounted(() => {
-  api.getCategoryOption().then(res => (categoryOptions.value = res.data))
-  api.getTagOption().then(res => (tagOptions.value = res.data))
+  // 拦截器已经弹过错误提示, 这里补 catch 只是别留下 unhandled rejection
+  api.getCategoryOption().then(res => (categoryOptions.value = res.data)).catch(err => console.error(err))
+  api.getTagOption().then(res => (tagOptions.value = res.data)).catch(err => console.error(err))
   handleChangeTab('all') // Default view all
 })
 
@@ -61,10 +65,21 @@ const columns = [
     width: 55,
     align: 'center',
     render(row) {
+      // 尺寸必须写死: 原来是 height/width 都给 100%, 而父容器高度又来自图片本身,
+      // 循环依赖, 实测这一列渲染出来是 0x0, 封面永远看不见。
+      // 同项目其他表格(留言/友链/用户)都是写死 40 / 30 的
       return h(NImage, {
-        imgProps: { style: { 'border-radius': '2px', 'height': '100%', 'width': '100%' } },
+        width: 40,
+        height: 40,
+        // object-fit 要走 NImage 自己的 prop: 写在 imgProps.style 里会被它
+        // 追加在后面的 object-fit(默认 fill) 覆盖掉 —— 实测过
+        objectFit: 'cover',
+        imgProps: {
+          alt: row.title,
+          style: { 'border-radius': '2px', 'width': '40px', 'height': '40px' },
+        },
         src: convertImgUrl(row.img),
-        fallbackSrc: 'http://dummyimage.com/400x400',
+        fallbackSrc: IMG_PLACEHOLDER,
         showToolbarTooltip: true,
       })
     },
@@ -83,7 +98,8 @@ const columns = [
     align: 'center',
     ellipsis: { tooltip: true },
     render(row) {
-      return h('div', row.category.name || 'None')
+      // 导入的文章是草稿且不带分类, category 为 null, 不能直接取 name
+      return h('div', row.category?.name || 'None')
     },
   },
   {
@@ -171,28 +187,25 @@ const columns = [
       return [
         row.is_delete
           ? h(
-            NButton,
-            {
-              size: 'small',
-              type: 'success',
-              secondary: true,
-              onClick: async () => {
-                await api.softDeleteArticle([row.id], false)
-                await $table.value?.handleSearch()
+              NButton,
+              {
+                size: 'small',
+                type: 'success',
+                secondary: true,
+                onClick: () => handleRestore(row),
               },
-            },
-            { default: () => 'Restore', icon: () => h('i', { class: 'i-majesticons:eye-line' }) },
-          )
+              { default: () => 'Restore', icon: () => h('i', { class: 'i-majesticons:eye-line' }) },
+            )
           : h(
-            NButton,
-            {
-              size: 'small',
-              type: 'primary',
-              secondary: true,
-              onClick: () => router.push(`/article/write/${row.id}`), // Navigate to write article page with parameters
-            },
-            { default: () => 'View', icon: () => h('i', { class: 'i-majesticons:eye-line' }) },
-          ),
+              NButton,
+              {
+                size: 'small',
+                type: 'primary',
+                secondary: true,
+                onClick: () => router.push(`/article/write/${row.id}`), // 携带参数前往 写文章 页面
+              },
+              { default: () => 'View', icon: () => h('i', { class: 'i-majesticons:eye-line' }) },
+            ),
         h(
           NPopconfirm,
           { onPositiveClick: () => handleDelete([row.id], false) },
@@ -212,7 +225,8 @@ const columns = [
 ]
 
 function updateOrDeleteArticles(ids) {
-  extraParams.value.is_delete
+  // 必须 return, 否则 useCRUD 里 await 到 undefined: 删除成功不提示, 失败也无法捕获
+  return extraParams.value.is_delete
     ? api.deleteArticle(ids)
     : api.softDeleteArticle(JSON.parse(ids), true)
 }
@@ -230,10 +244,29 @@ async function handleUpdateTop(row) {
     $table.value?.handleSearch()
   }
   catch (err) {
+    // 乐观更新后失败必须回滚, 否则开关显示已开、后端其实没变
+    // (菜单/接口/用户三个页面的同类开关都是这么写的)
+    row.is_top = !row.is_top
     console.error(err)
   }
   finally {
     row.publishing = false
+  }
+}
+
+// 从回收站恢复: 相邻的置顶/审核/删除都有提示, 只有这里原来既不 catch 也不提示,
+// 失败时是未捕获 rejection, 成功时只能靠列表刷新猜
+async function handleRestore(row) {
+  if (!row.id) {
+    return
+  }
+  try {
+    await api.softDeleteArticle([row.id], false)
+    $message?.success('已恢复该文章')
+    await $table.value?.handleSearch()
+  }
+  catch (err) {
+    console.error(err)
   }
 }
 
@@ -279,8 +312,10 @@ function handleChangeTab(value) {
 
 // Check file type before upload
 function beforeUpload(data) {
-  if (!data.file.name.endsWith('.md')) {
-    $message.error('Only .md format files can be uploaded, please re-upload')
+  // 后端 F9 之后同时接受 .md 与 .markdown, 两边保持一致
+  const name = data.file.name.toLowerCase()
+  if (!name.endsWith('.md') && !name.endsWith('.markdown')) {
+    $message.error('只能上传 .md / .markdown 格式的文件，请重新上传')
     return false
   }
   return true
@@ -288,29 +323,15 @@ function beforeUpload(data) {
 
 // Operations after file upload
 function afterUpload({ event }) {
-  const respStr = (event?.target).response
-  const res = JSON.parse(respStr)
-  if (res.code === 0) {
+  // 网关拦截或鉴权失败时响应不是 JSON, 不能直接 JSON.parse
+  const res = parseJson(event?.target?.response)
+  if (res?.code === 0) {
     $table.value?.handleSearch()
     $message.success('Article imported successfully!')
   }
   else {
-    $message.error('Article import failed!')
+    $message.error(res?.message || 'Article import failed!')
   }
-}
-
-function downloadFile(content, fileName) {
-  const aEle = document.createElement('a') // Create download link
-  aEle.download = fileName // Set download filename
-  aEle.style.display = 'none'// Hidden downloadable link
-  // Convert string content to blob address
-  const blob = new Blob([content])
-  aEle.href = URL.createObjectURL(blob)
-  // Bind click event
-  document.body.appendChild(aEle)
-  aEle.click()
-  // Then remove
-  document.body.removeChild(aEle)
 }
 </script>
 
@@ -323,8 +344,11 @@ function downloadFile(content, fileName) {
         </template>
         New Article
       </NButton>
+      <!-- 只有「新建文章」是主操作(填充), 其余三个用 secondary:
+           原来四个按钮四种填充色平铺, 看不出主次 -->
       <NButton
         type="error"
+        secondary
         :disabled="!$table?.selections.length"
         @click="handleDelete($table?.selections)"
       >
@@ -334,7 +358,7 @@ function downloadFile(content, fileName) {
         Batch Delete
       </NButton>
       <NButton
-        type="info"
+        secondary
         :disabled="!$table?.selections.length"
         @click="exportArticles($table?.selections)"
       >
@@ -346,12 +370,13 @@ function downloadFile(content, fileName) {
       <div class="inline-block">
         <NUpload
           action="/api/article/import"
+          :headers="{ Authorization: `Bearer ${authStore.token}` }"
           :show-file-list="false"
           multiple
           @before-upload="beforeUpload"
           @finish="afterUpload"
         >
-          <NButton type="success">
+          <NButton secondary>
             <template #icon>
               <i class="i-mdi:import" />
             </template>
@@ -398,7 +423,7 @@ function downloadFile(content, fileName) {
             @update:value="$table?.handleSearch()"
           />
         </QueryItem>
-        <QueryItem label="Category" :label-width="60" :content-width="160">
+        <QueryItem label="Category" :label-width="40" :content-width="160">
           <NSelect
             v-model:value="queryItems.category_id"
             clearable

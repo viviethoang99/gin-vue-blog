@@ -15,14 +15,13 @@ type AddOrEditCategoryReq struct {
 	Name string `json:"name" binding:"required"`
 }
 
-// @Summary Get category list
-// @Description Get category list by conditions
+// @Summary 条件查询分类列表
+// @Description 分类列表, 附带每个分类下的文章数
 // @Tags Category
-// @Param page_size query int false "Current page"
-// @Param page_num query int false "Page size"
-// @Param keyword query string false "Keyword"
-// @Accept json
 // @Produce json
+// @Param keyword query string false "关键字"
+// @Param page_num query int false "页码"
+// @Param page_size query int false "每页数量"
 // @Success 0 {object} Response[PageResult[model.CategoryVO]]
 // @Security ApiKeyAuth
 // @Router /category/list [get]
@@ -47,12 +46,12 @@ func (*Category) GetList(c *gin.Context) {
 	})
 }
 
-// @Summary Add or edit category
-// @Description Add or edit category
+// @Summary 新增或编辑分类
+// @Description 分类名称不能重复
 // @Tags Category
-// @Param form body AddOrEditCategoryReq true "Add or edit category"
 // @Accept json
 // @Produce json
+// @Param form body AddOrEditCategoryReq true "新增或编辑分类"
 // @Success 0 {object} Response[model.Category]
 // @Security ApiKeyAuth
 // @Router /category [post]
@@ -73,12 +72,12 @@ func (*Category) SaveOrUpdate(c *gin.Context) {
 }
 
 // @Summary Delete categories (batch)
-// @Description Delete categories by ID array
+// @Description 分类下存在文章时不允许删除
 // @Tags Category
-// @Param ids body []int true "Category ID array"
 // @Accept json
 // @Produce json
-// @Success 0 {object} Response[int]
+// @Param ids body []int true "Category ID array"
+// @Success 0 {object} Response[int64]
 // @Security ApiKeyAuth
 // @Router /category [delete]
 func (*Category) Delete(c *gin.Context) {
@@ -110,10 +109,9 @@ func (*Category) Delete(c *gin.Context) {
 	ReturnSuccess(c, rows)
 }
 
-// @Summary Get category options
-// @Description Get category options list
+// @Summary 获取分类选项
+// @Description 用于文章选择分类
 // @Tags Category
-// @Accept json
 // @Produce json
 // @Success 0 {object} Response[[]model.OptionVO]
 // @Security ApiKeyAuth

@@ -1,17 +1,19 @@
 import { defineStore } from 'pinia'
-import { convertImgUrl } from '@/utils'
 import api from '@/api'
+
+// 默认头像: 原来是 bing 的一张外链图, 换成本仓库 images/ 下的图片
+const DEFAULT_AVATAR = 'https://raw.githubusercontent.com/szluyu99/gin-vue-blog/main/images/config/user_avatar.jpeg'
 
 export const useUserStore = defineStore('user', {
   persist: {
     key: 'gvb_blog_user',
-    paths: ['token'],
+    pick: ['token', 'lastUsername'],
   },
   state: () => ({
     userInfo: {
       id: '',
       nickname: '',
-      avatar: 'https://www.bing.com/rp/ar_9isCNU2Q-VG1yEDDHnx8HAFQ.png',
+      avatar: DEFAULT_AVATAR,
       website: '',
       intro: '',
       email: '',
@@ -19,11 +21,15 @@ export const useUserStore = defineStore('user', {
       commentLikeSet: [],
     },
     token: null,
+    // 上次登录成功的用户名, 只做登录框回填用
+    lastUsername: '',
   }),
   getters: {
     userId: state => state.userInfo.id ?? '',
     nickname: state => state.userInfo.nickname ?? '',
-    avatar: state => state.userInfo.avatar ?? 'https://www.bing.com/rp/ar_9isCNU2Q-VG1yEDDHnx8HAFQ.png',
+    // 用 || 而不是 ??: 头像为空串时也要退回默认图,
+    // 否则 convertImgUrl('') 会给出 dummyimage.com 的占位图而不是头像
+    avatar: state => state.userInfo.avatar || DEFAULT_AVATAR,
     website: state => state.userInfo.website ?? '',
     intro: state => state.userInfo.intro ?? '',
     email: state => state.userInfo.email ?? '',
@@ -34,12 +40,23 @@ export const useUserStore = defineStore('user', {
     setToken(token) {
       this.token = token
     },
+    // 只在登录成功后记, 所以从没登录成功过的机器上永远是空的
+    setLastUsername(username) {
+      this.lastUsername = username ?? ''
+    },
     resetLoginState() {
-      this.$reset()
+      this.keepLastUsername(() => this.$reset())
     },
     async logout() {
       await api.logout()
-      this.$reset()
+      this.keepLastUsername(() => this.$reset())
+    },
+    // $reset 会把 lastUsername 一起清掉, 但退出登录不该忘记用户名 ——
+    // 下次进来还是给他填好, 只是要重新输密码
+    keepLastUsername(reset) {
+      const last = this.lastUsername
+      reset()
+      this.lastUsername = last
     },
     async getUserInfo() {
       if (!this.token) {
@@ -52,7 +69,9 @@ export const useUserStore = defineStore('user', {
           this.userInfo = {
             id: data.id,
             nickname: data.nickname,
-            avatar: data.avatar ? convertImgUrl(data.avatar) : 'https://www.bing.com/rp/ar_9isCNU2Q-VG1yEDDHnx8HAFQ.png',
+            // 存原始相对路径, 展示时才 convertImgUrl:
+            // 否则个人中心会把带域名的绝对地址当表单初值写回库
+            avatar: data.avatar ?? '',
             website: data.website,
             intro: data.intro,
             email: data.email,
@@ -69,15 +88,19 @@ export const useUserStore = defineStore('user', {
         return Promise.reject(error)
       }
     },
+    // 注意要写 userInfo 里的数组, 不能写 commentLikeSet / articleLikeSet 这两个 getter:
+    // 底层数组为空时 getter 返回的是新建的 [], push 进去的东西会被丢掉
     commentLike(commentId) {
-      this.commentLikeSet.includes(commentId)
-        ? this.commentLikeSet.splice(this.commentLikeSet.indexOf(commentId), 1)
-        : this.commentLikeSet.push(commentId)
+      const set = (this.userInfo.commentLikeSet ??= [])
+      set.includes(commentId)
+        ? set.splice(set.indexOf(commentId), 1)
+        : set.push(commentId)
     },
     articleLike(articleId) {
-      this.articleLikeSet.includes(articleId)
-        ? this.articleLikeSet.splice(this.articleLikeSet.indexOf(articleId), 1)
-        : this.articleLikeSet.push(articleId)
+      const set = (this.userInfo.articleLikeSet ??= [])
+      set.includes(articleId)
+        ? set.splice(set.indexOf(articleId), 1)
+        : set.push(articleId)
     },
   },
 })

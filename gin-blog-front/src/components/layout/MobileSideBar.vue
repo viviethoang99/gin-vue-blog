@@ -1,27 +1,28 @@
 <script setup>
-import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 
-import { Icon } from '@iconify/vue'
-import UDrawer from '@/components/ui/UDrawer.vue'
+import { useRoute, useRouter } from 'vue-router'
 
-import { useAppStore, useUserStore } from '@/store'
-import api from '@/api'
+import UDrawer from '@/components/ui/UDrawer.vue'
+import { useAppStore, useNotificationStore, useUserStore } from '@/store'
 
 const { collapsed, blogConfig, articleCount, categoryCount, tagCount } = storeToRefs(useAppStore())
 
 const [route, router] = [useRoute(), useRouter()]
 const [userStore, appStore] = [useUserStore(), useAppStore()]
+// 未读数由 AppHeader 挂载时拉取, 这里只读
+const notificationStore = useNotificationStore()
 
 const menuOptions = [
-  { text: '首页', icon: 'mdi:home', path: '/' },
-  { text: '归档', icon: 'mdi:archive', path: '/archives' },
-  { text: '分类', icon: 'mdi:menu', path: '/categories' },
-  { text: '标签', icon: 'mdi:tag', path: '/tags' },
-  { text: '相册', icon: 'mdi:view-gallery', path: '/albums' },
-  { text: '友链', icon: 'mdi:vector-link', path: '/links' },
-  { text: '关于', icon: 'mdi:information-outline', path: '/about' },
-  { text: '留言', icon: 'mdi:forum', path: '/message' },
+  { text: '首页', icon: 'i-mdi:home', path: '/' },
+  { text: '归档', icon: 'i-mdi:archive', path: '/archives' },
+  { text: '分类', icon: 'i-mdi:menu', path: '/categories' },
+  { text: '标签', icon: 'i-mdi:tag', path: '/tags' },
+  { text: '说说', icon: 'i-mdi:message-text-outline', path: '/talks' },
+  { text: '相册', icon: 'i-mdi:view-gallery', path: '/albums' },
+  { text: '友链', icon: 'i-mdi:vector-link', path: '/links' },
+  { text: '关于', icon: 'i-mdi:information-outline', path: '/about' },
+  { text: '留言', icon: 'i-mdi:forum', path: '/message' },
 ]
 
 async function logout() {
@@ -66,11 +67,11 @@ async function logout() {
         </div>
       </div>
       <!-- 分隔线 -->
-      <hr class="my-4 border-2 border-color-#d2ebfd border-dashed">
+      <hr class="my-4 border-2 border-color-divider border-dashed">
       <!-- 菜单 -->
       <div v-for="item of menuOptions" :key="item.text" class="m-2 p-1">
         <RouterLink :to="item.path" class="flex items-center" @click="appStore.setCollapsed(false)">
-          <Icon :icon="item.icon" class="text-lg" />
+          <span :class="item.icon" class="text-lg" />
           <span class="ml-5"> {{ item.text }} </span>
         </RouterLink>
       </div>
@@ -78,19 +79,32 @@ async function logout() {
       <div>
         <template v-if="!userStore.userId">
           <div class="m-2 flex items-center p-1" @click="appStore.setLoginFlag(true)">
-            <Icon icon="ph:user-bold" class="text-lg" />
+            <span class="i-mdi:account text-lg" />
             <span class="ml-5"> 登录 </span>
           </div>
         </template>
         <template v-else>
+          <!-- 窄屏没有头部铃铛, 通知入口放在侧边栏里 -->
+          <RouterLink to="/notifications">
+            <div class="m-2 flex items-center p-1" @click="appStore.setCollapsed(false)">
+              <span class="i-mdi:bell-outline text-lg" />
+              <span class="ml-5"> 站内通知 </span>
+              <span
+                v-if="notificationStore.unreadCount"
+                class="ml-2 h-4 min-w-4 flex items-center justify-center rounded-full bg-accent px-1 text-[10px] text-white"
+              >
+                {{ notificationStore.unreadCount > 99 ? '99+' : notificationStore.unreadCount }}
+              </span>
+            </div>
+          </RouterLink>
           <RouterLink to="/user">
             <div class="m-2 flex items-center p-1" @click="appStore.setCollapsed(false)">
-              <Icon icon="mdi:account-circle" class="text-lg" />
+              <span class="i-mdi:account-circle text-lg" />
               <span class="ml-5"> 个人中心 </span>
             </div>
           </RouterLink>
           <div class="m-2 flex items-center p-1" @click="logout">
-            <Icon icon="mdi:logout" class="text-lg" />
+            <span class="i-mdi:logout text-lg" />
             <span class="ml-5"> 退出登录 </span>
           </div>
         </template>

@@ -1,6 +1,17 @@
 import { defineStore } from 'pinia'
-import { convertImgUrl } from '@/utils'
 import api from '@/api'
+import { convertImgUrl } from '@/utils'
+
+const THEME_KEY = 'blog-theme'
+
+// 没存过偏好时跟随系统, 存过就以用户的选择为准
+function initialTheme() {
+  const saved = localStorage.getItem(THEME_KEY)
+  if (saved === 'dark' || saved === 'light') {
+    return saved
+  }
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
 
 export const useAppStore = defineStore('app', {
   state: () => ({
@@ -8,6 +19,9 @@ export const useAppStore = defineStore('app', {
     loginFlag: false,
     registerFlag: false,
     collapsed: false, // 侧边栏折叠（移动端）
+    theme: 'light', // light | dark, 由 initTheme 校正
+    // 刚注册完带过去给登录框填的用户名: 只在本次会话有效, 刷新就没了
+    prefillUsername: '',
 
     page_list: [], // 页面数据
     // TODO: 优化
@@ -33,12 +47,27 @@ export const useAppStore = defineStore('app', {
     viewCount: state => state.blogInfo.view_count ?? 0,
     pageList: state => state.page_list ?? [],
     blogConfig: state => state.blog_config,
+    isDark: state => state.theme === 'dark',
   },
   actions: {
     setCollapsed(flag) { this.collapsed = flag },
     setLoginFlag(flag) { this.loginFlag = flag },
     setRegisterFlag(flag) { this.registerFlag = flag },
     setSearchFlag(flag) { this.searchFlag = flag },
+    setPrefillUsername(username) { this.prefillUsername = username ?? '' },
+
+    // 入口处调用一次, 把 store 和 <html> 的 class 对齐
+    initTheme() {
+      this.setTheme(initialTheme())
+    },
+    setTheme(theme) {
+      this.theme = theme === 'dark' ? 'dark' : 'light'
+      localStorage.setItem(THEME_KEY, this.theme)
+      document.documentElement.classList.toggle('dark', this.theme === 'dark')
+    },
+    toggleTheme() {
+      this.setTheme(this.theme === 'dark' ? 'light' : 'dark')
+    },
 
     async getBlogInfo() {
       try {

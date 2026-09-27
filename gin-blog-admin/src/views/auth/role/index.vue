@@ -1,15 +1,15 @@
 <script setup>
-import { h, onMounted, ref } from 'vue'
 import { NButton, NForm, NFormItem, NInput, NPopconfirm, NSwitch, NTag, NTree } from 'naive-ui'
+import { h, onMounted, ref } from 'vue'
 
+import api from '@/api'
 import CommonPage from '@/components/common/CommonPage.vue'
-import QueryItem from '@/components/crud/QueryItem.vue'
 import CrudModal from '@/components/crud/CrudModal.vue'
 import CrudTable from '@/components/crud/CrudTable.vue'
 
-import { formatDate } from '@/utils'
+import QueryItem from '@/components/crud/QueryItem.vue'
 import { useCRUD } from '@/composables'
-import api from '@/api'
+import { formatDate } from '@/utils'
 
 defineOptions({ name: 'Role Management' })
 
@@ -31,7 +31,7 @@ const {
   modalFormRef,
 } = useCRUD({
   name: 'Role',
-  initForm: {},
+  initForm: { name: '', label: '', menu_ids: [], resource_ids: [] },
   doCreate: api.saveOrUpdateRole,
   doDelete: api.deleteRole,
   doUpdate: api.saveOrUpdateRole,
@@ -45,9 +45,80 @@ const menuOption = ref([]) // Menu options
 
 onMounted(() => {
   $table.value?.handleSearch()
-  // api.getResourceOption().then(res => (resourceOption.value = res.data))
-  // api.getMenuOption().then(res => (menuOption.value = res.data))
 })
+
+// 拉取菜单/资源选项, 已经拉过就不重复请求
+async function loadOptions() {
+  const tasks = []
+  if (!menuOption.value.length) {
+    tasks.push(api.getMenuOption().then(resp => (menuOption.value = resp.data ?? [])))
+  }
+  if (!resourceOption.value.length) {
+    tasks.push(api.getResourceOption().then(resp => (resourceOption.value = resp.data ?? [])))
+  }
+  await Promise.all(tasks)
+}
+
+// 打开某个角色的权限弹窗
+//
+// 选项拉不回来时绝对不能照常打开: 保存走的是「整体替换角色关联」(见 handleUpdateDisable
+// 上方的注释), 树是空的时候用户点确定就把这个角色的权限清空了
+async function openPermission(row, menuMode) {
+  try {
+    await loadOptions()
+  }
+  catch (err) {
+    console.error(err)
+    $message?.error('权限选项加载失败, 请重试')
+    return
+  }
+  showMenu.value = menuMode
+  handleEdit(row)
+}
+
+// 新建角色: 后端 SaveRole 已经支持一并写入 role_resource / role_menu,
+// 所以这里把两棵树都给出来, 不用再走「先建角色, 再编辑权限」两趟
+async function handleAddRole() {
+  try {
+    await loadOptions()
+  }
+  catch (err) {
+    console.error(err)
+    return
+  }
+  handleAdd()
+}
+
+// 禁用/启用角色: 以前开关写死 checkedValue: 1 / uncheckedValue: 0, 而后端 is_disable 是布尔值,
+// 所以已禁用的角色也一直显示成关闭, 点了只弹「暂时还不支持」
+// 注意必须带上 resource_ids / menu_ids: 后端 UpdateRole 会整体替换角色的资源与菜单关联,
+// 不传就等于把这个角色的权限全清空
+async function handleUpdateDisable(row) {
+  if (!row.id) {
+    return
+  }
+  row.publishing = true
+  const isDisable = !row.is_disable
+  try {
+    await api.saveOrUpdateRole({
+      id: row.id,
+      name: row.name,
+      label: row.label,
+      is_disable: isDisable,
+      resource_ids: row.resource_ids ?? [],
+      menu_ids: row.menu_ids ?? [],
+    })
+    row.is_disable = isDisable
+    $message?.success(isDisable ? '已禁用该角色' : '已启用该角色')
+    $table.value?.handleSearch()
+  }
+  catch (err) {
+    console.error(err)
+  }
+  finally {
+    row.publishing = false
+  }
+}
 
 const columns = [
   {
@@ -92,9 +163,7 @@ const columns = [
         rubberBand: false,
         value: row.is_disable,
         loading: !!row.publishing, // Loading animation
-        checkedValue: 1,
-        uncheckedValue: 0,
-        onUpdateValue: () => $message.info('This feature is not supported yet~'),
+        onUpdateValue: () => handleUpdateDisable(row),
       })
     },
   },
@@ -112,11 +181,7 @@ const columns = [
             size: 'tiny',
             quaternary: true,
             type: 'info',
-            onClick: async () => {
-              showMenu.value = true
-              await api.getMenuOption().then(resp => (menuOption.value = resp.data))
-              handleEdit(row)
-            },
+            onClick: () => openPermission(row, true),
           },
           {
             default: () => 'Menu Permissions',
@@ -129,11 +194,7 @@ const columns = [
             size: 'tiny',
             quaternary: true,
             type: 'info',
-            onClick: async () => {
-              showMenu.value = false
-              await api.getResourceOption().then(resp => (resourceOption.value = resp.data))
-              handleEdit(row)
-            },
+            onClick: () => openPermission(row, false),
           },
           {
             default: () => 'Resource Permissions',
@@ -172,7 +233,7 @@ const columns = [
 <template>
   <CommonPage title="Role Management">
     <template #action>
-      <NButton type="primary" @click="handleAdd">
+      <NButton type="primary" @click="handleAddRole">
         <template #icon>
           <i class="i-material-symbols:add" />
         </template>
@@ -197,7 +258,7 @@ const columns = [
       :get-data="api.getRoles"
     >
       <template #queryBar>
-        <QueryItem label="Role Name" :label-width="80">
+        <QueryItem label="Role Name" :label-width="50">
           <NInput
             v-model:value="queryItems.keyword"
             clearable
@@ -229,8 +290,26 @@ const columns = [
         <NFormItem label="Role Label" path="name">
           <NInput v-model:value="modalForm.label" placeholder="Enter role label" />
         </NFormItem>
-        <!-- TODO: Can select menu and resource permissions when adding -->
-        <template v-if="modalAction === 'edit'">
+        <!-- 新增时两棵树都给出; 编辑时按入口按钮只展示对应的那棵 -->
+        <template v-if="modalAction === 'add'">
+          <NFormItem label="Menu Permissions" path="menu_ids">
+            <NTree
+              :data="menuOption"
+              :checked-keys="modalForm.menu_ids"
+              checkable expand-on-click block-line
+              @update:checked-keys="(v) => (modalForm.menu_ids = v)"
+            />
+          </NFormItem>
+          <NFormItem label="Resource Permissions" path="resource_ids">
+            <NTree
+              :data="resourceOption"
+              :checked-keys="modalForm.resource_ids"
+              block-line checkable expand-on-click cascade accordion
+              @update:checked-keys="(v) => (modalForm.resource_ids = v)"
+            />
+          </NFormItem>
+        </template>
+        <template v-else-if="modalAction === 'edit'">
           <NFormItem v-if="showMenu" label="Menu Permissions" path="menu_ids">
             <NTree
               :data="menuOption"

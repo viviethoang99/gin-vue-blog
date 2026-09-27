@@ -1,15 +1,15 @@
 <script setup>
-import { h, onMounted, ref } from 'vue'
 import { NButton, NImage, NInput, NPopconfirm, NSelect, NTabPane, NTabs, NTag } from 'naive-ui'
+import { h, onMounted, ref } from 'vue'
 
-import CommonPage from '@/components/common/CommonPage.vue'
-import QueryItem from '@/components/crud/QueryItem.vue'
-import CrudTable from '@/components/crud/CrudTable.vue'
-
-import { commentTypeMap, commentTypeOptions } from '@/assets/config'
-import { convertImgUrl, formatDate } from '@/utils'
-import { useCRUD } from '@/composables'
 import api from '@/api'
+import { commentTypeMap, commentTypeOptions } from '@/assets/config'
+import CommonPage from '@/components/common/CommonPage.vue'
+
+import CrudTable from '@/components/crud/CrudTable.vue'
+import QueryItem from '@/components/crud/QueryItem.vue'
+import { useCRUD } from '@/composables'
+import { convertImgUrl, formatDate, IMG_PLACEHOLDER } from '@/utils'
 
 defineOptions({ name: 'Comment Management' })
 
@@ -44,7 +44,7 @@ const columns = [
         'height': 40,
         'imgProps': { style: { 'border-radius': '3px' } },
         'src': convertImgUrl(row.user?.info?.avatar),
-        'fallback-src': 'http://dummyimage.com/400x400', // Load failed
+        'fallback-src': IMG_PLACEHOLDER, // 加载失败时用内联占位图, 不再请求外网
         'show-toolbar-tooltip': true,
       })
     },
@@ -61,24 +61,9 @@ const columns = [
   },
   // TODO: Display comment article information properly
   {
-    title: 'Comment Type',
-    key: '',
-    width: 50,
-    align: 'center',
-    render(row) {
-      if (row.type === 1) { // Article
-        return [
-          h(NTag, { type: 'info' }, { default: () => 'Article' }),
-        ]
-      }
-      if (row.type === 2) { // Friend links
-        return h(NTag, { type: 'success' }, { default: () => 'Friend Link' })
-      }
-    },
-  },
-  {
     title: 'Reply To',
-    key: 'reply_nick_name',
+    // 这里的 key 只用于导出(CrudTable 按 item[key] 取值), 展示走 render
+    key: 'reply_user',
     width: 50,
     align: 'center',
     render(row) {
@@ -127,10 +112,12 @@ const columns = [
     width: 50,
     align: 'center',
     render(row) {
+      // 后端新增评论类型时前端的映射表可能还没跟上, 不能直接取 .tag
+      const type = commentTypeMap[row.type]
       return h(
         NTag,
-        { type: commentTypeMap[row.type].tag },
-        { default: () => commentTypeMap[row.type].name },
+        { type: type?.tag ?? 'default' },
+        { default: () => type?.name ?? '未知' },
       )
     },
   },
@@ -144,31 +131,31 @@ const columns = [
       return [
         row.is_review
           ? h(
-            NButton,
-            {
-              size: 'small',
-              type: 'warning',
-              style: 'margin-left: 15px;',
-              onClick: () => handleUpdateReview([row.id], false),
-            },
-            {
-              default: () => 'Revoke',
-              icon: () => h('i', { class: 'i-mi:circle-error' }),
-            },
-          )
+              NButton,
+              {
+                size: 'small',
+                type: 'warning',
+                style: 'margin-left: 15px;',
+                onClick: () => handleUpdateReview([row.id], false),
+              },
+              {
+                default: () => 'Revoke',
+                icon: () => h('i', { class: 'i-mi:circle-error' }),
+              },
+            )
           : h(
-            NButton,
-            {
-              size: 'small',
-              type: 'success',
-              style: 'margin-left: 15px;',
-              onClick: () => handleUpdateReview([row.id], true),
-            },
-            {
-              default: () => 'Approve',
-              icon: () => h('i', { class: 'i-mi:circle-check' }),
-            },
-          ),
+              NButton,
+              {
+                size: 'small',
+                type: 'success',
+                style: 'margin-left: 15px;',
+                onClick: () => handleUpdateReview([row.id], true),
+              },
+              {
+                default: () => 'Approved',
+                icon: () => h('i', { class: 'i-mi:circle-check' }),
+              },
+            ),
         h(
           NPopconfirm,
           { onPositiveClick: () => handleDelete([row.id], false) },
@@ -193,7 +180,14 @@ async function handleUpdateReview(ids, is_review) {
     window.$message.info('Please select data to review')
     return
   }
-  await api.updateCommentReview(ids, is_review)
+  // 失败时拦截器已经弹过提示, 这里只要别让列表刷新和成功提示误报
+  try {
+    await api.updateCommentReview(ids, is_review)
+  }
+  catch (err) {
+    console.error(err)
+    return
+  }
   window.$message?.success(is_review ? 'Review successful' : 'Revoke successful')
   $table.value?.handleSearch()
 }
@@ -272,7 +266,7 @@ function handleChangeTab(value) {
           <NSelect
             v-model:value="queryItems.type"
             clearable
-            filterablec
+            filterable
             placeholder="Select comment source"
             :options="commentTypeOptions"
             @update:value="$table?.handleSearch()"

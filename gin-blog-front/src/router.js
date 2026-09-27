@@ -1,6 +1,6 @@
-import { createRouter, createWebHistory } from 'vue-router'
-
 import NProgress from 'nprogress'
+
+import { createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
 import './styles/nprogress.css'
 
 const basicRoutes = [
@@ -55,6 +55,23 @@ const basicRoutes = [
     },
   },
   {
+    name: 'Talk',
+    path: '/talks',
+    component: () => import('@/views/entertainment/talking/index.vue'),
+    meta: {
+      title: '说说',
+    },
+  },
+  {
+    // 说说详情单独一页: 评论组件按 route.params.id 取 topic_id, 沿用文章那套
+    name: 'TalkDetail',
+    path: '/talk/:id',
+    component: () => import('@/views/entertainment/talking/detail.vue'),
+    meta: {
+      title: '说说',
+    },
+  },
+  {
     name: 'Album',
     path: '/albums',
     component: () => import('@/views/entertainment/album/index.vue'),
@@ -95,6 +112,14 @@ const basicRoutes = [
     },
   },
   {
+    name: 'Notification',
+    path: '/notifications',
+    component: () => import('@/views/notification/index.vue'),
+    meta: {
+      title: '站内通知',
+    },
+  },
+  {
     name: '404',
     path: '/404',
     component: () => import('@/views/error-page/404.vue'),
@@ -109,20 +134,30 @@ const basicRoutes = [
 ]
 
 export const router = createRouter({
-  history: createWebHistory('/'),
+  // 静态托管（如 GitHub Pages）下直接访问子路径会 404, 故 mock 构建走 hash 路由
+  history: import.meta.env.VITE_USE_HASH_ROUTER === 'true'
+    ? createWebHashHistory()
+    : createWebHistory(import.meta.env.VITE_PUBLIC_PATH || '/'),
   routes: basicRoutes,
-  scrollBehavior: () => ({ left: 0, top: 0 }),
+  // 带 ?comment= 的跳转是站内通知定位到某条评论, 位置交给评论组件自己滚 ——
+  // 这里再返回 top: 0 会把它刚滚到的位置拉回顶部(同一篇文章内点通知时尤其明显)
+  scrollBehavior: to => (to.query.comment ? false : { left: 0, top: 0 }),
 })
 
 router.afterEach((to) => {
   document.title = `${to.meta?.title ?? import.meta.env.VITE_APP_TITLE}`
+  NProgress.done()
 })
 
 NProgress.configure({ showSpinner: false })
 
+// 路由组件是懒加载的, 进度条要跟着导航结束(afterEach / onError)收尾。
+// 以前是 start() 之后固定 setTimeout 300ms 就 done(), 网速慢时进度条早走完了 chunk 还在下载
 router.beforeEach((to, from, next) => {
   NProgress.start()
-  for (let i = 0; i < 5; i++) NProgress.inc()
-  setTimeout(() => NProgress.done(), 300)
   next()
+})
+
+router.onError(() => {
+  NProgress.done()
 })

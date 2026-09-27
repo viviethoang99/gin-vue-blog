@@ -17,53 +17,52 @@ import (
 )
 
 // JWT-based authorization
-// If a session exists, get user info from session
-// If no session, read token from Authorization, parse it to get user info, and set session
-func JWTAuth() gin.HandlerFunc {
+//
+// 无论接口是否允许匿名访问, 只要请求带了 Authorization 就会解析 token,
+// 把用户挂到 gin context 与 session 上 —— 前台接口靠这一步识别当前用户。
+// (之前资源表中没登记的接口会直接跳过解析, 前台的登录态只能依赖 session cookie,
+// session 只有 10 分钟, 过期后发评论/上传头像都会莫名返回 TOKEN 不存在)
+//
+// requireLogin 为 true 时, 资源表中不存在的接口也必须携带有效 token,
+// 仅跳过权限校验(fail closed)。后台接口必须用 true, 否则新增接口忘记
+// 在资源表登记, 该接口就会完全无鉴权。
+// 前台接口用 false: 大部分是匿名可读的, 只是顺便识别一下当前用户。
+func JWTAuth(requireLogin bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// FIXME: Session mix-up between front/back; cannot cache user in gin context for now
-		// auth, _ := handle.CurrentUserAuth(c)
-		// if auth != nil {
-		// 	slog.Debug("[middleware-JWTAuth] user auth exist, skip jwt auth")
-		// 	c.Next()
-		// 	return
-		// }
-
-		slog.Debug("[middleware-JWTAuth] user auth not exist, do jwt auth")
-
 		db := c.MustGet(g.CTX_DB).(*gorm.DB)
 
 		// Only system-managed resources require verification; others are skipped
 		url, method := c.FullPath()[4:], c.Request.Method
 		resource, err := model.GetResource(db, url, method)
-		if err != nil {
-			// Resource not found; skip further checks
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				slog.Debug("[middleware-JWTAuth] resource not exist, skip jwt auth")
-				c.Set("skip_check", true)
-				c.Next()
-				c.Set("skip_check", false)
-				return
-			}
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			handle.ReturnError(c, g.ErrDbOp, err)
 			return
 		}
+		registered := err == nil
 
-		// Anonymous resource; skip further checks
-		if resource.Anonymous {
-			slog.Debug(fmt.Sprintf("[middleware-JWTAuth] resource: %s %s is anonymous, skip jwt auth!", url, method))
+		// 资源表中没登记的接口, 以及登记为匿名的接口, 都不做权限校验
+		if !registered || resource.Anonymous {
+			slog.Debug(fmt.Sprintf("[middleware-JWTAuth] resource: %s %s skip permission check", url, method))
 			c.Set("skip_check", true)
-			c.Next()
-			c.Set("skip_check", false)
-			return
 		}
+
+		// 是否必须携带有效 token:
+		// 资源表中登记且非匿名的接口必须; 没登记的接口由 requireLogin 决定
+		mustLogin := (registered && !resource.Anonymous) || (!registered && requireLogin)
 
 		authorization := c.Request.Header.Get("Authorization")
 		if authorization == "" {
-			handle.ReturnError(c, g.ErrTokenNotExist, nil)
+			if mustLogin {
+				handle.ReturnError(c, g.ErrTokenNotExist, nil)
+				return
+			}
+			// 匿名访问: 后续 handler 自己决定要不要用户信息
+			slog.Debug("[middleware-JWTAuth] no authorization header, continue as anonymous")
 			return
 		}
 
+		// 带了凭证就必须是有效的, 坏掉的 token 直接报错而不是降级成匿名,
+		// 否则前端无法区分"没登录"和"登录过期"
 		// Token format: `Bearer [tokenString]`
 		parts := strings.Split(authorization, " ")
 		if len(parts) != 2 || parts[0] != "Bearer" {
@@ -89,7 +88,13 @@ func JWTAuth() gin.HandlerFunc {
 			return
 		}
 
-		// session
+		// 禁用是即时生效的: 只在登录时校验, 已经签发的 token 还能一直用到过期
+		if user.IsDisable {
+			handle.ReturnError(c, g.ErrUserDisabled, nil)
+			return
+		}
+
+		// session: 每次请求都刷新一次, 避免 10 分钟后失效
 		session := sessions.Default(c)
 		session.Set(g.CTX_USER_AUTH, claims.UserId)
 		session.Save()
@@ -124,20 +129,27 @@ func PermissionCheck() gin.HandlerFunc {
 		method := c.Request.Method
 
 		slog.Debug(fmt.Sprintf("[middleware-PermissionCheck] %v, %v, %v\n", auth.Username, url, method))
+		// 任一角色拥有该资源即放行 (OR 语义):
+		// 多角色时不能因为其中一个角色没有权限就拒绝, 否则多加一个弱角色反而会减少权限
 		for _, role := range auth.Roles {
+			// 被禁用的角色不参与鉴权, 否则后台的角色禁用开关只是改个字段, 权限照旧
+			if role.IsDisable {
+				slog.Debug(fmt.Sprintf("[middleware-PermissionCheck] role %v disabled, skip\n", role.Name))
+				continue
+			}
 			slog.Debug(fmt.Sprintf("[middleware-PermissionCheck] %v\n", role.Name))
 			pass, err := model.CheckRoleAuth(db, role.ID, url, method)
 			if err != nil {
 				handle.ReturnError(c, g.ErrDbOp, err)
 				return
 			}
-			if !pass {
-				handle.ReturnError(c, g.ErrPermission, nil)
+			if pass {
+				slog.Debug("[middleware-PermissionCheck]: pass")
+				c.Next()
 				return
 			}
 		}
 
-		slog.Debug("[middleware-PermissionCheck]: pass")
-		c.Next()
+		handle.ReturnError(c, g.ErrPermission, nil)
 	}
 }

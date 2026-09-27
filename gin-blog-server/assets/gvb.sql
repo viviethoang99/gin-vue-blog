@@ -136,7 +136,7 @@ INSERT INTO `config` VALUES (3, '2023-12-27 22:40:22.813', '2023-12-27 23:01:35.
 INSERT INTO `config` VALUES (4, '2023-12-27 22:40:22.813', '2023-12-27 23:01:35.023', '', 'website_intro', 'Let the past go with the wind', 'Website Introduction');
 INSERT INTO `config` VALUES (5, '2023-12-27 22:40:22.813', '2023-12-27 23:01:35.038', '', 'website_notice', 'Welcome to Zhenyu personal blog, the project is still in development...', 'Website Notice');
 INSERT INTO `config` VALUES (6, '2023-12-27 22:40:22.813', '2023-12-27 23:01:35.031', '', 'website_createtime', '2023-12-27 22:40:22', 'Website Creation Date');
-INSERT INTO `config` VALUES (7, '2023-12-27 22:40:22.813', '2023-12-27 23:01:35.011', '', 'website_record', '粤ICP备2021032312号', 'Website Registration Number');
+INSERT INTO `config` VALUES (7, '2023-12-27 22:40:22.813', '2023-12-27 23:01:35.011', '', 'website_record', '粤ICP备2021032312号', '网站备案号');
 INSERT INTO `config` VALUES (8, '2023-12-27 22:40:22.813', '2023-12-27 23:01:35.008', '', 'qq', '123456789', 'QQ');
 INSERT INTO `config` VALUES (9, '2023-12-27 22:40:22.813', '2023-12-27 23:01:35.015', '', 'github', 'https://github.com/szluyu99', 'github');
 INSERT INTO `config` VALUES (10, '2023-12-27 22:40:22.813', '2023-12-27 23:01:35.025', '', 'gitee', 'https://gitee.com/szluyu99', 'gitee');
@@ -299,7 +299,7 @@ INSERT INTO `page` VALUES (7, '2022-12-08 13:53:17.707', '2023-12-28 16:27:13.41
 INSERT INTO `page` VALUES (8, '2022-12-08 13:53:30.187', '2023-12-28 14:55:25.724', 'Personal Center', 'user', 'https://cdn.hahacode.cn/page/user.jpg');
 INSERT INTO `page` VALUES (9, '2022-12-16 23:54:52.650', '2023-12-28 14:54:42.341', 'Album', 'album', 'https://cdn.hahacode.cn/page/album.png');
 INSERT INTO `page` VALUES (10, '2022-12-16 23:55:36.059', '2023-12-28 14:55:09.345', '错误页面', '404', 'https://cdn.hahacode.cn/page/404.jpg');
-INSERT INTO `page` VALUES (11, '2022-12-16 23:56:17.917', '2023-12-28 16:33:16.644', '文章列表', 'article_list', 'https://cdn.hahacode.cn/page/article_list.jpg');
+INSERT INTO `page` VALUES (11, '2022-12-16 23:56:17.917', '2023-12-28 16:33:16.644', 'Article List', 'article_list', 'https://cdn.hahacode.cn/page/article_list.jpg');
 
 -- ----------------------------
 -- Table structure for resource

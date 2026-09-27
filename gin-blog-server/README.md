@@ -1,97 +1,87 @@
-## Refactor
+# gin-blog-server
 
-- Use `slog` as the logging library. For Go 1.21+, `slog` is in the standard library. For earlier versions, import `exp/slog` (TODO: log persistence).
-- Adopt the official Golang project layout.
-- Generate API docs with Swagger (TODO: enrich comments for each API; consider alternatives to go-swagger).
-- Replace global variables with dependency injection; initialize in `main.go`.
-- Restructure the `utils` package to simplify the architecture.
-- Use SQLite for unit tests in development; support MySQL in production.
-- Remove Casbin and implement RBAC-based access control.
-- Previous versions used panic for error codes; now use a Gin middleware to catch panics globally.
-- TODO: Standardize error handling via `errors`.
+博客后端。Go 1.26 + Gin + GORM，支持 SQLite / MySQL，**Redis 为必需依赖**（默认 `127.0.0.1:6379` 的 DB 7）。
 
-Run the new version (run/init data): all related files are under `cmd/`.
+监听 `:8765`，接口前缀 `/api`。
 
-1. MySQL: set `DbType = "mysql"` in `config.yml`, update MySQL connection info, and import `assets/gvb.sql` (you can also initialize data manually similar to SQLite flow).
+## 启动
 
-2. SQLite: set `DbType = "sqlite"` in `config.yml`, then initialize data:
-- `create_superadmin.sh` creates a super admin (all permissions), username `superadmin`, password `superadmin`.
-- `generate_data.sh` initializes three default roles (admin, user, guest) + three default users (admin, user, guest; all passwords `123456`), initializes config, pages, and resource data (TODO).
+配置文件是 `config.yml`（程序从 `cmd` 目录下以 `../config.yml` 读取）。默认为 SQLite，开箱即用：
 
----
-
-The following are notes from older versions and can be skipped.
-
-## Deployment
-
-Use docker-compose for one-command deployment.
-
-`./config/config.docker.toml` is the config file used in deployment; some values are overridden by docker-compose environment variables.
-
-See `deploy/start/docker-compose.yml` for details.
-
-Config precedence: environment variables > values in `config.docker.toml`. When using docker-compose, modify the `environment` block.
-
-## Development Guidelines
-
-Model layer returns `error`; Service layer returns a `code`; Controller uses `GetMsg(code)` to return messages to frontend.
-
-- Error codes are maintained in `global/errmsg`.
-
-For JSON, use snake_case; in Go code, use camelCase.
-
-## Database
-
-For MySQL boolean fields, use `tinyint`. In Go structs, define such fields as pointers so you can distinguish zero values via `nil`.
-
-## Tests
-
-Unit tests are important, especially for refactoring and iterative changes. They reduce manual API calls and ensure correctness.
-
-## Gin
-
-### Validator and zero values
-
-Gin uses `validator` for parameter validation. If a field is tagged `required`, it must not receive the type's zero value.
-- Strings: cannot be empty.
-- Int: cannot be 0.
-- Bool: cannot be false.
-
-Sometimes a field is required yet 0 is a valid value (e.g., `sex` 0=female, 1=male). Use a pointer to the type: the pointer's zero value is `nil`.
-
-```go
-When decoding JSON into `any` in Go, the types map as follows:
-bool, for JSON booleans
-float64, for JSON numbers
-string, for JSON strings
-[]interface{}, for JSON arrays
-map[string]interface{}, for JSON objects
-nil for JSON null
+```bash
+go mod tidy
+cd cmd
+go run main.go
 ```
 
-### POST vs PUT
+`DbAutoMigrate: true` 时启动会自动迁移表结构，但**只建表、不造数据**。
 
-POST:
-- Submits requests to create or update resources; not idempotent.
-- For user registration, each request creates a new account; use POST.
+## 初始化数据
 
-PUT:
-- Updates resources at a specific URL; idempotent.
-- For changing a password, each request overwrites the same user's password; use PUT.
+### SQLite
 
-### Tree data for menus/resources
+第一次启动后需要手动生成基础数据（菜单、资源、角色、默认用户、网站配置、页面封面）：
 
-Three approaches:
-1. Query a tree directly from MySQL (custom functions or other techniques).
-2. Build the tree with recursion in code.
-3. Use a single pass with a `map` to build the tree.
-> Note: the `map` approach may only easily handle two levels. TODO: investigate.
+```bash
+cd cmd
+sh generate_data.sh          # 内部执行 go run main.go -t "all"
+```
 
-### Logging
+生成默认角色 `admin`、`guest` 和同名用户，密码都是 `123456`。后台登录用 `admin / 123456`。
 
-Log startup to console; write runtime logs to files.
+如需一个拥有全部权限的超级管理员（`superadmin / superadmin`）：
+
+```bash
+sh create_superadmin.sh
+```
+
+> `generate_data.sh` 只生成系统基础数据，**不含文章、分类、标签、评论、友链等内容数据**，这些需要自己在后台添加。
+> `assets/gvb.sql` 里有一份示例内容数据，但它是 MySQL 格式（Navicat 导出），SQLite 下需要先转换才能导入。
+
+### MySQL
+
+`config.yml` 中改 `DbType: "mysql"` 并填好连接信息，然后导入 `assets/gvb.sql`（已包含表结构和示例数据）。
+
+## 需要注意的缓存
+
+`page`（页面封面）和 `config`（博客配置，含「关于我」）在 Redis 里是 10 分钟的读穿缓存。走后台接口改动会立即失效；直接改库或跑 `generate-data` 灌种子不会触发失效，等 TTL 到期即可，急的话手动删：
+
+```bash
+redis-cli -n 7 del page config
+```
+
+点赞数 / 浏览数 / 访客地域 / 按天访问量**故意不设过期时间**（按天的那个例外，30 天）：这些计数只在 Redis 里累加，数据库没有对应字段，Redis 就是唯一数据源，过期等于丢数据。
+
+不过它们有落库备份：后端每 10 分钟、以及收到 `SIGTERM` / `SIGINT` 时把计数抄一份进 `counter_snapshot` 表，启动时把 Redis 里缺的键补回去（`internal/counter.go`）。回填只补不存在的键，不会用旧备份覆盖 Redis 里的活数据。按天的访问量不在备份范围内——它只是趋势图的原料。
 
 
-# Nginx Deployment
 
-HTTPS reference: [Nginx SSL certificate setup](https://cloud.tencent.com/document/product/400/35244)
+## 前端不想启动后端？
+
+博客前台和后台都内置了 Mock 模式，把对应目录 `.env.development` 中的 `VITE_USE_MOCK` 设为 `true` 即可完全脱离后端运行，详见各自的 README。
+
+## 测试
+
+```bash
+go test ./...              # 8 个包: model / handle / middleware / global / utils / 路由注册
+
+go test ./... -cover       # 看覆盖率
+```
+
+测试用 SQLite 内存库和 [miniredis](https://github.com/alicebob/miniredis)，不需要真实的 MySQL / Redis。
+
+## 其他
+
+```bash
+./swag_init.sh    # swag init 生成 Swagger 文档到 docs/
+```
+
+`docs/` 是生成产物但需要一起提交，CI 会校验它和代码里的注解是否一致。没有 `swag` 命令时先
+`go install github.com/swaggo/swag/cmd/swag@v1.16.6`。
+
+> 注意：给 model 结构体的字段加注释会被 swag 当成该字段的 description 写进文档，容易覆盖掉原有说明。
+
+`cmd/run_swag.sh` 是生成文档后顺便启动服务的便捷脚本，只想生成文档用上面的 `swag_init.sh`。
+
+目录约定：`internal/model` 返回 error，`internal/handle` 负责错误码与响应；JSON 字段统一 **小写 + 下划线**，Go 结构体用驼峰。
+

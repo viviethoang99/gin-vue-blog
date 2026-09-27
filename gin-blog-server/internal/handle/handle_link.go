@@ -18,14 +18,13 @@ type AddOrEditLinkReq struct {
 	Intro   string `json:"intro"`
 }
 
-// @Summary Get friend link list
-// @Description Get friend link list by conditions
+// @Summary 条件查询友链列表
+// @Description 关键字匹配名称/地址/简介
 // @Tags Link
-// @Param page_size query int false "Current page"
-// @Param page_num query int false "Page size"
-// @Param keyword query string false "Keyword"
-// @Accept json
 // @Produce json
+// @Param keyword query string false "关键字"
+// @Param page_num query int false "页码"
+// @Param page_size query int false "每页数量"
 // @Success 0 {object} Response[PageResult[model.FriendLink]]
 // @Security ApiKeyAuth
 // @Router /link/list [get]
@@ -50,12 +49,12 @@ func (*Link) GetList(c *gin.Context) {
 	})
 }
 
-// @Summary Add or edit friend link
-// @Description Add or edit friend link
+// @Summary 新增或编辑友链
+// @Description 新增或编辑友链
 // @Tags Link
-// @Param form body AddOrEditLinkReq true "Add or edit friend link"
 // @Accept json
 // @Produce json
+// @Param form body AddOrEditLinkReq true "新增或编辑友链"
 // @Success 0 {object} Response[model.FriendLink]
 // @Security ApiKeyAuth
 // @Router /link [post]
@@ -78,9 +77,9 @@ func (*Link) SaveOrUpdate(c *gin.Context) {
 // @Summary Delete friend links (batch)
 // @Description Delete friend links by ID array
 // @Tags Link
-// @Param ids body []int true "Friend link ID array"
 // @Accept json
 // @Produce json
+// @Param ids body []int true "友链 ID 数组"
 // @Success 0 {object} Response[int64]
 // @Security ApiKeyAuth
 // @Router /link [delete]

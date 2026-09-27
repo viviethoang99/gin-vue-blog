@@ -19,6 +19,7 @@ var (
 	userAPI         handle.User         // 用户
 	userAuthAPI     handle.UserAuth     // 用户账号
 	commentAPI      handle.Comment      // 评论
+	talkAPI         handle.Talk         // 说说
 	uploadAPI       handle.Upload       // 文件上传
 	messageAPI      handle.Message      // 留言
 	linkAPI         handle.Link         // 友情链接
@@ -27,11 +28,14 @@ var (
 	menuAPI         handle.Menu         // 菜单
 	blogInfoAPI     handle.BlogInfo     // 博客设置
 	operationLogAPI handle.OperationLog // 操作日志
+	loginLogAPI     handle.LoginLog     // 登录日志
+	errorLogAPI     handle.ErrorLog     // 前端错误日志(上报匿名, 管理需登录)
 	pageAPI         handle.Page         // 页面
 
 	// 博客前台接口
 
-	frontAPI handle.Front // 博客前台接口汇总
+	frontAPI        handle.Front        // 博客前台接口汇总
+	notificationAPI handle.Notification // 站内通知(前台, 需登录)
 )
 
 // TODO: 前端修改 PUT 和 PATCH 请求
@@ -50,13 +54,12 @@ func registerBaseHandler(r *gin.Engine) {
 	base := r.Group("/api")
 
 	// TODO: 登录, 注册 记录日志
-	base.POST("/login", userAuthAPI.Login)          // 登录
-	base.POST("/register", userAuthAPI.Register)    // 注册
-	base.GET("/logout", userAuthAPI.Logout)         // 退出登录
-	base.POST("/report", blogInfoAPI.Report)        // 上报信息
-	base.GET("/config", blogInfoAPI.GetConfigMap)   // 获取配置
-	base.PATCH("/config", blogInfoAPI.UpdateConfig) // 更新配置
-	base.GET("/email/verify",userAuthAPI.VerifyCode)
+	base.POST("/login", userAuthAPI.Login)        // 登录
+	base.POST("/register", userAuthAPI.Register)  // 注册
+	base.GET("/logout", userAuthAPI.Logout)       // 退出登录
+	base.POST("/report", blogInfoAPI.Report)      // 上报信息
+	base.GET("/config", blogInfoAPI.GetConfigMap) // 获取配置
+	base.GET("/email/verify", userAuthAPI.VerifyCode)
 }
 
 // 后台管理系统的接口: 全部需要 登录 + 鉴权
@@ -64,13 +67,14 @@ func registerAdminHandler(r *gin.Engine) {
 	auth := r.Group("/api")
 
 	// !注意使用中间件的顺序
-	auth.Use(middleware.JWTAuth())
+	auth.Use(middleware.JWTAuth(true)) // 后台接口: 未登记的接口也要求登录
 	auth.Use(middleware.PermissionCheck())
 	auth.Use(middleware.OperationLog())
 	auth.Use(middleware.ListenOnline())
 
-	auth.GET("/home", blogInfoAPI.GetHomeInfo) // 后台首页信息
-	auth.POST("/upload", uploadAPI.UploadFile) // 文件上传
+	auth.GET("/home", blogInfoAPI.GetHomeInfo)      // 后台首页信息
+	auth.POST("/upload", uploadAPI.UploadFile)      // 文件上传
+	auth.PATCH("/config", blogInfoAPI.UpdateConfig) // 更新配置
 
 	// 博客设置
 	setting := auth.Group("/setting")
@@ -126,6 +130,14 @@ func registerAdminHandler(r *gin.Engine) {
 		comment.DELETE("", commentAPI.Delete)           // 删除评论
 		comment.PUT("/review", commentAPI.UpdateReview) // 修改评论审核
 	}
+	// 说说模块
+	talk := auth.Group("/talk")
+	{
+		talk.GET("/list", talkAPI.GetList)  // 说说列表
+		talk.GET("/:id", talkAPI.GetDetail) // 说说详情
+		talk.POST("", talkAPI.SaveOrUpdate) // 新增/编辑说说
+		talk.DELETE("", talkAPI.Delete)     // 删除说说
+	}
 	// 留言模块
 	message := auth.Group("/message")
 	{
@@ -167,10 +179,23 @@ func registerAdminHandler(r *gin.Engine) {
 		role.GET("/option", roleAPI.GetOption) // 角色选项列表(树形)
 	}
 	// 操作日志模块
+	loginLog := auth.Group("/login/log")
+	{
+		loginLog.GET("/list", loginLogAPI.GetList) // 登录日志列表
+		loginLog.DELETE("", loginLogAPI.Delete)    // 删除登录日志
+	}
+
 	operationLog := auth.Group("/operation/log")
 	{
 		operationLog.GET("/list", operationLogAPI.GetList) // 操作日志列表
 		operationLog.DELETE("", operationLogAPI.Delete)    // 删除操作日志
+	}
+
+	// 前端错误日志: 上报接口在前台(匿名), 这里只有查看和删除
+	errorLog := auth.Group("/error/log")
+	{
+		errorLog.GET("/list", errorLogAPI.GetList) // 前端错误日志列表
+		errorLog.DELETE("", errorLogAPI.Delete)    // 删除前端错误日志
 	}
 	// 页面模块
 	page := auth.Group("/page")
@@ -184,6 +209,12 @@ func registerAdminHandler(r *gin.Engine) {
 // 博客前台的接口: 大部分不需要登录, 部分需要登录
 func registerBlogHandler(r *gin.Engine) {
 	base := r.Group("/api/front")
+
+	// 前台接口: 允许匿名访问, 仅识别用户
+	// 必须在注册任何路由之前 Use, gin 的中间件只对之后注册的路由生效。
+	// 放在后面会让只读接口完全不过鉴权: 坏 token 被当成匿名放行,
+	// handler 里也拿不到当前用户。
+	base.Use(middleware.JWTAuth(false))
 
 	base.GET("/about", blogInfoAPI.GetAbout) // 获取关于我
 	base.GET("/home", frontAPI.GetHomeInfo)  // 前台首页
@@ -217,9 +248,16 @@ func registerBlogHandler(r *gin.Engine) {
 		comment.GET("/list", frontAPI.GetCommentList)                         // 前台评论列表
 		comment.GET("/replies/:comment_id", frontAPI.GetReplyListByCommentId) // 根据评论 id 查询回复
 	}
+	talk := base.Group("/talk")
+	{
+		talk.GET("/list", frontAPI.GetTalkList) // 前台说说列表
+		talk.GET("/:id", frontAPI.GetTalk)      // 前台说说详情
+	}
 
-	// 需要登录才能进行的操作
-	base.Use(middleware.JWTAuth())
+	// 前端错误上报: 访客没有登录态, 必须匿名可访问; 防滥用靠 handler 里的按 IP 配额
+	base.POST("/error/report", errorLogAPI.Report)
+
+	// 需要登录才能进行的操作(由 handler 内的 MustCurrentUserAuth 兜底)
 	{
 		base.POST("/upload", uploadAPI.UploadFile)    // 文件上传
 		base.GET("/user/info", userAPI.GetInfo)       // 根据 Token 获取用户信息
@@ -229,5 +267,14 @@ func registerBlogHandler(r *gin.Engine) {
 		base.POST("/comment", frontAPI.SaveComment)                 // 前台新增评论
 		base.GET("/comment/like/:comment_id", frontAPI.LikeComment) // 前台点赞评论
 		base.GET("/article/like/:article_id", frontAPI.LikeArticle) // 前台点赞文章
+
+		// 站内通知: 只能看/改自己的, handler 里从 token 取 user_id, 不接受前端传
+		notification := base.Group("/notification")
+		{
+			notification.GET("/list", notificationAPI.GetList)          // 通知列表
+			notification.GET("/unread", notificationAPI.GetUnreadCount) // 未读数
+			notification.PUT("/read", notificationAPI.Read)             // 标记已读(ids 为空则全部)
+			notification.DELETE("", notificationAPI.Delete)             // 删除通知
+		}
 	}
 }

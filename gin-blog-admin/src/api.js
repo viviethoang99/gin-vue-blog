@@ -43,9 +43,21 @@ export default {
   getLinks: (params = {}) => request.get('/link/list', { params }),
   deleteLinks: (data = []) => request.delete('/link', { data }),
   saveOrUpdateLink: data => request.post('/link', data),
+
+  // 说说相关接口
+  getTalks: (params = {}) => request.get('/talk/list', { params }),
+  getTalkById: id => request.get(`/talk/${id}`),
+  saveOrUpdateTalk: data => request.post('/talk', data),
+  deleteTalks: (data = []) => request.delete('/talk', { data }),
   // 日志相关接口
   getOperationLogs: (params = {}) => request.get('/operation/log/list', { params }),
   deleteOperationLogs: (data = []) => request.delete('/operation/log', { data }),
+  getLoginLogs: (params = {}) => request.get('/login/log/list', { params }),
+  deleteLoginLogs: (data = []) => request.delete('/login/log', { data }),
+
+  // 前端错误日志 (上报接口在前台, 匿名访问, 见 utils/error-report.js)
+  getErrorLogs: (params = {}) => request.get('/error/log/list', { params }),
+  deleteErrorLogs: (data = []) => request.delete('/error/log', { data }),
 
   // 用户相关接口
   getUserInfo: () => request.get('/user/info'),

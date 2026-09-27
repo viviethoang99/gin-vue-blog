@@ -1,18 +1,21 @@
 <script setup>
-import { h, onMounted, ref } from 'vue'
 import { useClipboard } from '@vueuse/core'
 import { NButton, NForm, NFormItem, NImage, NInput, NPopconfirm } from 'naive-ui'
+import { h, onMounted, ref } from 'vue'
 
+import api from '@/api'
 import CommonPage from '@/components/common/CommonPage.vue'
-import QueryItem from '@/components/crud/QueryItem.vue'
 import CrudModal from '@/components/crud/CrudModal.vue'
 import CrudTable from '@/components/crud/CrudTable.vue'
 
-import { formatDate } from '@/utils'
+import QueryItem from '@/components/crud/QueryItem.vue'
 import { useCRUD } from '@/composables'
-import api from '@/api'
+import { convertImgUrl, formatDate, IMG_PLACEHOLDER } from '@/utils'
 
-defineOptions({ name: 'Friend Links Management' })
+defineOptions({ name: 'Friend Links' })
+
+// 在 setup 里创建一次: 原来写在列的 render 里, 每次点击都新建一个实例
+const { copy } = useClipboard()
 
 const $table = ref(null)
 const queryItems = ref({
@@ -53,8 +56,9 @@ const columns = [
       return h(NImage, {
         'height': 40,
         'imgProps': { style: { 'border-radius': '3px' } },
-        'src': row.avatar,
-        'fallback-src': 'http://dummyimage.com/400x400', // Loading failed
+        // 本地上传的头像存的是相对路径, 不转换直接给 img 会裂图
+        'src': convertImgUrl(row.avatar),
+        'fallback-src': IMG_PLACEHOLDER, // 加载失败时用内联占位图, 不再请求外网
         'show-toolbar-tooltip': true,
       })
     },
@@ -67,7 +71,7 @@ const columns = [
     ellipsis: { tooltip: true },
   },
   {
-    title: 'Link Address',
+    title: 'Address',
     key: 'address',
     width: 120,
     align: 'center',
@@ -80,7 +84,6 @@ const columns = [
           // href: row.address,
           // target: '_blank',
           onClick: () => {
-            const { copy } = useClipboard()
             copy(row.address)
             $message.info('Link copied to clipboard!')
           },
@@ -138,7 +141,7 @@ const columns = [
               { size: 'small', type: 'error', style: 'margin-left: 15px;' },
               { default: () => 'Delete', icon: () => h('i', { class: 'i-material-symbols:delete-outline' }) },
             ),
-            default: () => h('div', {}, 'Are you sure you want to delete this friend link?'),
+            default: () => h('div', {}, '确定删除该友链吗?'),
           },
         ),
       ]

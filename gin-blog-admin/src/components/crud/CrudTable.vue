@@ -1,7 +1,6 @@
 <script setup>
-import { nextTick, reactive, ref } from 'vue'
 import { NButton, NDataTable, NSpace } from 'naive-ui'
-import { utils, writeFile } from 'xlsx'
+import { nextTick, reactive, ref } from 'vue'
 
 const props = defineProps({
   /** Whether to not set column dividers */
@@ -44,22 +43,20 @@ const tableData = ref([]) // Table data
 const initQuery = { ...props.queryItems }
 
 // Pagination configuration
+// ! 翻页只能有一个入口: naive-ui 内部的 mergedOnUpdatePage 会先调 pagination.onChange
+// ! 再触发组件的 onUpdate:page, 两处都发请求的话每次翻页会请求两次, 且慢的响应会覆盖新的
 const pagination = reactive({
   page: 1,
   pageSize: 10,
   showSizePicker: true,
   pageSizes: [5, 10, 20],
-  onChange: (page) => {
-    pagination.page = page
-    handleQuery()
-  },
   onUpdatePageSize: (pageSize) => {
     pagination.page = 1
     pagination.pageSize = pageSize
     handleQuery()
   },
   prefix({ itemCount }) {
-    return `Total ${itemCount} items`
+    return `共 ${itemCount} 条`
   },
 })
 
@@ -81,10 +78,15 @@ async function handleQuery() {
       ...props.extraParams,
       ...paginationParams,
     })
-    tableData.value = data?.page_data || data
-    pagination.itemCount = data?.total ?? data.length
+    // data 为 null 时原来会在 data.length 上抛 TypeError, 又被下面的空 catch 吞掉,
+    // 表现是「点了搜索什么都没发生」。这里显式当成空列表处理
+    const list = data?.page_data ?? data ?? []
+    tableData.value = Array.isArray(list) ? list : []
+    pagination.itemCount = data?.total ?? tableData.value.length
   }
-  catch (error) {
+  catch (err) {
+    console.error(err)
+    window.$message?.error('数据加载失败, 请重试')
     tableData.value = []
     pagination.itemCount = 0
   }
@@ -127,7 +129,7 @@ function onSorterChange(sorter) {
   emit('sorterChange', sorter)
 }
 
-function handleExport(columns = props.columns, data = tableData.value) {
+async function handleExport(columns = props.columns, data = tableData.value) {
   if (!data?.length) {
     return window.$message.warning('No data available')
   }
@@ -135,10 +137,30 @@ function handleExport(columns = props.columns, data = tableData.value) {
   const thKeys = columnsData.map(item => item.key)
   const thData = columnsData.map(item => item.title)
   const trData = data.map(item => thKeys.map(key => item[key]))
-  const sheet = utils.aoa_to_sheet([thData, ...trData])
-  const workBook = utils.book_new()
-  utils.book_append_sheet(workBook, sheet, 'Data Report')
-  writeFile(workBook, 'Data Report.xlsx')
+
+  // exceljs 不提供浏览器端下载, 需自行生成 Blob 触发
+  // 本函数为 async, 失败时的 rejection 不会被 Vue 的错误处理捕获, 故在此兜住
+  try {
+    // exceljs 体积较大(gzip 后约 300KB), 点击导出时才加载, 不进入首屏
+    const { default: ExcelJS } = await import('exceljs')
+    const workbook = new ExcelJS.Workbook()
+    const sheet = workbook.addWorksheet('Data Report')
+    sheet.addRows([thData, ...trData])
+
+    const buffer = await workbook.xlsx.writeBuffer()
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'Data Report.xlsx'
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+  catch {
+    window.$message.error('导出失败')
+  }
 }
 
 defineExpose({

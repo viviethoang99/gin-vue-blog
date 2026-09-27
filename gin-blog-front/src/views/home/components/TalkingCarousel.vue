@@ -1,23 +1,49 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 
-const sentence = ref('书山有路勤为径，学海无涯苦作舟。')
+import api from '@/api'
+import { getOneSentence, getRandomSentence } from '@/utils'
 
-onMounted(() => {
-  fetch('https://v1.hitokoto.cn?c=i')
-    .then(res => res.json())
-    .then(data => sentence.value = data.hitokoto)
+// 首页轮播: 有说说就轮播真实内容, 没有(或接口挂了)退回一言兜底
+const sentence = ref(getRandomSentence())
+const index = ref(0)
+const talks = ref([])
+let timer = null
+
+async function rotate() {
+  if (talks.value.length) {
+    sentence.value = talks.value[index.value % talks.value.length].content
+    index.value++
+  }
+  else {
+    sentence.value = await getOneSentence()
+  }
+}
+
+onMounted(async () => {
+  try {
+    const resp = await api.getTalks({ page_num: 1, page_size: 5 })
+    talks.value = resp.data?.page_data ?? []
+  }
+  catch (err) {
+    console.error(err)
+  }
+
+  await rotate()
+  timer = setInterval(rotate, 5000)
 })
+
+onUnmounted(() => clearInterval(timer))
 </script>
 
 <template>
-  <div class="card-view animate-zoom-in animate-duration-600">
+  <div class="card-view card-enter">
     <div class="flex text-center">
       <button class="i-mdi-chat-outline text-xl" />
       <div class="flex-1">
         {{ sentence }}
       </div>
-      <button class="animate-arrow i-mdi-chevron-double-right text-2xl" />
+      <RouterLink to="/talks" class="animate-arrow i-mdi-chevron-double-right text-2xl" />
     </div>
   </div>
 </template>

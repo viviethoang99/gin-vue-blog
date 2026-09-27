@@ -1,9 +1,9 @@
 <script setup>
-import { onMounted, ref } from 'vue'
 import { useWindowScroll, watchThrottled } from '@vueuse/core'
+import { onMounted, ref } from 'vue'
 
 const { previewRef } = defineProps({
-  previewRef: { type: Object, required: true, },
+  previewRef: { type: Object, required: true },
 })
 
 onMounted(() => {
@@ -12,12 +12,15 @@ onMounted(() => {
 
 const selectAnchor = ref('')
 const anchors = ref([])
-const headings = Array.from(previewRef.querySelectorAll('h1,h2,h3,h4,h5,h6'))
+// 正文还没渲染出来时 previewRef 可能是 null, 直接 querySelectorAll 会抛
+// 空标题(markdown 里写了 ## 但没写文字)不进目录, 否则目录里会多出一行空白
+const headings = previewRef
+  ? Array.from(previewRef.querySelectorAll('h1,h2,h3,h4,h5,h6')).filter(t => !!t.textContent.trim())
+  : []
 
 function buildAnchors() {
   // 用于确认层级
-  const titleList = Array.from(headings).filter(t => !!t.innerText.trim())
-  const hTags = Array.from(new Set(titleList.map(t => t.tagName))).sort()
+  const hTags = Array.from(new Set(headings.map(t => t.tagName))).sort()
 
   let count = 0 // 解决重名问题
   for (let i = 0; i < headings.length; i++) {
@@ -26,7 +29,7 @@ function buildAnchors() {
     headings[i].id = `${anchor}-${count++}`
     anchors.value.push({
       id: headings[i].id,
-      name: headings[i].innerText,
+      name: anchor,
       indent: hTags.indexOf(headings[i].tagName),
     })
   }
@@ -34,6 +37,10 @@ function buildAnchors() {
 
 function handleClickAnchor(id) {
   const anchorElement = document.getElementById(id)
+  // 正文被重新渲染过时可能找不到对应元素
+  if (!anchorElement) {
+    return
+  }
   window.scrollTo({
     behavior: 'smooth',
     top: anchorElement.offsetTop - 40,
@@ -64,9 +71,10 @@ watchThrottled(y, () => {
       <ul>
         <li v-for="anchor of anchors" :key="anchor.id">
           <div
-            class="cursor-pointer border-l-4 border-transparent rounded py-1 text-sm color-#666261 hover:bg-#00c4b6 hover:bg-opacity-30"
-            :class="anchor.id === selectAnchor && 'bg-#00c4b6 text-white border-l-#009d92'"
-            :style="{ paddingLeft: `${5 + anchor.indent * 15}px` }" @click="handleClickAnchor(anchor.id)">
+            class="cursor-pointer border-l-4 border-transparent rounded py-1 text-sm color-muted hover:bg-primary hover:bg-opacity-30"
+            :class="anchor.id === selectAnchor && 'bg-primary text-white border-l-accent'"
+            :style="{ paddingLeft: `${5 + anchor.indent * 15}px` }" @click="handleClickAnchor(anchor.id)"
+          >
             {{ anchor.name }}
           </div>
         </li>

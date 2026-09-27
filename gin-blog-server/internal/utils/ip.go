@@ -2,10 +2,10 @@ package utils
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
 	"net"
 	"strings"
+	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lionsoul2014/ip2region/binding/golang/xdb"
@@ -17,80 +17,73 @@ var IP = new(ipUtil)
 type ipUtil struct{}
 
 // Get the IP address from which the user sent the request
-// If the server is not behind a proxy, you can get the IP directly via c.Request.RemoteAddr
-// In common architectures, requests usually pass through a proxy (most commonly Nginx) before reaching the server; directly obtaining the IP yields the proxy server's IP
+/*
+   走 gin 的 c.ClientIP(): 它先判断直连对端(RemoteAddr) 是否落在可信代理名单里,
+   只有可信时才去读 X-Forwarded-For / X-Real-IP, 否则一律用对端地址。
+
+   原来是无条件 `c.Request.Header.Get("X-Real-IP")`, 配合 SetTrustedProxies("*")
+   等于任何人都能自称任意 IP: 登录失败计数键里带 IP(handle_auth.go 的 LOGIN_FAIL),
+   轮换这个请求头就能对同一账号无限试密码; 访客地域统计和 user_auth.ip_address 同样会被污染。
+
+   可信名单由 config.yml 的 server.trusted-proxies 决定, 见 cmd/main.go 与 global/config.go。
+*/
 func (*ipUtil) GetIpAddress(c *gin.Context) (ipAddress string) {
-	// c.ClientIP() gets the proxy server's IP (Nginx)
-
-	// X-Real-IP: Nginx proxy header; since this project explicitly uses Nginx, prefer this first
-	ipAddress = c.Request.Header.Get("X-Real-IP")
-
-	// X-Forwarded-For is added when passing through HTTP proxies or load balancers
-	// Format: client1,proxy1,proxy2
-	// Typically, the first IP is the real client IP; the rest are proxy servers
-	if ipAddress == "" || len(ipAddress) == 0 || strings.EqualFold("unknown", ipAddress) {
-		ips := c.Request.Header.Get("X-Forwarded-For") // "ip1,ip2,ip3"
-		splitIps := strings.Split(ips, ",")            // ["ip1", "ip2", "ip3"]
-		if len(splitIps) > 0 {
-			ipAddress = splitIps[0]
-		}
-	}
-
-	// Proxy-Client-IP: Apache proxy header
-	if ipAddress == "" || len(ipAddress) == 0 || strings.EqualFold("unknown", ipAddress) {
-		ipAddress = c.Request.Header.Get("Proxy-Client-IP")
-	}
-
-	// WL-Proxy-Client-IP: Weblogic proxy header
-	if ipAddress == "" || len(ipAddress) == 0 || strings.EqualFold("unknown", ipAddress) {
-		ipAddress = c.Request.Header.Get("WL-Proxy-Client-IP")
-	}
-
-	// RemoteAddr: the remote host IP of the request (will be the proxy IP if behind a proxy)
-	if ipAddress == "" || len(ipAddress) == 0 || strings.EqualFold("unknown", ipAddress) {
-		ipAddress = c.Request.RemoteAddr
+	ipAddress = c.ClientIP()
+	if ipAddress == "" {
+		// ClientIP 解析不出合法 IP 时兜底(如单元测试里构造的非常规 RemoteAddr)
+		ipAddress = c.RemoteIP()
 	}
 
 	// If local IP is detected, fetch the LAN IP address
-	if strings.HasPrefix(ipAddress, "127.0.0.1") || strings.HasPrefix(ipAddress, "[::1]") {
+	if strings.HasPrefix(ipAddress, "127.0.0.1") || strings.HasPrefix(ipAddress, "[::1]") || ipAddress == "::1" {
 		ip, err := externalIP()
 		if err != nil {
-			slog.Error("GetIpAddress, externalIP, err: ", err)
+			slog.Error("GetIpAddress, externalIP", "err", err)
+			return ipAddress
 		}
 		ipAddress = ip.String()
-	}
-
-	if ipAddress != "" && len(ipAddress) > 15 {
-		if strings.Index(ipAddress, ",") > 0 {
-			ipAddress = ipAddress[:strings.Index(ipAddress, ",")]
-		}
 	}
 	return ipAddress
 }
 
 // Get IP source
 // https://github.com/lionsoul2014/ip2region
-var vIndex []byte // Cache VectorIndex index to reduce a fixed IO operation
+const xdbPath = "../assets/ip2region.xdb" // IP 数据库文件, 路径相对于 main.go
+
+var (
+	xdbOnce    sync.Once
+	xdbContent []byte
+	xdbErr     error
+)
+
+/*
+第一次用到时把整个 xdb(约 11MB) 读进内存并复用
+
+之前每次查询都要重新打开文件、构造 searcher, 而访客上报和登录都会走到这里。
+用内存缓存换掉这部分 IO, 代价是常驻内存多 11MB, 且只在真正查过 IP 后才占用。
+*/
+func loadXdbContent() ([]byte, error) {
+	xdbOnce.Do(func() {
+		xdbContent, xdbErr = xdb.LoadContentFromFile(xdbPath)
+		if xdbErr != nil {
+			slog.Error("加载 IP 数据库失败", "path", xdbPath, "err", xdbErr)
+		}
+	})
+	return xdbContent, xdbErr
+}
 
 // Get region info: China|0|Jiangsu Province|Suzhou City|Telecom
 func (*ipUtil) GetIpSource(ipAddress string) string {
-	var dbPath = "../assets/ip2region.xdb" // IP database file
-	// File-only query: read from file each time
-	// searcher, err := xdb.NewWithFileOnly(dbPath)
-
-	// Cache VectorIndex to reduce a fixed IO operation
-	if vIndex == nil {
-		var err error
-		vIndex, err = xdb.LoadVectorIndexFromFile(dbPath)
-		if err != nil {
-			slog.Error(fmt.Sprintf("failed to load vector index from `%s`: %s\n", dbPath, err))
-			return ""
-		}
-	}
-	searcher, err := xdb.NewWithVectorIndex(dbPath, vIndex)
-
+	content, err := loadXdbContent()
 	if err != nil {
-		slog.Error("failed to create searcher with vector index: ", err)
+		return ""
+	}
+
+	// searcher 只是包了一层 buffer, 构造过程没有 IO;
+	// 但它本身不是并发安全的, 所以不共享, 每次查询新建一个
+	searcher, err := xdb.NewWithBuffer(content)
+	if err != nil {
+		slog.Error("创建 IP 查询器失败", "err", err)
 		return ""
 	}
 	defer searcher.Close()
@@ -99,7 +92,7 @@ func (*ipUtil) GetIpSource(ipAddress string) string {
 	// Only China's data is mostly accurate to city; for other countries, often only to country; the rest are 0
 	region, err := searcher.SearchByStr(ipAddress)
 	if err != nil {
-		slog.Error(fmt.Sprintf("failed to search ip(%s): %s\n", ipAddress, err))
+		slog.Error("查询 IP 归属失败", "ip", ipAddress, "err", err)
 		return ""
 	}
 	return region
@@ -111,8 +104,8 @@ func (i *ipUtil) GetIpSourceSimpleIdle(ipAddress string) string {
 
 	// Detected as intranet, return "Intranet IP"
 	// Example: 0|0|0|Intranet IP|Intranet IP
-	if strings.Contains(region, "内网IP") {
-		return "内网IP"
+	if strings.Contains(region, "Intranet IP") {
+		return "Intranet IP"
 	}
 
 	// Often unable to get region

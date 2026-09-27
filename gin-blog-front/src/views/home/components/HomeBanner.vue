@@ -1,9 +1,10 @@
 <script setup>
-import { computed, onMounted, reactive } from 'vue'
+import EasyTyper from 'easy-typer-js'
 import { storeToRefs } from 'pinia'
 
-import EasyTyper from 'easy-typer-js'
+import { computed, onMounted, reactive } from 'vue'
 import { useAppStore } from '@/store'
+import { getOneSentence } from '@/utils'
 
 const { pageList, blogConfig } = storeToRefs(useAppStore())
 
@@ -11,7 +12,7 @@ const { pageList, blogConfig } = storeToRefs(useAppStore())
 const typer = reactive({
   output: '',
   isEnd: false, // 全局控制是否终止
-  speed: 300, // 打字速度
+  speed: 100, // 打字速度(每字毫秒), 300 一句话要打七八秒, 太慢
   singleBack: false, // 单次的回滚
   sleep: 0, // 完整输出一句话后, 睡眠一定时候后触发回滚事件
   type: 'normal', // rollback, normal
@@ -20,15 +21,14 @@ const typer = reactive({
 })
 
 onMounted(() => {
-  getOneSentence()
+  startTyper()
 })
 
-function getOneSentence() {
-  // 一言 + 打字机特效
-  fetch('https://v1.hitokoto.cn?c=i')
-    .then(res => res.json())
-    .then(data => new EasyTyper(typer, data.hitokoto, () => {}, () => {}))
-    .catch(() => new EasyTyper(typer, '宠辱不惊，看庭前花开花落；去留无意，望天上云卷云舒。', () => {}, () => {}))
+async function startTyper() {
+  // 一言 + 打字机特效, 接口不通时 getOneSentence 内部会随机取一句内置文案
+  const one = await getOneSentence()
+  // EasyTyper 靠构造函数直接开始打字, 返回实例只是为了不写成裸 new
+  return new EasyTyper(typer, one, () => {}, () => {})
 }
 
 function scrollDown() {
@@ -53,7 +53,8 @@ const coverStyle = computed(() => {
       <h1 class="animate-zoom-in text-4xl font-bold lg:text-5xl">
         {{ blogConfig.website_name }}
       </h1>
-      <div class="text-lg lg:text-xl">
+      <!-- min-h: 打字过程中句子从 1 行变 2 行时不要把下面的内容顶下去 -->
+      <div class="min-h-14 text-lg lg:text-xl">
         {{ typer.output }}
         <span class="animate-ping"> | </span>
       </div>

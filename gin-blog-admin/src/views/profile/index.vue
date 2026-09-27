@@ -1,17 +1,19 @@
 <script setup>
-import { onMounted, ref } from 'vue'
 import { NButton, NForm, NFormItem, NInput, NTabPane, NTabs } from 'naive-ui'
+import { onMounted, ref } from 'vue'
 
-import CommonPage from '@/components/common/CommonPage.vue'
-import UploadOne from '@/components//UploadOne.vue'
-import { useUserStore } from '@/store'
 import api from '@/api'
+import UploadOne from '@/components//UploadOne.vue'
+import CommonPage from '@/components/common/CommonPage.vue'
+import { useUserStore } from '@/store'
 
 const userStore = useUserStore()
 
 const infoFormRef = ref(null)
 const infoForm = ref({
-  avatar: userStore.avatar,
+  // 用原始 avatar 而不是 userStore.avatar 这个 getter:
+  // getter 跑过 convertImgUrl, 提交时会把展示用的地址(空头像时是占位图)写回库
+  avatar: userStore.userInfo.avatar,
   nickname: userStore.nickname,
   intro: userStore.intro,
   website: userStore.website,
@@ -20,19 +22,35 @@ const infoForm = ref({
 onMounted(async () => {
   await userStore.getUserInfo()
   infoForm.value = {
-    avatar: userStore.avatar,
+    avatar: userStore.userInfo.avatar,
     nickname: userStore.nickname,
     intro: userStore.intro,
     website: userStore.website,
   }
 })
 
+// 两个提交按钮都要带 loading 并在请求期间禁用:
+// 改密码接口慢时连点两次, 第二次会带着已经失效的旧密码请求
+const infoLoading = ref(false)
+const passwordLoading = ref(false)
+
 async function updateProfile() {
   infoFormRef.value?.validate(async (err) => {
-    if (!err) {
+    if (err) {
+      return
+    }
+    // 以前是裸 await: 更新失败会留下未捕获的 rejection
+    infoLoading.value = true
+    try {
       await api.updateCurrent(infoForm.value)
       $message.success('Update successful!')
-      userStore.getUserInfo()
+      await userStore.getUserInfo()
+    }
+    catch (err) {
+      console.error(err)
+    }
+    finally {
+      infoLoading.value = false
     }
   })
 }
@@ -56,9 +74,21 @@ const passwordForm = ref({
 
 function updatePassword() {
   passwordFormRef.value?.validate(async (err) => {
-    if (!err) {
+    if (err) {
+      return
+    }
+    passwordLoading.value = true
+    try {
       await api.updateCurrentPassword(passwordForm.value)
       $message.success('Password updated successfully!')
+      // 改成功后清空, 否则旧密码留在框里, 再点一次会用已经失效的旧密码请求
+      passwordForm.value = { old_password: '', new_password: '', confirm_password: '' }
+    }
+    catch (err) {
+      console.error(err)
+    }
+    finally {
+      passwordLoading.value = false
     }
   })
 }
@@ -144,7 +174,7 @@ function validatePasswordSame(rule, value) {
                 placeholder="Please enter website"
               />
             </NFormItem>
-            <NButton type="primary" @click="updateProfile">
+            <NButton type="primary" :loading="infoLoading" :disabled="infoLoading" @click="updateProfile">
               Update
             </NButton>
           </NForm>
@@ -186,7 +216,7 @@ function validatePasswordSame(rule, value) {
               placeholder="Please enter new password again"
             />
           </NFormItem>
-          <NButton type="primary" @click="updatePassword">
+          <NButton type="primary" :loading="passwordLoading" :disabled="passwordLoading" @click="updatePassword">
             Update
           </NButton>
         </NForm>

@@ -65,6 +65,9 @@ var (
 	ErrPassword     = RegisterResult(1002, "密码错误")
 	ErrUserNotExist = RegisterResult(1003, "该用户不存在")
 	ErrOldPassword  = RegisterResult(1010, "旧密码不正确")
+	// 登录失败统一返回这个, 不区分"用户不存在"和"密码错误", 否则靠错误码就能枚举用户名
+	ErrLoginFail   = RegisterResult(1004, "用户名或密码错误")
+	ErrLoginLocked = RegisterResult(1005, "登录失败次数过多, 请稍后再试")
 
 	ErrTokenNotExist    = RegisterResult(1201, "TOKEN 不存在，请重新登陆")
 	ErrTokenRuntime     = RegisterResult(1202, "TOKEN 已过期，请重新登陆")
@@ -74,9 +77,13 @@ var (
 	ErrPermission       = RegisterResult(1206, "权限不足")
 	ErrForceOffline     = RegisterResult(1207, "您已被强制下线")
 	ErrForceOfflineSelf = RegisterResult(1208, "不能强制下线自己")
+	ErrUserDisabled     = RegisterResult(1209, "该账号已被禁用")
 
 	ErrFileUpload  = RegisterResult(9100, "文件上传失败")
 	ErrFileReceive = RegisterResult(9101, "文件接收失败")
+	ErrFileType    = RegisterResult(9102, "只支持上传图片")
+	ErrFileSize    = RegisterResult(9103, "文件大小超出限制")
+	ErrImportType  = RegisterResult(9104, "只支持导入 Markdown 文件")
 
 	ErrTagHasArt  = RegisterResult(4003, "删除失败，标签下存在文章")
 	ErrCateHasArt = RegisterResult(3003, "删除失败，分类下存在文章")
@@ -88,8 +95,8 @@ var (
 	ErrMenuUsedByRole      = RegisterResult(6007, "该菜单正在被角色使用，无法删除")
 	ErrMenuHasChildren     = RegisterResult(6008, "该菜单下存在子菜单，无法删除")
 
-	ErrSendEmail = RegisterResult(6101, "发送邮件失败")
-	ErrCodeNoexit = RegisterResult(6102, "Code不存在 请重新注册")
+	ErrSendEmail      = RegisterResult(6101, "发送邮件失败")
+	ErrCodeNoexit     = RegisterResult(6102, "Code不存在 请重新注册")
 	ErrParseEmailCode = RegisterResult(6103, "解析邮件Code失败 请重试")
-	ErrUserExist = RegisterResult(6104, "该邮箱已经注册 请重新注册")
+	ErrUserExist      = RegisterResult(6104, "该邮箱已经注册 请重新注册")
 )

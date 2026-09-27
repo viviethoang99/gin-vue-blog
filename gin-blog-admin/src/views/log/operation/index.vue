@@ -1,18 +1,23 @@
 <script setup>
-import { h, onMounted, ref } from 'vue'
-import { NButton, NCode, NForm, NFormItem, NInput, NPopconfirm, NTag } from 'naive-ui'
 import { useClipboard } from '@vueuse/core'
+import hljs from 'highlight.js/lib/core'
+import json from 'highlight.js/lib/languages/json'
+import { NButton, NCode, NForm, NFormItem, NInput, NPopconfirm, NTag } from 'naive-ui'
+import { h, onMounted, ref } from 'vue'
 
+import api from '@/api'
 import CommonPage from '@/components/common/CommonPage.vue'
-import QueryItem from '@/components/crud/QueryItem.vue'
 import CrudModal from '@/components/crud/CrudModal.vue'
 import CrudTable from '@/components/crud/CrudTable.vue'
 
-import { formatDate } from '@/utils'
+import QueryItem from '@/components/crud/QueryItem.vue'
 import { useCRUD } from '@/composables'
-import api from '@/api'
+import { formatDate, formatJson } from '@/utils'
 
 defineOptions({ name: 'Operation Log' })
+
+// NCode 需要 highlight.js 实例, 只有本页用到, 所以不放在 App.vue 的 NConfigProvider 上
+hljs.registerLanguage('json', json)
 
 // Request method corresponds to different types of tags (computed property with parameters)
 function tagType(type) {
@@ -137,9 +142,10 @@ const columns = [
   },
 ]
 
+// copy 在 setup 里创建一次: 原来每次点击都新建一个 useClipboard 实例
+const { copy } = useClipboard()
 function copyFormatCode(code) {
-  const { copy } = useClipboard()
-  copy(JSON.stringify(JSON.parse(code), null, 2))
+  copy(formatJson(code))
   window.$message.success('Content copied to clipboard!')
 }
 </script>
@@ -178,12 +184,14 @@ function copyFormatCode(code) {
       </template>
     </CrudTable>
 
+    <!-- width 直接进 CrudModal 的 :style, 原来写的 "full" 不是合法 CSS 值,
+         会被浏览器丢弃并回落到默认 600px, 两段 JSON 挤在窄弹窗里 -->
     <CrudModal
       v-model:visible="modalVisible"
       title="Log Details"
       :show-footer="false"
       :loading="modalLoading"
-      width="full"
+      width="900px"
     >
       <NForm
         ref="modalFormRef"
@@ -211,6 +219,7 @@ function copyFormatCode(code) {
             :code="modalForm.opt_method"
             code-wrap
             language="json"
+            :hljs="hljs"
           />
         </NFormItem>
         <NFormItem label="Operator: " path="nickname">
@@ -219,16 +228,18 @@ function copyFormatCode(code) {
         <NFormItem label="Request Parameters: " path="request_param">
           <NCode
             class="word-wrap cursor-pointer p-7"
-            :code="JSON.stringify(JSON.parse(modalForm.request_param), null, 2)"
+            :code="formatJson(modalForm.request_param)"
             language="json"
+            :hljs="hljs"
             @click="copyFormatCode(modalForm.request_param)"
           />
         </NFormItem>
         <NFormItem label="Response Data: " path="response_data">
           <NCode
             class="cursor-pointer p-7"
-            :code="JSON.stringify(JSON.parse(modalForm.response_data), null, 2)"
+            :code="formatJson(modalForm.response_data)"
             language="json"
+            :hljs="hljs"
             @click="copyFormatCode(modalForm.response_data)"
           />
         </NFormItem>

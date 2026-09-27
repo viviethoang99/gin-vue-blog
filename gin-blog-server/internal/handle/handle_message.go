@@ -24,13 +24,13 @@ type Message struct{}
 
 // @Summary Delete messages (batch)
 // @Description Delete messages by ID array
-// @Tags Category
-// @Param ids body []int true "Message ID array"
+// @Tags Message
 // @Accept json
 // @Produce json
-// @Success 0 {object} Response[int]
+// @Param ids body []int true "Message ID array"
+// @Success 0 {object} Response[int64]
 // @Security ApiKeyAuth
-// @Router /category [delete]
+// @Router /message [delete]
 func (*Message) Delete(c *gin.Context) {
 	var ids []int
 	if err := c.ShouldBindJSON(&ids); err != nil {
@@ -50,10 +50,10 @@ func (*Message) Delete(c *gin.Context) {
 // @Summary Update message review (batch)
 // @Description Update review status by ID array
 // @Tags Message
-// @Param form body UpdateReviewReq true "Update review status"
 // @Accept json
 // @Produce json
-// @Success 0 {object} Response[int]
+// @Param form body UpdateReviewReq true "Update review status"
+// @Success 0 {object} Response[int64]
 // @Security ApiKeyAuth
 // @Router /message/review [put]
 func (*Message) UpdateReview(c *gin.Context) {
@@ -73,14 +73,13 @@ func (*Message) UpdateReview(c *gin.Context) {
 }
 
 // @Summary Query message list
-// @Description Get message list by conditions
+// @Description 支持按昵称与审核状态过滤
 // @Tags Message
-// @Param nickname query string false "Nickname"
-// @Param is_review query int false "Review status"
-// @Param page_size query int false "Current page"
-// @Param page_num query int false "Page size"
-// @Accept json
 // @Produce json
+// @Param nickname query string false "Nickname"
+// @Param is_review query bool false "Review status"
+// @Param page_num query int false "页码"
+// @Param page_size query int false "每页数量"
 // @Success 0 {object} Response[PageResult[model.Message]]
 // @Security ApiKeyAuth
 // @Router /message/list [get]

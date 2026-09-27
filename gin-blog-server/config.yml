@@ -1,9 +1,13 @@
 Server:
   Mode: debug # debug | release
   Port: :8765
-  DbType: "mysql" # mysql | sqlite
+  DbType: "sqlite" # mysql | sqlite
   DbAutoMigrate: true # Auto-migrate DB schema (skip if unchanged to speed startup)
   DbLogMode: "error" # Log level: silent | error | warn | info (default info)
+  # 只有来自这些网段的请求才采信 X-Real-IP / X-Forwarded-For, 留空默认只信任内网
+  trusted-proxies: []
+  # 允许跨域的前端来源, 如 ["https://blog.example.com"], 留空只放行本机与内网
+  allowed-origins: []
 JWT:
   Secret: "abc123321"
   Expire: 24 # hour
@@ -25,6 +29,7 @@ Session:
   Name: "mysession"
   Salt: "salt"
   MaxAge: 600 # second
+  Secure: false # 部署在 https 之后时置 true, session cookie 只走加密连接
 Log:
   Level: "debug" # debug | info | warn | error
   Format: "text" # text | json
@@ -36,8 +41,10 @@ Email:
   SmtpPass: "" # SMTP auth code/token (not the mailbox login password)
   SmtpUser: "" # SMTP user / sender nickname
 Captcha:
-  SendEmail: true # Send verification code by email
-  ExpireTime: 15  # Expiration time (minutes)
+  # false: 注册直接创建用户, 不发邮件, 也不需要配上面的 Email 段
+  # true: 注册只发验证邮件, 用户点击链接后才真正创建, 必须先把 Email 段配全
+  SendEmail: false
+  ExpireTime: 15  # 验证链接过期时间 (分钟)
 Upload:
   OssType: "local" # local | qiniu
   Path: "public/uploaded"      # Public URL path (effective when OssType="local")
@@ -50,8 +57,3 @@ Qiniu:
   SecretKey: ""
   UseHttps: false
   UseCdnDomains: false
-Aws:
-  AccessKey: ""
-  SecretKey: ""
-  Bucket: ""
-  Region: ""

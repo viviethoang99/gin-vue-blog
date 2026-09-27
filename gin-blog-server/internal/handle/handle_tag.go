@@ -14,15 +14,14 @@ type AddOrEditTagReq struct {
 	Name string `json:"name" binding:"required"`
 }
 
-// @Summary Get tag list
-// @Description Get tag list by conditions
+// @Summary 条件查询标签列表
+// @Description 标签列表, 附带每个标签下的文章数
 // @Tags Tag
-// @Param page_size query int false "Current page"
-// @Param page_num query int false "Page size"
-// @Param keyword query string false "Keyword"
-// @Accept json
 // @Produce json
-// @Success 0 {object} Response[PageResult[model.TagVO]] "Success"
+// @Param keyword query string false "关键字"
+// @Param page_num query int false "页码"
+// @Param page_size query int false "每页数量"
+// @Success 0 {object} Response[PageResult[model.TagVO]]
 // @Security ApiKeyAuth
 // @Router /tag/list [get]
 func (*Tag) GetList(c *gin.Context) {
@@ -46,12 +45,13 @@ func (*Tag) GetList(c *gin.Context) {
 	})
 }
 
-// @Summary Add or edit tag
-// @Description Add or edit tag
+// @Summary 新增或编辑标签
+// @Description 标签名称不能重复
 // @Tags Tag
-// @Param form body AddOrEditTagReq true "Add or edit tag"
 // @Accept json
 // @Produce json
+// @Param form body AddOrEditTagReq true "新增或编辑标签"
+// @Success 0 {object} Response[model.Tag]
 // @Security ApiKeyAuth
 // @Router /tag [post]
 func (*Tag) SaveOrUpdate(c *gin.Context) {
@@ -70,13 +70,14 @@ func (*Tag) SaveOrUpdate(c *gin.Context) {
 	ReturnSuccess(c, tag)
 }
 
+// TODO: 删除行为, 添加强制删除: 有关联数据则将删除关联数据
 // TODO: Delete behavior: add force delete to remove related data if exists
-// @Summary Delete tags (batch)
-// @Description Delete tags by ID array
+// @Description 标签下存在文章时不允许删除
 // @Tags Tag
-// @Param ids body []int true "Tag ID array"
 // @Accept json
 // @Produce json
+// @Tags Tag
+// @Success 0 {object} Response[int64]
 // @Security ApiKeyAuth
 // @Router /tag [delete]
 func (*Tag) Delete(c *gin.Context) {
@@ -108,14 +109,13 @@ func (*Tag) Delete(c *gin.Context) {
 	ReturnSuccess(c, result.RowsAffected)
 }
 
-// @Summary Get tag options
-// @Description Get tag options list
+// @Summary 获取标签选项
+// @Description 用于文章选择标签
 // @Tags Tag
-// @Accept json
 // @Produce json
+// @Success 0 {object} Response[[]model.OptionVO]
 // @Security ApiKeyAuth
 // @Router /tag/option [get]
-// @Success 0 {object} Response[model.OptionVO]
 func (*Tag) GetOption(c *gin.Context) {
 	list, err := model.GetTagOption(GetDB(c))
 	if err != nil {

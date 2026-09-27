@@ -19,6 +19,10 @@ const props = defineProps({
   closeable: { type: Boolean, default: false },
 })
 
+// 自增 id: 用 Date.now() 时同一毫秒内的两条提示 id 相同,
+// remove 按 id 过滤会一起删掉, TransitionGroup 的 key 也会重复
+let seq = 0
+
 const flux = reactive({
   /** @type { Array<{ show, id, content, type }> } */
   events: [],
@@ -36,7 +40,7 @@ const flux = reactive({
       flux.events = []
 
     setTimeout(() => {
-      const event = { id: Date.now(), content, type }
+      const event = { id: ++seq, content, type }
       flux.events.push(event)
       setTimeout(() => flux.remove(event), props.timeout)
     }, 100)
@@ -92,7 +96,7 @@ defineExpose({
           }"
         >
           <slot :type="event.type" :content="event.content">
-            <div class="pointer-events-auto w-full overflow-hidden rounded-lg bg-white ring-1 ring-black ring-opacity-5">
+            <div class="pointer-events-auto w-full overflow-hidden rounded-lg bg-surface ring-1 ring-black ring-opacity-5">
               <div class="flex justify-between px-4 py-3">
                 <div class="flex items-center">
                   <div
@@ -112,7 +116,7 @@ defineExpose({
                 </div>
                 <button
                   v-if="closeable"
-                  class="i-mdi:close h-5 w-5 flex items-center justify-center rounded-full rounded-full p-1 font-bold text-gray-400 hover:text-gray-600"
+                  class="i-mdi:close h-5 w-5 flex items-center justify-center rounded-full rounded-full p-1 text-muted font-bold hover:text-main"
                   @click="flux.remove(event)"
                 />
               </div>

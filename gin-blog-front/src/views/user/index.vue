@@ -2,11 +2,11 @@
 import { onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 
-import UploadOne from './UploadOne.vue'
+import api from '@/api'
 import BannerPage from '@/components/BannerPage.vue'
 
 import { useUserStore } from '@/store'
-import api from '@/api'
+import UploadOne from './UploadOne.vue'
 
 const userStore = useUserStore()
 const router = useRouter()
@@ -23,7 +23,17 @@ onMounted(async () => {
   await userStore.getUserInfo()
   if (!userStore.userId) {
     router.push('/')
+    return
   }
+  // form 是在 setup 阶段拷的一次性快照, getUserInfo 返回后必须重新同步,
+  // 否则页面显示默认头像和空表单, 只改昵称提交还会把头像/简介/网站清空
+  Object.assign(form, {
+    avatar: userStore.avatar,
+    nickname: userStore.nickname,
+    intro: userStore.intro,
+    website: userStore.website,
+    email: userStore.email,
+  })
 })
 
 async function updateUserInfo() {
@@ -62,7 +72,7 @@ async function updateUserInfo() {
             </div>
             <input
               v-model="form[item.key]" required :placeholder="`Please enter ${item.label}`"
-              class="block w-full border-0 rounded-md p-2 text-gray-900 shadow-sm outline-none ring-1 ring-gray-300 ring-inset placeholder:text-gray-400 focus:ring-2 focus:ring-emerald"
+              class="block w-full border-0 rounded-md p-2 text-main shadow-sm outline-none ring-1 ring-line ring-inset placeholder:text-muted focus:ring-2 focus:ring-emerald"
             >
           </div>
         </div>

@@ -21,12 +21,18 @@ func MakeMigrate(db *gorm.DB) error {
 		&Category{},     // Category
 		&Tag{},          // Tag
 		&Comment{},      // Comment
+		&Talk{},         // 说说
 		&Message{},      // Message
 		&FriendLink{},   // Friend Link
 		&Page{},         // Page
 		&Config{},       // Site Config
 		&OperationLog{}, // Operation Log
+		&LoginLog{},     // 登录日志
+		&ErrorLog{},     // 前端错误日志
+		&Notification{}, // 站内通知
 		&UserInfo{},     // User Info
+
+		&CounterSnapshot{}, // Redis 计数的落库备份
 
 		&UserAuth{},     // User Auth
 		&Role{},         // Role
@@ -53,9 +59,17 @@ type OptionVO struct {
 
 // Gorm Scopes
 
+// PageSizeAll 表示不分页, 一次取全部。
+// 前台的标签/分类/友链/留言列表就是全量返回, 以前传 size=1000 会被下面的 100 上限截断,
+// 超出的数据在前台直接消失。只允许服务端代码使用这个值, 不要让它从请求参数进来。
+const PageSizeAll = -1
+
 // Pagination scope
 func Paginate(page, size int) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
+		if size == PageSizeAll {
+			return db
+		}
 		if page <= 0 {
 			page = 1
 		}

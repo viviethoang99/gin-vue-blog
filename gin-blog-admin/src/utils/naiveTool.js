@@ -1,7 +1,7 @@
-import { computed } from 'vue'
 import * as NaiveUI from 'naive-ui'
-import { useThemeStore } from '@/store'
+import { computed } from 'vue'
 import themes from '@/assets/themes'
+import { useThemeStore } from '@/store'
 
 function setupMessage(NMessage) {
   class Message {
@@ -107,7 +107,9 @@ export function setupNaiveDiscreteApi() {
   const themeStore = useThemeStore()
   const configProviderProps = computed(() => ({
     theme: themeStore.darkMode ? NaiveUI.darkTheme : undefined,
-    themeOverrides: themes.naiveThemeOverrides(themeStore.darkMode),
+    // themes.js 导出的键名是 naiveThemeOverrides(App.vue 用的就是这个),
+    // 原来写 themes.themeOverrides 取到 undefined, 离散 API 全部回落到 naive 默认绿
+    themeOverrides: themes.naiveThemeOverrides,
   }))
   const { message, dialog, notification, loadingBar } = NaiveUI.createDiscreteApi(
     ['message', 'dialog', 'notification', 'loadingBar'],
@@ -127,4 +129,26 @@ export function setupNaiveUnocss() {
   const meta = document.createElement('meta')
   meta.name = 'naive-ui-style'
   document.head.appendChild(meta)
+}
+
+/**
+ * 把 naiveThemeOverrides.common 里的色值写成 :root 上的 CSS 变量
+ *
+ * uno.config.js 声明了 primary / info / success / warning / error 五组语义色, 都指向
+ * CSS 变量, 但除 --primary-color 外没人给这些变量赋值 —— 实测 --info-color、
+ * --success-color、--warning-color 全是空的, 于是 text-info、bg-success 这类类名
+ * 静默失效(颜色回落到继承值, 看起来就是"没生效"), 20 个 token 里 19 个是死的。
+ *
+ * 命名对齐 uno.config.js: primaryColorHover -> --primary-color-hover;
+ * naive 没有 Active 这一档, 用它的 Suppl 顶上。
+ */
+export function setupThemeVars(el = document.documentElement) {
+  const common = themes.naiveThemeOverrides?.common ?? {}
+  for (const [key, value] of Object.entries(common)) {
+    const name = key
+      .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+      .toLowerCase()
+      .replace(/-suppl$/, '-active')
+    el.style.setProperty(`--${name}`, value)
+  }
 }

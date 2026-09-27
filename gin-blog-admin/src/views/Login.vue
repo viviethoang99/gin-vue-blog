@@ -1,15 +1,15 @@
 <script setup>
-import { reactive, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
 import { useStorage } from '@vueuse/core'
 import { NButton, NCheckbox, NInput } from 'naive-ui'
+import { reactive, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+
+import api from '@/api'
 
 import AppPage from '@/components/common/AppPage.vue'
-
 import { addDynamicRoutes } from '@/router'
-import { getLocal, removeLocal, setLocal } from '@/utils'
 import { useAuthStore, useUserStore } from '@/store'
-import api from '@/api'
+import { getLocal, removeLocal, setLocal } from '@/utils'
 
 const title = import.meta.env.VITE_TITLE // Read from environment variables
 
@@ -19,9 +19,17 @@ const authStore = useAuthStore()
 const router = useRouter()
 const { query } = useRoute()
 
+/*
+  Mock 模式(GitHub Pages 演示站)预填演示账号, 真实部署留空
+
+  演示站没有后端, 随便什么账号都能登进去, 预填是为了让访客少输两下;
+  但连了真后端时预填账号/密码等于把凭据写在页面上, 所以只在 mock 下给。
+*/
+const isMock = import.meta.env.VITE_USE_MOCK === 'true'
+
 const loginForm = reactive({
-  username: 'guest',
-  password: '123456',
+  username: isMock ? 'guest' : '',
+  password: isMock ? '123456' : '',
 })
 
 initLoginInfo()
@@ -57,7 +65,9 @@ async function handleLogin() {
       await userStore.getUserInfo()
       await addDynamicRoutes()
 
-      isRemember ? setLocal('loginInfo', { username, password }) : removeLocal('loginInfo')
+      // isRemember 是 useStorage 返回的 Ref, 必须取 .value:
+      // 直接判断 Ref 恒为真, 取消勾选也会把账号密码存进 localStorage
+      isRemember.value ? setLocal('loginInfo', { username, password }) : removeLocal('loginInfo')
       $message.success('Login successful')
 
       // Page navigation: Navigate based on redirect in URL
@@ -75,7 +85,8 @@ async function handleLogin() {
     }
   }
 
-  doLogin(username, password)
+  // doLogin 里只有 try/finally, 失败时的 rejection 需要在这里兜住
+  doLogin(username, password).catch(err => console.error(err))
 
   // Check if verification code is needed
   // if (JSON.parse(import.meta.env.VITE_USE_CAPTCHA)) {
@@ -92,7 +103,7 @@ async function handleLogin() {
 <template>
   <!-- FIXME: Using style="background-image: url(/image/login_bg.webp);" doesn't work; set it in a CSS class instead -->
   <AppPage class="backgroundImg bg-cover">
-    <div style="transform: translateY(25px)" class="m-auto max-w-[700px] min-w-[345px] flex items-center justify-center rounded-2 bg-white bg-opacity-60 p-4 shadow dark:bg-dark dark:bg-opacity-80">
+    <div style="transform: translateY(25px)" class="m-auto max-w-[700px] min-w-[345px] flex items-center justify-center rounded-2 bg-white bg-opacity-60 p-4 shadow">
       <div class="hidden w-[380px] px-5 py-9 md:block">
         <img src="/image/login_banner.webp" class="w-full" alt="login_banner">
       </div>
@@ -106,7 +117,7 @@ async function handleLogin() {
           v-model:value="loginForm.username"
           class="h-[50px] items-center pl-2"
           autofocus
-          placeholder="test@qq.com"
+          placeholder="用户名"
           :maxlength="20"
         />
         <NInput
@@ -114,7 +125,7 @@ async function handleLogin() {
           class="h-[50px] items-center pl-2"
           type="password"
           show-password-on="mousedown"
-          placeholder="11111"
+          placeholder="密码"
           :maxlength="20"
           @keydown.enter="handleLogin"
         />

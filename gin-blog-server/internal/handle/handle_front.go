@@ -4,15 +4,38 @@ import (
 	g "gin-blog/internal/global"
 	"gin-blog/internal/model"
 	"gin-blog/internal/utils"
+	"html/template"
+	"log/slog"
 	"strconv"
 	"strings"
 	"time"
-	"html/template"
 
 	"github.com/gin-gonic/gin"
 )
 
 type Front struct{}
+
+// 同一访客对同一篇文章的浏览量计数间隔
+const articleViewInterval = time.Hour
+
+// 搜索最多返回多少条
+const searchResultLimit = 20
+
+/*
+把命中的关键字包上高亮标签
+
+前台是用 v-html 渲染搜索结果的, 而 keyword 直接来自 query string,
+所以必须先整体转义再插标签, 否则搜一段 <img onerror=...> 就会在浏览器里执行。
+*/
+func highlightKeyword(text, keyword string) string {
+	escaped := template.HTMLEscapeString(text)
+	escapedKeyword := template.HTMLEscapeString(keyword)
+	if escapedKeyword == "" {
+		return escaped
+	}
+	return strings.ReplaceAll(escaped, escapedKeyword,
+		"<span style='color:#f47466'>"+escapedKeyword+"</span>")
+}
 
 type FAddMessageReq struct {
 	Nickname string `json:"nickname" binding:"required"`
@@ -21,12 +44,13 @@ type FAddMessageReq struct {
 	Speed    int    `json:"speed"`
 }
 
+// 注意校验用 binding 而不是 validate: 本项目没有注册自定义 validator, Gin 只认 binding tag
 type FAddCommentReq struct {
 	ReplyUserId int    `json:"reply_user_id" form:"reply_user_id"`
 	TopicId     int    `json:"topic_id" form:"topic_id"`
-	Content     string `json:"content" form:"content"`
+	Content     string `json:"content" form:"content" binding:"required"`
 	ParentId    int    `json:"parent_id" form:"parent_id"`
-	Type        int    `json:"type" form:"type" validate:"required,min=1,max=3" label:"Comment Type"`
+	Type        int    `json:"type" form:"type" binding:"required,min=1,max=3"`
 }
 
 type FCommentQuery struct {
@@ -56,7 +80,12 @@ type ArticleSearchVO struct {
 	Content string `json:"content"`
 }
 
-// Front page info
+// @Summary 前台首页信息
+// @Description 文章数, 分类数, 标签数, 公告与访问量
+// @Tags Front
+// @Produce json
+// @Success 0 {object} Response[model.FrontHomeVO]
+// @Router /front/home [get]
 func (*Front) GetHomeInfo(c *gin.Context) {
 	db := GetDB(c)
 	rdb := GetRDB(c)
@@ -71,9 +100,14 @@ func (*Front) GetHomeInfo(c *gin.Context) {
 	ReturnSuccess(c, data)
 }
 
-// Get tag list
+// @Summary 前台标签列表
+// @Description 获取全部标签
+// @Tags Front
+// @Produce json
+// @Success 0 {object} Response[[]model.TagVO]
+// @Router /front/tag/list [get]
 func (*Front) GetTagList(c *gin.Context) {
-	list, _, err := model.GetTagList(GetDB(c), 1, 1000, "")
+	list, _, err := model.GetTagList(GetDB(c), 1, model.PageSizeAll, "")
 	if err != nil {
 		ReturnError(c, g.ErrDbOp, err)
 		return
@@ -81,9 +115,14 @@ func (*Front) GetTagList(c *gin.Context) {
 	ReturnSuccess(c, list)
 }
 
-// Get category list
+// @Summary 前台分类列表
+// @Description 获取全部分类
+// @Tags Front
+// @Produce json
+// @Success 0 {object} Response[[]model.CategoryVO]
+// @Router /front/category/list [get]
 func (*Front) GetCategoryList(c *gin.Context) {
-	list, _, err := model.GetCategoryList(GetDB(c), 1, 1000, "")
+	list, _, err := model.GetCategoryList(GetDB(c), 1, model.PageSizeAll, "")
 	if err != nil {
 		ReturnError(c, g.ErrDbOp, err)
 		return
@@ -91,10 +130,15 @@ func (*Front) GetCategoryList(c *gin.Context) {
 	ReturnSuccess(c, list)
 }
 
-// Get message list
+// @Summary 前台留言列表
+// @Description 只返回审核通过的留言
+// @Tags Front
+// @Produce json
+// @Success 0 {object} Response[[]model.Message]
+// @Router /front/message/list [get]
 func (*Front) GetMessageList(c *gin.Context) {
 	isReview := true
-	list, _, err := model.GetMessageList(GetDB(c), 1, 1000, "", &isReview)
+	list, _, err := model.GetMessageList(GetDB(c), 1, model.PageSizeAll, "", &isReview)
 	if err != nil {
 		ReturnError(c, g.ErrDbOp, err)
 		return
@@ -102,23 +146,87 @@ func (*Front) GetMessageList(c *gin.Context) {
 	ReturnSuccess(c, list)
 }
 
-// Get friend link list
+// @Summary 前台友链列表
+// @Description 获取全部友链
+// @Tags Front
+// @Produce json
+// @Success 0 {object} Response[[]model.FriendLink]
+// @Router /front/link/list [get]
 func (*Front) GetLinkList(c *gin.Context) {
-	list, _, err := model.GetLinkList(GetDB(c), 1, 1000, "")
+	list, _, err := model.GetLinkList(GetDB(c), 1, model.PageSizeAll, "")
 	if err != nil {
 		ReturnError(c, g.ErrDbOp, err)
 		return
 	}
 
 	ReturnSuccess(c, list)
+}
+
+// @Summary 前台说说列表
+// @Description 只返回公开的说说, 置顶排前面, 带评论数
+// @Tags Front
+// @Produce json
+// @Param page_num query int false "页码"
+// @Param page_size query int false "每页数量"
+// @Success 0 {object} Response[PageResult[model.TalkVO]]
+// @Router /front/talk/list [get]
+func (*Front) GetTalkList(c *gin.Context) {
+	var query PageQuery
+	if err := c.ShouldBindQuery(&query); err != nil {
+		ReturnError(c, g.ErrRequest, err)
+		return
+	}
+
+	list, total, err := model.GetBlogTalkList(GetDB(c), query.Page, query.Size)
+	if err != nil {
+		ReturnError(c, g.ErrDbOp, err)
+		return
+	}
+
+	ReturnSuccess(c, PageResult[model.TalkVO]{
+		Total: total,
+		List:  list,
+		Size:  query.Size,
+		Page:  query.Page,
+	})
+}
+
+// @Summary 前台说说详情
+// @Description 私密说说当作不存在
+// @Tags Front
+// @Produce json
+// @Param id path int true "说说 ID"
+// @Success 0 {object} Response[model.TalkVO]
+// @Router /front/talk/{id} [get]
+func (*Front) GetTalk(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		ReturnError(c, g.ErrRequest, err)
+		return
+	}
+
+	talk, err := model.GetBlogTalk(GetDB(c), id)
+	if err != nil {
+		ReturnError(c, g.ErrDbOp, err)
+		return
+	}
+
+	ReturnSuccess(c, talk)
 }
 
 /*
 // The following APIs require login
 */
-
 // TODO: Add avatar/nickname for messages (allow anonymous messages)
-// Save message (add only, no edit)
+// @Summary 新增留言
+// @Description 新增留言, 需要登录, 是否需要审核取决于博客配置
+// @Tags Front
+// @Accept json
+// @Produce json
+// @Param form body FAddMessageReq true "新增留言"
+// @Success 0 {object} Response[model.Message]
+// @Security ApiKeyAuth
+// @Router /front/message [post]
 func (*Front) SaveMessage(c *gin.Context) {
 	var req FAddMessageReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -127,12 +235,16 @@ func (*Front) SaveMessage(c *gin.Context) {
 	}
 
 	req.Content = template.HTMLEscapeString(req.Content)
-	auth, _ := CurrentUserAuth(c)
+	auth, ok := MustCurrentUserAuth(c)
+	if !ok {
+		return
+	}
 	db := GetDB(c)
 
 	ipAddress := utils.IP.GetIpAddress(c)
 	ipSource := utils.IP.GetIpSource(ipAddress)
-	isReview := model.GetConfigBool(db, g.CONFIG_IS_COMMENT_REVIEW)
+	// 留言要读留言自己的审核开关, 之前读的是评论的开关, 后台设置里的 is_message_review 根本没人用
+	isReview := model.GetConfigBool(db, g.CONFIG_IS_MESSAGE_REVIEW)
 
 	info := auth.UserInfo
 	message, err := model.SaveMessage(db, info.Nickname, info.Nickname, req.Content, ipAddress, ipSource, req.Speed, isReview)
@@ -148,6 +260,15 @@ func (*Front) SaveMessage(c *gin.Context) {
 // TODO: Add avatar/nickname for comments (allow anonymous comments)
 // TODO: Enable email notifications for users
 // TODO: HTMLUtil.Filter to sanitize strings in HTML elements...
+// @Summary 新增评论
+// @Description 新增评论或回复评论, 需要登录
+// @Tags Front
+// @Accept json
+// @Produce json
+// @Param form body FAddCommentReq true "新增评论"
+// @Success 0 {object} Response[model.Comment]
+// @Security ApiKeyAuth
+// @Router /front/comment [post]
 func (*Front) SaveComment(c *gin.Context) {
 	var req FAddCommentReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -157,8 +278,20 @@ func (*Front) SaveComment(c *gin.Context) {
 
 	// Filter comment content to prevent XSS
 	req.Content = template.HTMLEscapeString(req.Content)
-	auth, _ := CurrentUserAuth(c)
+	auth, ok := MustCurrentUserAuth(c)
+	if !ok {
+		return
+	}
 	db := GetDB(c)
+	/*
+		这个开关的语义是「免审核」, 不是「要审核」:
+		  true  → 新评论直接 IsReview = true, 前台立刻可见
+		  false → IsReview = false, 要在后台点「通过」才可见(那一刻才补发站内通知)
+
+		key 叫 is_comment_review, 读起来像「需要审核」, 但后台设置页的选项(true 对应
+		「关闭审核」)和前台查询(WHERE is_review = true 才展示)都按上面这套走, 整条链是自洽的。
+		别看着名字就把它取反 —— 那会把所有新评论藏起来。
+	*/
 	isReview := model.GetConfigBool(db, g.CONFIG_IS_COMMENT_REVIEW)
 
 	var comment *model.Comment
@@ -175,10 +308,25 @@ func (*Front) SaveComment(c *gin.Context) {
 		return
 	}
 
+	// 站内通知: 写失败不影响发评论本身, 只记日志
+	// (邮件通知默认关闭, 这是「别人回复了你」唯一的出口)
+	if err := model.NotifyOnComment(db, comment); err != nil {
+		slog.Warn("写站内通知失败", "err", err, "comment_id", comment.ID)
+	}
+
 	ReturnSuccess(c, comment)
 }
 
-// Get comment list
+// @Summary 前台评论列表
+// @Description 顶级评论列表, 每条最多带 3 条回复
+// @Tags Front
+// @Produce json
+// @Param topic_id query int false "主题 ID(文章/说说)"
+// @Param type query int false "评论类型(1-文章 2-友链 3-说说)"
+// @Param page_num query int false "页码"
+// @Param page_size query int false "每页数量"
+// @Success 0 {object} Response[PageResult[model.CommentVO]]
+// @Router /front/comment/list [get]
 func (*Front) GetCommentList(c *gin.Context) {
 	var query FCommentQuery
 	if err := c.ShouldBindQuery(&query); err != nil {
@@ -195,12 +343,24 @@ func (*Front) GetCommentList(c *gin.Context) {
 		return
 	}
 
-	likeCountMap := rdb.HGetAll(rctx, g.COMMENT_LIKE_COUNT).Val()
-	for i, comment := range data {
+	// 顶层评论和它们的回复一起取点赞数: 以前只取了顶层的,
+	// 回复的 like_count 恒为 0, 展开更多之后又会变成真实值
+	ids := make([]int, 0, len(data))
+	for i := range data {
 		if len(data[i].ReplyList) > 3 {
 			data[i].ReplyList = data[i].ReplyList[:3] // show only 3 replies
 		}
-		data[i].LikeCount, _ = strconv.Atoi(likeCountMap[strconv.Itoa(comment.ID)])
+		ids = append(ids, data[i].ID)
+		for _, reply := range data[i].ReplyList {
+			ids = append(ids, reply.ID)
+		}
+	}
+	likeCountMap := hashCounts(rdb, g.COMMENT_LIKE_COUNT, ids)
+	for i := range data {
+		data[i].LikeCount = likeCountMap[data[i].ID]
+		for j := range data[i].ReplyList {
+			data[i].ReplyList[j].LikeCount = likeCountMap[data[i].ReplyList[j].ID]
+		}
 	}
 
 	ReturnSuccess(c, PageResult[model.CommentVO]{
@@ -211,7 +371,15 @@ func (*Front) GetCommentList(c *gin.Context) {
 	})
 }
 
-// Get reply list by comment id
+// @Summary 获取评论的回复列表
+// @Description 根据评论 ID 分页查询其回复
+// @Tags Front
+// @Produce json
+// @Param comment_id path int true "评论 ID"
+// @Param page_num query int false "页码"
+// @Param page_size query int false "每页数量"
+// @Success 0 {object} Response[[]model.CommentVO]
+// @Router /front/comment/replies/{comment_id} [get]
 func (*Front) GetReplyListByCommentId(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("comment_id"))
 	if err != nil {
@@ -234,21 +402,31 @@ func (*Front) GetReplyListByCommentId(c *gin.Context) {
 		return
 	}
 
-	likeCountMap := rdb.HGetAll(rctx, g.COMMENT_LIKE_COUNT).Val()
-
-	data := make([]model.CommentVO, 0)
+	ids := make([]int, 0, len(replyList))
 	for _, reply := range replyList {
-		like, _ := strconv.Atoi(likeCountMap[strconv.Itoa(reply.ID)])
+		ids = append(ids, reply.ID)
+	}
+	likeCountMap := hashCounts(rdb, g.COMMENT_LIKE_COUNT, ids)
+
+	data := make([]model.CommentVO, 0, len(replyList))
+	for _, reply := range replyList {
 		data = append(data, model.CommentVO{
 			Comment:   reply,
-			LikeCount: like,
+			LikeCount: likeCountMap[reply.ID],
 		})
 	}
 
 	ReturnSuccess(c, data)
 }
 
-// Like a comment
+// @Summary 点赞评论
+// @Description 点赞/取消点赞评论, 需要登录
+// @Tags Front
+// @Produce json
+// @Param comment_id path int true "评论 ID"
+// @Success 0 {object} Response[any]
+// @Security ApiKeyAuth
+// @Router /front/comment/like/{comment_id} [get]
 func (*Front) LikeComment(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("comment_id"))
 	if err != nil {
@@ -257,7 +435,10 @@ func (*Front) LikeComment(c *gin.Context) {
 	}
 
 	rdb := GetRDB(c)
-	auth, _ := CurrentUserAuth(c)
+	auth, ok := MustCurrentUserAuth(c)
+	if !ok {
+		return
+	}
 
 	// Record that a user liked a specific comment
 	commentLikeUserKey := g.COMMENT_USER_LIKE_SET + strconv.Itoa(auth.ID)
@@ -277,7 +458,16 @@ func (*Front) LikeComment(c *gin.Context) {
 // Article related APIs
 */
 
-// Get article list
+// @Summary 前台文章列表
+// @Description 只返回公开且不在回收站的文章
+// @Tags Front
+// @Produce json
+// @Param category_id query int false "分类 ID"
+// @Param tag_id query int false "标签 ID"
+// @Param page_num query int false "页码"
+// @Param page_size query int false "每页数量"
+// @Success 0 {object} Response[PageResult[model.Article]]
+// @Router /front/article/list [get]
 func (*Front) GetArticleList(c *gin.Context) {
 	var query FArticleQuery
 	if err := c.ShouldBindQuery(&query); err != nil {
@@ -285,16 +475,29 @@ func (*Front) GetArticleList(c *gin.Context) {
 		return
 	}
 
-	list, _, err := model.GetBlogArticleList(GetDB(c), query.Page, query.Size, query.CategoryId, query.TagId)
+	list, total, err := model.GetBlogArticleList(GetDB(c), query.Page, query.Size, query.CategoryId, query.TagId)
 	if err != nil {
 		ReturnError(c, g.ErrDbOp, err)
 		return
 	}
 
-	ReturnSuccess(c, list)
+	// 以前把 total 丢掉只返回当页数据, 前台拿不到总数也就做不了分页,
+	// 分类/标签下超过一页的文章等于没有入口能看到
+	ReturnSuccess(c, PageResult[model.Article]{
+		Page:  query.Page,
+		Size:  query.Size,
+		Total: total,
+		List:  list,
+	})
 }
 
-// Get article detail by id
+// @Summary 前台文章详情
+// @Description 文章详情, 附带上下篇/推荐/最新文章与点赞浏览评论数, 同一访客一小时内只计一次浏览量
+// @Tags Front
+// @Produce json
+// @Param id path int true "文章 ID"
+// @Success 0 {object} Response[model.BlogArticleVO]
+// @Router /front/article/{id} [get]
 func (*Front) GetArticleInfo(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -328,12 +531,17 @@ func (*Front) GetArticleInfo(c *gin.Context) {
 		return
 	}
 
-	// Update article view count TODO: remove view count when article deleted
-	// updateArticleViewCount(c, id)
-
-	// TODO: Update visit count
-	// * Each request increments visit count; refresh can inflate visits
-	rdb.ZIncrBy(rctx, g.ARTICLE_VIEW_COUNT, 1, strconv.Itoa(id))
+	// 更新文章浏览量: 同一访客在 articleViewInterval 内重复访问只算一次,
+	// 否则刷新页面就能刷量。SetNX 成功说明是这个窗口里的首次访问。
+	viewKey := g.ARTICLE_VIEW_VISITOR + strconv.Itoa(id) + ":" + visitorFingerprint(c)
+	first, err := rdb.SetNX(rctx, viewKey, 1, articleViewInterval).Result()
+	if err != nil {
+		// Redis 异常时宁可多计一次, 也不要让浏览量停止统计
+		slog.Warn("文章浏览去重失败, 本次直接计数", "article_id", id, "err", err)
+	}
+	if first || err != nil {
+		rdb.ZIncrBy(rctx, g.ARTICLE_VIEW_COUNT, 1, strconv.Itoa(id))
+	}
 
 	// Previous article
 	article.LastArticle, err = model.GetLastArticle(db, id)
@@ -364,7 +572,14 @@ func (*Front) GetArticleInfo(c *gin.Context) {
 	ReturnSuccess(c, article)
 }
 
-// Get article archives
+// @Summary 前台文章归档
+// @Description 按时间归档的文章列表
+// @Tags Front
+// @Produce json
+// @Param page_num query int false "页码"
+// @Param page_size query int false "每页数量"
+// @Success 0 {object} Response[PageResult[ArchiveVO]]
+// @Router /front/article/archive [get]
 func (*Front) GetArchiveList(c *gin.Context) {
 	var query FArticleQuery
 	if err := c.ShouldBindQuery(&query); err != nil {
@@ -372,7 +587,7 @@ func (*Front) GetArchiveList(c *gin.Context) {
 		return
 	}
 
-	list, total, err := model.GetBlogArticleList(GetDB(c), query.Page, query.Size, query.CategoryId, query.TagId)
+	list, total, err := model.GetBlogArticleArchiveList(GetDB(c), query.Page, query.Size)
 	if err != nil {
 		ReturnError(c, g.ErrDbOp, err)
 		return
@@ -395,10 +610,19 @@ func (*Front) GetArchiveList(c *gin.Context) {
 	})
 }
 
-// Like an article
-// Record user liked a specific article to prevent duplicate likes
+// @Summary 点赞文章
+// @Description 点赞/取消点赞文章, 需要登录
+// @Tags Front
+// @Produce json
+// @Param article_id path int true "文章 ID"
+// @Success 0 {object} Response[any]
+// @Security ApiKeyAuth
+// @Router /front/article/like/{article_id} [get]
 func (*Front) LikeArticle(c *gin.Context) {
-	auth, _ := CurrentUserAuth(c)
+	auth, ok := MustCurrentUserAuth(c)
+	if !ok {
+		return
+	}
 
 	articleId, err := strconv.Atoi(c.Param("article_id"))
 	if err != nil {
@@ -422,7 +646,13 @@ func (*Front) LikeArticle(c *gin.Context) {
 	ReturnSuccess(c, nil)
 }
 
-// Article search
+// @Summary 搜索文章
+// @Description 按关键字搜索标题和内容, 命中处高亮
+// @Tags Front
+// @Produce json
+// @Param keyword query string false "搜索关键字"
+// @Success 0 {object} Response[[]ArticleSearchVO]
+// @Router /front/article/search [get]
 func (*Front) SearchArticle(c *gin.Context) {
 	result := make([]ArticleSearchVO, 0)
 
@@ -434,19 +664,13 @@ func (*Front) SearchArticle(c *gin.Context) {
 
 	db := GetDB(c)
 
-	articleList, err := model.List(db, []model.Article{}, "*", "",
-		"is_delete = 0 AND status = 1 AND (title LIKE ? OR content LIKE ?)",
-		"%"+keyword+"%", "%"+keyword+"%")
+	articleList, err := model.SearchArticle(db, keyword, searchResultLimit)
 	if err != nil {
 		ReturnError(c, g.ErrDbOp, err)
 		return
 	}
 
 	for _, article := range articleList {
-		// Highlight keywords in title
-		title := strings.ReplaceAll(article.Title, keyword,
-			"<span style='color:#f47466'>"+keyword+"</span>")
-
 		content := article.Content
 		// Keyword start index in content
 		keywordStartIndex := unicodeIndex(content, keyword)
@@ -457,7 +681,6 @@ func (*Front) SearchArticle(c *gin.Context) {
 			}
 			// Avoid Chinese substring garbling (use rune to handle multibyte)
 			preText := substring(content, preIndex, keywordStartIndex)
-			// string([]rune(content[preIndex:keywordStartIndex]))
 
 			// Keyword end index in content
 			keywordEndIndex := keywordStartIndex + unicodeLen(keyword)
@@ -467,17 +690,14 @@ func (*Front) SearchArticle(c *gin.Context) {
 			} else {
 				afterIndex = keywordEndIndex + afterLength
 			}
-			// afterText := string([]rune(content)[keywordStartIndex:afterIndex])
 			afterText := substring(content, keywordStartIndex, afterIndex)
-			// Highlight keywords in content
-			content = strings.ReplaceAll(preText+afterText, keyword,
-				"<span style='color:#f47466'>"+keyword+"</span>")
+			content = preText + afterText
 		}
 
 		result = append(result, ArticleSearchVO{
 			ID:      article.ID,
-			Title:   title,
-			Content: content,
+			Title:   highlightKeyword(article.Title, keyword),
+			Content: highlightKeyword(content, keyword),
 		})
 	}
 

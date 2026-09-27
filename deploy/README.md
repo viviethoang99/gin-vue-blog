@@ -1,29 +1,31 @@
-# Latest: available scripts
+最新版：有以下几个脚本
+- `bootstrap.sh`：一键部署，用 docker 里的 node 打包前端静态资源
+- `bootstrap.sh dev`：一键部署，改用本机的 pnpm 打包前端静态资源（内部会调 `build_web.sh`）
+- `build_web.sh`：用本机的 pnpm 打包两个前端项目，产物分别放到 `build/web/dist_blog` 和 `build/web/dist_admin`
+- `clean_docker.sh`：清理本项目相关的旧 Docker 容器
 
-- `build_web.sh`: Build web projects locally (requires Node) and move built assets into the container build context
-- `clean_docker.sh`: Clean old Docker containers related to this project
-- `bootstrap.sh`: Use a Docker Node image to build frontend static assets
-- `bootstrap.sh dev`: Use your local `pnpm` to build frontend assets
+一般来说，直接运行 `bootstrap.sh` 即可，每次自动清理旧容器，打包最新代码，并构建新容器。第一次会比较耗时，但是后面会有缓存就会快很多
 
-In most cases, just run `bootstrap.sh`. It will clean old containers, build the latest code, and rebuild the images each time. The first run can be slow, later runs use cache and are much faster.
+> `bootstrap.sh` 会自动判断本机是 `docker compose`（插件，新版）还是 `docker-compose`（独立命令，旧版），不用手动区分。
 
 ---
 
-One-click run consists of two steps:
-
-1. Environment setup: Ensure Docker and Docker Compose are installed
-2. Start: Execute the `bootstrap.sh` script
-3. Troubleshooting: If it fails, check the notes below
+一键运行分成两步：
+1. 环境准备: 需要 Docker 和 Docker Compose 环境
+2. 开始运行: 执行 `bootstrap.sh` 脚本
+3. 运行可能遇到的问题: 如果运行失败了，可以来这看看
 
 ## 1. Environment Setup
 
 ## Windows / macOS
 
 Most people use Windows daily and can run this project with Docker on Windows to preview it quickly.
-
+> 
 If you plan to deploy to a cloud server, Linux is recommended.
 
 Install [Docker Desktop](https://www.docker.com/products/docker-desktop/). It includes both Docker and Docker Compose.
+
+> 软件安装无脑下一步就行，遇到问题多百度。
 
 ## Linux
 
@@ -78,27 +80,19 @@ sudo apt-get install docker-ce docker-ce-cli containerd.io docker-compose-plugin
 
 5. Verify installation
 
-```bash
+```
 sudo docker run hello-world
 ```
 
-#### 3) Install Docker Compose (standalone)
+#### 3. 确认 Docker Compose 可用
 
-Refer to: https://docs.docker.com/compose/install/other/
-
-1. Download binary
+上一步的 `docker-compose-plugin` 已经带上了 Compose V2，验证一下：
 
 ```bash
-sudo curl -SL https://github.com/docker/compose/releases/download/v2.14.2/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
-# If slow, try a mirror:
-# sudo curl -SL https://get.daocloud.io/docker/compose/releases/download/v2.14.2/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
+docker compose version
 ```
 
-2. Make it executable
-
-```bash
-sudo chmod +x /usr/local/bin/docker-compose
-```
+> 如果用的是很旧的 Docker，只有独立命令 `docker-compose`，`bootstrap.sh` 也能正常工作，它会自动回退。
 
 ## 2. Run
 
@@ -121,17 +115,22 @@ For production, edit important values (like DB passwords) in `start/.env`.
 
 Backend: Modify `gin-blog-server` directly; the backend image is built from its Dockerfile.
 
-Admin frontend (`gin-blog-admin`): After building, copy the `dist` output to `build/web/dist_admin`.
+前端源码同理，直接重新执行 `bootstrap.sh` 就会用容器里的 node 重新打包。
 
-Blog frontend (`gin-blog-front`): After building, copy the `dist` output to `build/web/dist_blog`.
+如果想用本机的 pnpm 打包（更快，但需要本机有 node），执行 `bootstrap.sh dev`，它会调 `build_web.sh`
+把 gin-blog-front 的产物放到 `build/web/dist_blog`、gin-blog-admin 的产物放到 `build/web/dist_admin`。
 
-Then rebuild and run under `start/`:
+只想重启容器不重新打包，可以进 start 目录：
 
 ```bash
-docker-compose up -d --build
+docker compose up -d --build
 ```
 
-The above is automated in `build_web.sh`. Just run the script.
+> 前提是 `start/.env.secrets` 已经存在（第一次跑 `bootstrap.sh` 时生成），否则 compose 会报错。
+
+> 重启是安全的：后端收到 `SIGTERM` 会先把 Redis 里的点赞数 / 浏览数 / 访问量落库再退出，
+> 启动时又会把 Redis 里缺的键从 `counter_snapshot` 表补回去。所以 `docker compose restart`
+> 或重建容器都不会把这些计数清零，详见 `gin-blog-server/README.md` 的「需要注意的缓存」。
 
 ## Production notes
 
@@ -139,14 +138,21 @@ Production deployment is simply running this project on a server. Two places are
 
 1. Before `docker-compose up -d`, edit the environment in `.env`:
 
-For security, change at least:
+1、执行 `docker compose up -d` 前建议修改 `.env` 文件中的环境变量
 
-- `REDIS_PASSWORD`
-- `MYSQL_ROOT_PASSWORD`
+为了保证安全性，以下几项建议修改：
+- `REDIS_PASSWORD` Redis 连接密码 
+- `MYSQL_ROOT_PASSWORD` MySQL 连接密码
 
 Other values are optional per your needs.
 
-2. The backend image builds directly from the `gin-blog-server` source and loads `config/config.docker.toml`.
+> JWT 密钥和 session 盐不在 `.env` 里：`bootstrap.sh` 第一次运行会生成 `start/.env.secrets`
+> （已在 `.gitignore` 中），compose 通过 `env_file` 注入给后端。`config.docker.yml` 是 release
+> 模式，后端启动时会拒绝空值和仓库里的示例密钥，所以第一次部署必须走 `bootstrap.sh`，
+> 直接在 `start` 目录 `docker compose up` 会因为缺 `.env.secrets` 报错。
+> 换掉这两个值会让所有已签发的 token 和 session 立即失效。
+
+2、后端镜像的构建直接依赖于 gin-blog-server 中的源码，构建时加载的是 gin-blog-server/config.docker.yml 配置文件。
 
 Review and adjust values there as needed (see file comments).
 
@@ -158,12 +164,12 @@ Default admin user is `admin / 123456`. Important: After startup, log into the a
 
 ## gvb-mysql and gvb-server fail to start
 
-If you already have a local MySQL using port 3306, `gvb-mysql` may fail to start. Since `gvb-server` depends on it, it will fail too.
+gvb-mysql 服务 和 gvb-server 服务运行不起来，很有可能是因为你本机已经有了一个 MySQL 服务占用了 3306 端口，所以 gvb-mysql 运行失败，然后由于 gvb-server 依赖 gvb-mysql，所以它也运行失败。
+- 解决方案一：关闭本机的 MySQL 服务，自行百度
+- 解决方案二：修改 .env 文件中的 `MYSQL_PORT` 为其他端口
 
-- Option A: Stop your local MySQL service
-- Option B: Change `MYSQL_PORT` in `.env` to a different port
+> 解决方案二中修改了 MySQL 的端口是 Docker 容器对外暴露的端口，即我如果修改为 33069，则我本机通过 Navicat 连接的应该是 127.0.0.1:33069 的 mysql 服务。但是 MySQL 容器内是固定运行在 3306 端口的。但是容器和主机，以及容器之前是互相隔离的，所以不会有影响。
 
-Note: The changed port is the host-exposed port. If you set it to `33069`, connect via `127.0.0.1:33069` in Navicat. Inside the container MySQL still runs on 3306. Containers are isolated from the host and from each other, so this is fine.
 
 ## gvb-web and gvb-server fail to start on Windows
 
@@ -173,13 +179,14 @@ You may see an error similar to:
 '：No such file or directory
 ```
 
-On Windows, run the following first to avoid line-ending issues, or download the ZIP instead of cloning with Git. Linux/macOS do not need this.
-
-Reason: The project uses LF line endings. Windows Git may convert to CRLF on checkout, which breaks the build.
+如果是 Windows 系统，clone 前先执行下面这条指令，或者直接下载 ZIP 而不是通过 git clone 克隆项目。Linux 和 Mac 不需要。
 
 ```bash
+# 防止 git 自动将换行符转换为 crlf
 git config --global core.autocrlf false
 ```
+
+> 原因是该项目开发时基于 Linux，本项目规范使用 lf 换行符。而 Windows 的 git 在自动拉取项目时会将项目文件中换行符转换为 crlf，经过测试，构建过程会产生 BUG。
 
 ## Changed DB password in .env after a previous run
 

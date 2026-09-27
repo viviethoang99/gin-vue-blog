@@ -3,6 +3,7 @@ package handle
 import (
 	g "gin-blog/internal/global"
 	"gin-blog/internal/model"
+	"log/slog"
 
 	"github.com/gin-gonic/gin"
 )
@@ -19,10 +20,10 @@ type Comment struct{}
 // @Summary Delete comments (batch)
 // @Description Delete comments by ID array
 // @Tags Comment
-// @Param ids body []int true "Comment ID array"
 // @Accept json
 // @Produce json
-// @Success 0 {object} Response[int]
+// @Param ids body []int true "Comment ID array"
+// @Success 0 {object} Response[int64]
 // @Security ApiKeyAuth
 // @Router /comment [delete]
 func (*Comment) Delete(c *gin.Context) {
@@ -32,22 +33,25 @@ func (*Comment) Delete(c *gin.Context) {
 		return
 	}
 
-	result := GetDB(c).Delete(model.Comment{}, "id in ?", ids)
-	if result.Error != nil {
-		ReturnError(c, g.ErrDbOp, result.Error)
+	rows, deletedIds, err := model.DeleteComments(GetDB(c), ids)
+	if err != nil {
+		ReturnError(c, g.ErrDbOp, err)
 		return
 	}
 
-	ReturnSuccess(c, result.RowsAffected)
+	// 与文章删除保持一致: 清掉点赞计数, 否则新评论复用 id 会继承旧数据
+	cleanCommentCounters(GetRDB(c), deletedIds)
+
+	ReturnSuccess(c, rows)
 }
 
 // @Summary Update comment review (batch)
 // @Description Update review status by ID array
 // @Tags Comment
-// @Param form body UpdateReviewReq true "Update review status"
 // @Accept json
 // @Produce json
-// @Success 0 {object} Response[any]
+// @Param form body UpdateReviewReq true "Update review status"
+// @Success 0 {object} Response[int64]
 // @Security ApiKeyAuth
 // @Router /comment/review [put]
 func (*Comment) UpdateReview(c *gin.Context) {
@@ -56,29 +60,36 @@ func (*Comment) UpdateReview(c *gin.Context) {
 		ReturnError(c, g.ErrRequest, err)
 		return
 	}
-	maps := map[string]any{"is_review": req.IsReview}
-	result := GetDB(c).Model(model.Comment{}).Where("id in ?", req.Ids).Updates(maps)
-	if result.Error != nil {
-		ReturnError(c, g.ErrDbOp, result.Error)
+	db := GetDB(c)
+	rows, approved, err := model.ReviewComments(db, req.Ids, req.IsReview)
+	if err != nil {
+		ReturnError(c, g.ErrDbOp, err)
 		return
 	}
 
-	ReturnSuccess(c, result.RowsAffected)
+	// 过审这一刻才补发通知: 评论待审核期间是不可见的, 当时没发
+	// 通知写失败不影响审核结果, 只记日志
+	for i := range approved {
+		if err := model.NotifyOnComment(db, &approved[i]); err != nil {
+			slog.Warn("审核通过后写站内通知失败", "err", err, "comment_id", approved[i].ID)
+		}
+	}
+
+	ReturnSuccess(c, rows)
 }
 
 // @Summary Query comment list
-// @Description Get comment list by conditions
+// @Description 支持按昵称/审核状态/类型过滤
 // @Tags Comment
+// @Produce json
 // @Param nickname query string false "Nickname"
-// @Param is_review query int false "Review status"
-// @Param type query int false "Comment type"
+// @Param is_review query bool false "Review status"
+// @Param type query int false "评论类型(1-文章 2-友链 3-说说)"
 // @Param page_num query int false "Page number"
 // @Param page_size query int false "Page size"
-// @Accept json
-// @Produce json
-// @Success 0 {object} Response[model.CommentVO]
+// @Success 0 {object} Response[PageResult[model.Comment]]
 // @Security ApiKeyAuth
-// @Router /comment [get]
+// @Router /comment/list [get]
 func (*Comment) GetList(c *gin.Context) {
 	var query CommentQuery
 	if err := c.ShouldBindQuery(&query); err != nil {

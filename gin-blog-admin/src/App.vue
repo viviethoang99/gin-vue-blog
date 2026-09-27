@@ -1,20 +1,17 @@
 <script setup>
-import { computed, onMounted } from 'vue'
-import { NConfigProvider, darkTheme, dateViVN as dateLocale, viVN as locale } from 'naive-ui'
-import hljs from 'highlight.js/lib/core'
-import json from 'highlight.js/lib/languages/json'
+import { darkTheme, dateZhCN, NConfigProvider, zhCN } from 'naive-ui'
 
-import { useAuthStore, useThemeStore } from '@/store'
 import themes from '@/assets/themes'
-import api from '@/api'
+import { useThemeStore } from '@/store'
 
-hljs.registerLanguage('json', json)
 const themeStore = useThemeStore()
-const naiveThemeOverrides = computed(() => themes.naiveThemeOverrides(themeStore.darkMode))
 
+// highlight.js 只有操作日志页的 NCode 用得到, 放在这里会进入首屏 chunk (约 38KB),
+// 改为在 views/log/operation 里按需引入并直接传给 NCode。
+
+// 上报用户信息, 需要时取消注释, 并补回 onMounted / api / useAuthStore 的导入
 // onMounted(() => {
 //   const { accessToken } = useAuthStore()
-//   // Report user information when access token exists
 //   accessToken && api.report()
 // })
 
@@ -26,10 +23,9 @@ const naiveThemeOverrides = computed(() => themes.naiveThemeOverrides(themeStore
   <NConfigProvider
     class="h-full w-full"
     :theme="themeStore.darkMode ? darkTheme : undefined"
-    :theme-overrides="naiveThemeOverrides"
-    :locale="locale"
-    :date-locale="dateLocale"
-    :hljs="hljs"
+    :theme-overrides="themes.naiveThemeOverrides"
+    :locale="zhCN"
+    :date-locale="dateZhCN"
   >
     <RouterView v-slot="{ Component }">
       <component :is="Component" />

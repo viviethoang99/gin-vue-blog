@@ -7,7 +7,7 @@ import (
 // hasMany: A category can contain multiple articles
 type Category struct {
 	Model
-	Name     string    `gorm:"unique;type:varchar(200);not null" json:"name"`
+	Name     string    `gorm:"unique;type:varchar(20);not null" json:"name"`
 	Articles []Article `gorm:"foreignKey:CategoryId"`
 }
 

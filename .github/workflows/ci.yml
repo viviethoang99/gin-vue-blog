@@ -1,0 +1,325 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    # 纯文档改动不值得跑一遍完整 CI
+    paths-ignore:
+      - '**.md'
+      - .github/dependabot.yml
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - .github/dependabot.yml
+
+# 同一分支/PR 上连续推送时取消还在跑的旧运行, 不白烧构建时间
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server:
+    name: Server (Go)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: gin-blog-server/go.mod
+          cache-dependency-path: gin-blog-server/go.sum
+
+      - name: Gofmt
+        working-directory: gin-blog-server
+        run: |
+          files=$(gofmt -l .)
+          if [ -n "$files" ]; then
+            echo "以下文件未格式化, 请执行 gofmt -w .:"
+            echo "$files"
+            exit 1
+          fi
+
+      - name: Vet
+        working-directory: gin-blog-server
+        run: go vet ./...
+
+      - name: Test
+        working-directory: gin-blog-server
+        run: go test ./...
+
+      # swag 每次都要从源码编译, 单独缓存二进制
+      - name: Cache swag
+        id: cache-swag
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin/swag
+          key: swag-v1.16.6-${{ runner.os }}
+
+      - name: Install swag
+        if: steps.cache-swag.outputs.cache-hit != 'true'
+        run: go install github.com/swaggo/swag/cmd/swag@v1.16.6
+
+      # docs/ 是 swag init 的产物, 提交时容易忘记重新生成
+      - name: Swagger
+        working-directory: gin-blog-server
+        run: |
+          swag init -g ./cmd/main.go
+          if ! git diff --quiet docs; then
+            echo "docs/ 与代码中的注解不一致, 请执行 ./swag_init.sh 并提交生成结果:"
+            git diff --stat docs
+            exit 1
+          fi
+
+  frontend:
+    name: Frontend (${{ matrix.project }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [gin-blog-front, gin-blog-admin]
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ${{ matrix.project }}/pnpm-lock.yaml
+
+      - name: Install
+        working-directory: ${{ matrix.project }}
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Lint
+        working-directory: ${{ matrix.project }}
+        run: pnpm lint
+
+      - name: Test
+        working-directory: ${{ matrix.project }}
+        run: pnpm test
+
+      - name: Build
+        working-directory: ${{ matrix.project }}
+        run: pnpm build
+
+      # 产物给 docker job 复用: 原来 web 镜像在 Docker 里重新 pnpm install + build 了一遍
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.project }}
+          path: ${{ matrix.project }}/dist
+          retention-days: 1
+
+  # 镜像构建依赖网络与基础镜像, 只在 CI 里验证能否构建并正常启动
+  #
+  # web 镜像用 frontend job 的产物 + deploy/build/web/Dockerfile 构建:
+  #   - 根 Dockerfile(在容器里 pnpm install + build 两个前端)由 deploy job 走 bootstrap.sh 覆盖,
+  #     这里再来一遍纯属重复, 是整条流水线里最贵的一步
+  #   - 顺带把 `bootstrap.sh dev` 用的这个 Dockerfile 也纳入验证, 之前没人测过
+  docker:
+    name: Docker
+    runs-on: ubuntu-latest
+    needs: frontend
+    # 发布镜像要写 packages, 默认的 GITHUB_TOKEN 只有读权限
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Fetch frontend dist
+        uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+
+      - name: Assemble web build context
+        run: |
+          # upload-artifact 会把上传路径的公共前缀剥掉, 所以下载下来的
+          # dist-gin-blog-front/ 里直接就是 index.html 和 assets/, 没有多一层 dist/
+          mv dist-gin-blog-front deploy/build/web/dist_blog
+          mv dist-gin-blog-admin deploy/build/web/dist_admin
+          # 目录结构一旦对不上, 在这里就报错, 而不是等 nginx 返回 404
+          test -f deploy/build/web/dist_blog/index.html
+          test -f deploy/build/web/dist_admin/index.html
+
+      - name: Build web image
+        uses: docker/build-push-action@v6
+        with:
+          context: deploy/build/web
+          tags: gvb-web:ci
+          load: true
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+      - name: Build server image
+        uses: docker/build-push-action@v6
+        with:
+          context: gin-blog-server
+          tags: gvb-server:ci
+          load: true
+          cache-from: type=gha,scope=server
+          cache-to: type=gha,mode=max,scope=server
+
+      - name: Smoke test web image
+        run: |
+          docker run -d --name gvb-web -p 8080:80 \
+            -e USE_HTTPS=false -e SERVER_NAME=localhost \
+            -e BACKEND_HOST=127.0.0.1 -e SERVER_PORT=8765 gvb-web:ci
+          for i in $(seq 15); do
+            curl -sf http://127.0.0.1:8080/ > /dev/null && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:8080/ > /dev/null
+          curl -sf http://127.0.0.1:8080/admin/ > /dev/null
+
+      - name: Smoke test server image
+        run: |
+          docker run -d --name gvb-redis redis:7.0-alpine
+          redis_ip=$(docker inspect -f '{{.NetworkSettings.IPAddress}}' gvb-redis)
+          # 用 sqlite 起, 不依赖 MySQL 容器
+          # config.docker.yml 是 release 模式, 必须注入签名密钥, 否则启动就被拒绝 (S1)
+          docker run -d --name gvb-server -p 8765:8765 \
+            -e SERVER_DBTYPE=sqlite -e SQLITE_DSN=/tmp/gvb-ci.db \
+            -e JWT_SECRET=ci-only-jwt-secret -e SESSION_SALT=ci-only-session-salt \
+            -e REDIS_ADDR="$redis_ip:6379" gvb-server:ci
+          for i in $(seq 15); do
+            curl -sf http://127.0.0.1:8765/api/config > /dev/null && break
+            sleep 1
+          done
+          # 先打日志: 健康检查失败时日志才是有用的那部分
+          docker logs gvb-server
+          curl -sf http://127.0.0.1:8765/api/config > /dev/null
+
+      # 发布只在 main 有新提交时做:
+      # PR(尤其是 fork 来的)拿不到 packages 写权限, 不加这个条件 PR 一律红。
+      # 而且冒烟测试通过之后才推 —— 反过来的话, 测失败时坏镜像已经在仓库里了
+      - name: Log in to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push images to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          # 镜像名必须全小写, 仓库 owner 带大写字母时 docker push 会直接拒绝
+          owner=$(echo "${{ github.repository_owner }}" | tr 'A-Z' 'a-z')
+          sha=$(echo "${{ github.sha }}" | cut -c1-7)
+          # 两个 tag: latest 给部署用, main-<sha> 用于回滚到具体某次提交
+          for name in web server; do
+            src="gvb-$name:ci"
+            dst="ghcr.io/$owner/gvb-$name"
+            docker tag "$src" "$dst:latest"
+            docker tag "$src" "$dst:main-$sha"
+            docker push "$dst:latest"
+            docker push "$dst:main-$sha"
+          done
+
+  # 一键部署的端到端验证: 起完整的 compose 栈, 校验权限种子数据的不变式
+  deploy:
+    name: Deploy (compose)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Bring up the stack
+        working-directory: deploy
+        run: sh bootstrap.sh
+
+      - name: Wait for backend
+        run: |
+          for i in $(seq 60); do
+            curl -sf http://127.0.0.1:8765/api/config > /dev/null && break
+            sleep 2
+          done
+          curl -sf http://127.0.0.1:8765/api/config > /dev/null
+
+      - name: Web is served
+        run: |
+          curl -sf http://127.0.0.1/ > /dev/null
+          curl -sf http://127.0.0.1/admin/ > /dev/null
+
+      # generate-data 是权限数据的唯一来源, 这里锁住它的结果:
+      # admin 能改配置, guest 不能, 未登录也不能
+      - name: Permission invariants
+        run: |
+          login() {
+            curl -s -X POST http://127.0.0.1:8765/api/login \
+              -H 'Content-Type: application/json' \
+              -d "{\"username\":\"$1\",\"password\":\"123456\"}"
+          }
+          patch_config() {
+            curl -s -X PATCH http://127.0.0.1:8765/api/config \
+              -H 'Content-Type: application/json' \
+              -H "Authorization: Bearer $1" \
+              -d '{"blog_name":"gin-vue-blog"}'
+          }
+
+          admin_token=$(login admin | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["token"])')
+          guest_token=$(login guest | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["token"])')
+
+          admin_resp=$(patch_config "$admin_token")
+          echo "admin: $admin_resp"
+          echo "$admin_resp" | grep -q '"code":0'
+
+          guest_resp=$(patch_config "$guest_token")
+          echo "guest: $guest_resp"
+          echo "$guest_resp" | grep -q '"code":1206'
+
+          # 没有 token 的请求必须被拦住 (资源表中登记的接口)
+          anon_resp=$(curl -s -X PATCH http://127.0.0.1:8765/api/config \
+            -H 'Content-Type: application/json' -d '{}')
+          echo "anonymous: $anon_resp"
+          echo "$anon_resp" | grep -q '"code":1201'
+
+      # 重启后种子数据不能重复写入, 且代码里已经不存在的资源要被清理掉
+      - name: Seeding reconciles the resource table
+        working-directory: deploy/start
+        run: |
+          # 密码见 deploy/start/.env 的 MYSQL_ROOT_PASSWORD
+          mysql() {
+            docker exec gvb-mysql mysql -uroot -p12345566 -N -B -e "$1" 2>/dev/null
+          }
+          before=$(mysql "SELECT COUNT(*) FROM gvb.resource")
+
+          # 伪造一条已经下线的接口资源, 并挂到 guest 角色上
+          mysql "INSERT INTO gvb.resource (name, parent_id, url, method, anonymous, created_at, updated_at)
+                 VALUES ('已下线接口', 0, '/gone', 'GET', 0, NOW(), NOW())"
+          mysql "INSERT INTO gvb.role_resource (role_id, resource_id)
+                 SELECT r.id, res.id FROM gvb.role r, gvb.resource res
+                 WHERE r.name = 'guest' AND res.url = '/gone'"
+
+          docker restart gvb-server
+          for i in $(seq 30); do
+            curl -sf http://127.0.0.1:8765/api/config > /dev/null && break
+            sleep 2
+          done
+
+          after=$(mysql "SELECT COUNT(*) FROM gvb.resource")
+          stale=$(mysql "SELECT COUNT(*) FROM gvb.resource WHERE url = '/gone'")
+          orphan=$(mysql "SELECT COUNT(*) FROM gvb.role_resource rr
+                          LEFT JOIN gvb.resource res ON res.id = rr.resource_id
+                          WHERE res.id IS NULL")
+          echo "resource: $before -> $after, stale: $stale, orphan bindings: $orphan"
+
+          [ "$before" = "$after" ] # 重复执行不新增
+          [ "$stale" = "0" ]       # 代码中不存在的资源被清理
+          [ "$orphan" = "0" ]      # 角色关联不残留
+
+      - name: Dump logs
+        if: failure()
+        working-directory: deploy/start
+        run: docker compose logs --tail 200
+
+      - name: Tear down
+        if: always()
+        working-directory: deploy/start
+        run: docker compose down -v

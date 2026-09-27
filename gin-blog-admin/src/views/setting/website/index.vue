@@ -1,15 +1,20 @@
 <script setup>
-import { onMounted, ref } from 'vue'
 import { NButton, NDatePicker, NForm, NFormItem, NInput, NRadio, NRadioGroup, NTabPane, NTabs } from 'naive-ui'
-
-import CommonPage from '@/components/common/CommonPage.vue'
-import UploadOne from '@/components//UploadOne.vue'
+import { onMounted, ref } from 'vue'
 
 import api from '@/api'
+import UploadOne from '@/components//UploadOne.vue'
+
+import CommonPage from '@/components/common/CommonPage.vue'
 
 defineOptions({ name: 'Website Management' })
 
-const formRef = ref(null)
+// 三个 tab 各自一个 ref: 原来四处(其中一处还是嵌套的)都叫 formRef,
+// 后挂载的实例覆盖前面的, handleSave 校验到的永远是最后那个。
+// 现在这些表单没有 rules 所以看不出问题, 以后任何一处加必填都会失效
+const basicFormRef = ref(null)
+const socialFormRef = ref(null)
+const otherFormRef = ref(null)
 const form = ref({
   website_avatar: '',
   website_name: 'Personal Blog',
@@ -21,17 +26,17 @@ const form = ref({
   qq: '123456789',
   github: 'https://github.com/szluyu99',
   gitee: 'https://gitee.com/szluyu99',
-  tourist_avatar: 'https://cdn.hahacode.cn/16815451239215dc82548dcadcd578a5bbc8d5deaa.jpg',
-  user_avatar: 'https://cdn.hahacode.cn/2299fc4d14c94e6183b082973b35855d.png',
-  article_cover: 'https://cdn.hahacode.cn/1679461519cc592408198d67faf1290ff8969dc614.png',
+  tourist_avatar: 'https://raw.githubusercontent.com/szluyu99/gin-vue-blog/main/images/config/tourist_avatar.jpeg',
+  user_avatar: 'https://raw.githubusercontent.com/szluyu99/gin-vue-blog/main/images/config/user_avatar.jpeg',
+  article_cover: 'https://raw.githubusercontent.com/szluyu99/gin-vue-blog/main/images/config/default_article_cover.png',
   is_comment_review: 1,
   is_message_review: 1,
   // is_email_notice: 0,
   // social_login_list: [],
   // social_url_list: [],
   // is_reward: 0,
-  // wechat_qrcode: 'http://dummyimage.com/100x100',
-  // alipay_ode: 'http://dummyimage.com/100x100',
+  // wechat_qrcode: 'https://dummyimage.com/100x100',
+  // alipay_ode: 'https://dummyimage.com/100x100',
 })
 
 onMounted(async () => {
@@ -39,12 +44,22 @@ onMounted(async () => {
 })
 
 async function fetchData() {
-  const resp = await api.getConfig()
-  form.value = resp.data
+  // 以前是裸 await + 直接赋值: 接口失败会产生未捕获的 rejection,
+  // 配置表为空时后端返回 {}, 直接赋值又会把表单里的默认值清空
+  try {
+    const resp = await api.getConfig()
+    if (resp.data && Object.keys(resp.data).length) {
+      form.value = resp.data
+    }
+  }
+  catch (err) {
+    console.error(err)
+  }
 }
 
-function handleSave() {
-  formRef.value?.validate(async (err) => {
+// 参数是表单实例本身(模板里的 basicFormRef 会自动解包), 不是 ref 对象
+function handleSave(formInst) {
+  formInst?.validate(async (err) => {
     if (!err) {
       try {
         $loadingBar?.start()
@@ -53,7 +68,7 @@ function handleSave() {
         $message.success('Website information updated successfully')
         // fetchData()
       }
-      catch (err) {
+      catch {
         $loadingBar?.error()
       }
     }
@@ -66,7 +81,7 @@ function handleSave() {
     <NTabs type="line" animated>
       <NTabPane name="website" tab="Website">
         <NForm
-          ref="formRef"
+          ref="basicFormRef"
           label-placement="left"
           label-align="left"
           :label-width="120"
@@ -116,14 +131,14 @@ function handleSave() {
               </n-space>
             </n-checkbox-group>
           </n-form-item> -->
-          <NButton type="primary" @click="handleSave">
+          <NButton type="primary" @click="handleSave(basicFormRef)">
             Confirm
           </NButton>
         </NForm>
       </NTabPane>
       <NTabPane name="contact" tab="Social">
         <NForm
-          ref="formRef"
+          ref="socialFormRef"
           label-placement="left"
           label-align="left"
           :label-width="120"
@@ -139,21 +154,23 @@ function handleSave() {
           <NFormItem label="Gitee" path="gitee">
             <NInput v-model:value="form.gitee" placeholder="Please enter Gitee" />
           </NFormItem>
-          <NButton type="primary" @click="handleSave">
+          <NButton type="primary" @click="handleSave(socialFormRef)">
             Confirm
           </NButton>
         </NForm>
       </NTabPane>
       <NTabPane name="other" tab="Others">
         <NForm
-          ref="formRef"
+          ref="otherFormRef"
           label-placement="left"
           label-align="left"
           :label-width="120"
           :model="form"
           class="mt-4"
         >
-          <NForm ref="formRef" label-align="left" :label-width="120" :model="form" inline>
+          <!-- 这里原来又套了一个表单, 只为让两个上传并排。表单嵌表单没有意义,
+               而且 ref 重名; 换成普通的 flex 容器 -->
+          <div class="flex flex-wrap gap-8">
             <NFormItem label="User Avatar" path="user_avatar">
               <UploadOne
                 v-model:preview="form.user_avatar"
@@ -166,36 +183,31 @@ function handleSave() {
                 :width="120"
               />
             </NFormItem>
-            <!-- <n-form-item label="WeChat Payment QR" path="tourist_avatar">
-              <n-image border-dashed border-1 text-gray width="120" :src="form.tourist_avatar" />
-            </n-form-item>
-            <n-form-item label="Alipay Payment QR" path="tourist_avatar">
-              <n-image border-dashed border-1 text-gray width="120" :src="form.tourist_avatar" />
-            </n-form-item> -->
-          </NForm>
+          </div>
           <NFormItem label-placement="top" label="Default Article Cover" path="article_cover">
             <UploadOne
               v-model:preview="form.article_cover"
               :width="300"
             />
           </NFormItem>
-          <NFormItem label="Comment Default Review" path="is_comment_review">
+          <!-- 值的含义反着读: is_comment_review = true 表示免审核(直接展示) -->
+          <NFormItem label="评论审核" path="is_comment_review">
             <NRadioGroup v-model:value="form.is_comment_review" name="is_comment_review">
               <NRadio value="true">
-                Disabled
+                关闭(新评论直接展示)
               </NRadio>
               <NRadio value="false">
-                Enabled
+                开启(需在评论管理里通过)
               </NRadio>
             </NRadioGroup>
           </NFormItem>
-          <NFormItem label="Message Default Review" path="is_message_review">
+          <NFormItem label="留言审核" path="is_message_review">
             <NRadioGroup v-model:value="form.is_message_review" name="is_message_review">
               <NRadio value="true">
-                Disabled
+                关闭(新留言直接展示)
               </NRadio>
               <NRadio value="false">
-                Enabled
+                开启(需在留言管理里通过)
               </NRadio>
             </NRadioGroup>
           </NFormItem>
@@ -209,7 +221,7 @@ function handleSave() {
               </NRadio>
             </NRadioGroup>
           </NFormItem> -->
-          <NButton type="primary" @click="handleSave">
+          <NButton type="primary" @click="handleSave(otherFormRef)">
             Confirm
           </NButton>
         </NForm>

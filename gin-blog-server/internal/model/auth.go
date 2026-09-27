@@ -2,13 +2,16 @@ package model
 
 import (
 	"encoding/json"
+	"errors"
 	"gin-blog/internal/utils"
-	"log/slog"
 	"strconv"
 	"time"
 
 	"gorm.io/gorm"
 )
+
+// 注册时邮箱已存在, 由 handle 层翻译成对应的业务错误码
+var ErrUsernameTaken = errors.New("该邮箱已经注册")
 
 // Access control: 7 tables (4 models + 3 relations)
 
@@ -45,10 +48,10 @@ type Role struct {
 
 type Resource struct {
 	Model
-	Name      string `gorm:"unique;type:varchar(200)" json:"name"`
+	Name      string `gorm:"unique;type:varchar(50)" json:"name"`
 	ParentId  int    `json:"parent_id"`
-	Url       string `gorm:"type:varchar(255)" json:"url"`
-	Method    string `gorm:"type:varchar(10)" json:"request_method"`
+	Url       string `gorm:"type:varchar(255);index:idx_resource_api,priority:1" json:"url"`
+	Method    string `gorm:"type:varchar(10);index:idx_resource_api,priority:2" json:"request_method"`
 	Anonymous bool   `json:"is_anonymous"`
 
 	Roles []*Role `json:"roles" gorm:"many2many:role_resource"`
@@ -57,9 +60,9 @@ type Resource struct {
 /*
 Menu design:
 
-Catalogue: catalogue === true
-	- If it is a catalogue, it appears as a single item and does not expand a submenu (e.g., "Home", "Profile").
-	- If not a catalogue and parent_id is 0, it is a first-level menu that can expand submenus (e.g., under "Article Management" there are "Article List", "Article Category", "Article Tag").
+目录: catalogue === true
+  - 如果是目录, 作为单独项, 不展开子菜单（例如 "Home", "Profile"）
+  - 如果不是目录, 且 parent_id 为 0, 则为一级菜单, 可展开子菜单（例如 "Article Management" 下有 "Article List", "Article Category", "Article Tag" 等子菜单）
 	- If not a catalogue and parent_id is not 0, it is a second-level menu.
 
 Hidden: hidden
@@ -71,17 +74,17 @@ External: external, external_link
 type Menu struct {
 	Model
 	ParentId     int    `json:"parent_id"`
-		Name         string `gorm:"uniqueIndex:idx_name_and_path;type:varchar(200)" json:"name"` // Menu name
-		Path         string `gorm:"uniqueIndex:idx_name_and_path;type:varchar(50)" json:"path"`  // Route path
-		Component    string `gorm:"type:varchar(50)" json:"component"`                           // Component path
-		Icon         string `gorm:"type:varchar(50)" json:"icon"`                                // Icon
-		OrderNum     int8   `json:"order_num"`                                                   // Order
-		Redirect     string `gorm:"type:varchar(50)" json:"redirect"`                            // Redirect URL
-		Catalogue    bool   `json:"is_catalogue"`                                                // Is catalogue
-		Hidden       bool   `json:"is_hidden"`                                                   // Hidden
-		KeepAlive    bool   `json:"keep_alive"`                                                  // Keep alive (cache)
-		External     bool   `json:"is_external"`                                                 // External link
-		ExternalLink string `gorm:"type:varchar(255)" json:"external_link"`                      // External URL
+	Name         string `gorm:"uniqueIndex:idx_name_and_path;type:varchar(20)" json:"name"` // 菜单名称
+	Path         string `gorm:"uniqueIndex:idx_name_and_path;type:varchar(50)" json:"path"` // 路由地址
+	Component    string `gorm:"type:varchar(50)" json:"component"`                          // 组件路径
+	Icon         string `gorm:"type:varchar(50)" json:"icon"`                               // 图标
+	OrderNum     int8   `json:"order_num"`                                                  // 排序
+	Redirect     string `gorm:"type:varchar(50)" json:"redirect"`                           // 重定向地址
+	Catalogue    bool   `json:"is_catalogue"`                                               // 是否为目录
+	Hidden       bool   `json:"is_hidden"`                                                  // 是否隐藏
+	KeepAlive    bool   `json:"keep_alive"`                                                 // 是否缓存
+	External     bool   `json:"is_external"`                                                // 是否外链
+	ExternalLink string `gorm:"type:varchar(255)" json:"external_link"`                     // 外链地址
 
 	Roles []*Role `json:"roles" gorm:"many2many:role_menu"`
 }
@@ -210,7 +213,7 @@ func SaveOrUpdateResource(db *gorm.DB, id, pid int, name, url, method string) er
 		result = db.Updates(&resource)
 	} else {
 		result = db.Create(&resource)
-		// TODO: Front-end workaround
+		// TODO: ????
 		// - Fix a front-end bug: after cascade-selecting a parent node, a newly added child node appears selected by default though it isn't actually selected.
 		// - Workaround: After adding a child node, remove the association between its parent node and roles.
 		// dao.Delete(model.RoleResource{}, "resource_id", data.ParentId)
@@ -286,13 +289,18 @@ func GetRoleIdsByUserId(db *gorm.DB, userAuthId int) (ids []int, err error) {
 	return ids, result.Error
 }
 
-func SaveRole(db *gorm.DB, name, label string) error {
+func SaveRole(db *gorm.DB, name, label string, resourceIds, menuIds []int) error {
 	role := Role{
 		Name:  name,
 		Label: label,
 	}
-	result := db.Create(&role)
-	return result.Error
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&role).Error; err != nil {
+			return err
+		}
+		// 新建时以前会把 resourceIds / menuIds 丢掉, 新角色一个权限都没有
+		return replaceRoleRelations(tx, role.ID, resourceIds, menuIds)
+	})
 }
 
 func UpdateRole(db *gorm.DB, id int, name, label string, isDisable bool, resourceIds, menuIds []int) error {
@@ -304,48 +312,58 @@ func UpdateRole(db *gorm.DB, id int, name, label string, isDisable bool, resourc
 	}
 
 	return db.Transaction(func(tx *gorm.DB) error {
-		if err := db.Model(&role).Select("name", "label", "is_disable").Updates(&role).Error; err != nil {
+		if err := tx.Model(&role).Select("name", "label", "is_disable").Updates(&role).Error; err != nil {
 			return err
 		}
-
-		// role_resource
-		if err := db.Delete(&RoleResource{}, "role_id = ?", id).Error; err != nil {
-			return err
-		}
-		for _, rid := range resourceIds {
-			if err := db.Create(&RoleResource{RoleId: role.ID, ResourceId: rid}).Error; err != nil {
-				return err
-			}
-		}
-
-		// role_menu
-		if err := db.Delete(&RoleMenu{}, "role_id = ?", id).Error; err != nil {
-			return err
-		}
-		for _, mid := range menuIds {
-			if err := db.Create(&RoleMenu{RoleId: role.ID, MenuId: mid}).Error; err != nil {
-				return err
-			}
-		}
-		return nil
+		return replaceRoleRelations(tx, role.ID, resourceIds, menuIds)
 	})
+}
+
+// 用给定的 id 列表整体替换角色的资源与菜单关联, 必须在事务里调用
+func replaceRoleRelations(tx *gorm.DB, roleId int, resourceIds, menuIds []int) error {
+	if err := tx.Delete(&RoleResource{}, "role_id = ?", roleId).Error; err != nil {
+		return err
+	}
+	if len(resourceIds) > 0 {
+		rows := make([]RoleResource, 0, len(resourceIds))
+		for _, rid := range resourceIds {
+			rows = append(rows, RoleResource{RoleId: roleId, ResourceId: rid})
+		}
+		if err := tx.Create(&rows).Error; err != nil {
+			return err
+		}
+	}
+
+	if err := tx.Delete(&RoleMenu{}, "role_id = ?", roleId).Error; err != nil {
+		return err
+	}
+	if len(menuIds) > 0 {
+		rows := make([]RoleMenu, 0, len(menuIds))
+		for _, mid := range menuIds {
+			rows = append(rows, RoleMenu{RoleId: roleId, MenuId: mid})
+		}
+		if err := tx.Create(&rows).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Delete roles: transactionally delete role, role_resource, and role_menu
 func DeleteRoles(db *gorm.DB, ids []int) error {
 	return db.Transaction(func(tx *gorm.DB) error {
 
-		result := db.Delete(&Role{}, "id in ?", ids)
+		result := tx.Delete(&Role{}, "id in ?", ids)
 		if result.Error != nil {
 			return result.Error
 		}
 
-		result = db.Delete(&RoleResource{}, "role_id in ?", ids)
+		result = tx.Delete(&RoleResource{}, "role_id in ?", ids)
 		if result.Error != nil {
 			return result.Error
 		}
 
-		result = db.Delete(&RoleMenu{}, "role_id in ?", ids)
+		result = tx.Delete(&RoleMenu{}, "role_id in ?", ids)
 		if result.Error != nil {
 			return result.Error
 		}
@@ -361,50 +379,70 @@ func GetUserAuthInfoById(db *gorm.DB, id int) (*UserAuth, error) {
 	result := db.Model(&userAuth).
 		Preload("Roles").Preload("UserInfo").
 		First(&userAuth)
-	return &userAuth, result.Error
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return &userAuth, nil
 }
 
+// 新注册用户的默认头像: 原来是 bing 的一张外链图, 换成本仓库 images/ 下的图片
+const DefaultAvatar = "https://raw.githubusercontent.com/szluyu99/gin-vue-blog/main/images/config/user_avatar.jpeg"
+
 // Register a new user
+//
+// 三张表必须一起成功: 以前没有事务, 中途失败会留下孤儿 user_info,
+// 或者一个没有任何角色的用户(能登录, 但 PermissionCheck 查不到角色)。
+// 昵称也不再按 Count 生成, 并发注册会重名, 改用插入后拿到的自增 id。
 func CreateNewUser(db *gorm.DB, username, password string) (*UserAuth, *UserInfo, *UserAuthRole, error) {
-	// Create user info
-	num, err := Count(db, &UserInfo{})
+	pass, err := utils.BcryptHash(password)
 	if err != nil {
-		slog.Info(err.Error())
+		return nil, nil, nil, err
 	}
-	number := strconv.Itoa(num)
+
 	userinfo := &UserInfo{
-		Email:    username,
-		Nickname: "Visitor" + number,
-		Avatar:   "https://www.bing.com/rp/ar_9isCNU2Q-VG1yEDDHnx8HAFQ.png",
-		Intro:    "I am user #" + number + " of this application",
+		Email:  username,
+		Avatar: DefaultAvatar,
 	}
-	result := db.Create(&userinfo)
-	if result.Error != nil {
-		return nil, nil, nil, result.Error
+	userauth := &UserAuth{}
+	userRole := &UserAuthRole{}
+
+	err = db.Transaction(func(tx *gorm.DB) error {
+		// 邮箱验证链接是一次性的, 但同一个邮箱可能有多封未过期的邮件,
+		// 这里再查一次, 避免两个链接都点导致建出两个账号
+		var exist int64
+		if err := tx.Model(&UserAuth{}).Where("username = ?", username).Count(&exist).Error; err != nil {
+			return err
+		}
+		if exist > 0 {
+			return ErrUsernameTaken
+		}
+
+		if err := tx.Create(userinfo).Error; err != nil {
+			return err
+		}
+		// 拿到 id 之后再补昵称和简介, 保证唯一
+		number := strconv.Itoa(userinfo.ID)
+		userinfo.Nickname = "Visitor" + number
+		userinfo.Intro = "I am user #" + number + " of this application"
+		if err := tx.Model(userinfo).
+			Select("nickname", "intro").Updates(userinfo).Error; err != nil {
+			return err
+		}
+
+		userauth.Username = username
+		userauth.Password = pass
+		userauth.UserInfoId = userinfo.ID
+		if err := tx.Create(userauth).Error; err != nil {
+			return err
+		}
+
+		userRole.UserAuthId = userauth.ID
+		userRole.RoleId = 2 // 默认身份为游客
+		return tx.Create(userRole).Error
+	})
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
-	// Create user auth first
-	pass, _ := utils.BcryptHash(password)
-	userauth := &UserAuth{
-		Username:   username,
-		Password:   pass,
-		UserInfoId: userinfo.ID,
-	}
-
-	result = db.Create(&userauth)
-	if result.Error != nil {
-		return nil, nil, nil, result.Error
-	}
-
-	// Then create role association record
-	user_role := &UserAuthRole{
-		UserAuthId: userauth.ID,
-		RoleId:     2, // Default role is visitor
-	}
-	result = db.Create(&user_role)
-	if result.Error != nil {
-		return nil, nil, nil, result.Error
-	}
-
-	return userauth, userinfo, user_role, result.Error
+	return userauth, userinfo, userRole, nil
 }

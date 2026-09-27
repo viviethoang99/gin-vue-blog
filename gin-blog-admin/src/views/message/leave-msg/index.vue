@@ -1,14 +1,14 @@
 <script setup>
-import { h, onMounted, ref } from 'vue'
 import { NButton, NImage, NInput, NPopconfirm, NTabPane, NTabs, NTag } from 'naive-ui'
+import { h, onMounted, ref } from 'vue'
 
+import api from '@/api'
 import CommonPage from '@/components/common/CommonPage.vue'
-import QueryItem from '@/components/crud/QueryItem.vue'
 import CrudTable from '@/components/crud/CrudTable.vue'
 
-import { convertImgUrl, formatDate } from '@/utils'
+import QueryItem from '@/components/crud/QueryItem.vue'
 import { useCRUD } from '@/composables'
-import api from '@/api'
+import { convertImgUrl, formatDate, IMG_PLACEHOLDER } from '@/utils'
 
 defineOptions({ name: 'Message Management' })
 
@@ -42,7 +42,7 @@ const columns = [
         'height': 40,
         'imgProps': { style: { 'border-radius': '3px' } },
         'src': convertImgUrl(row.avatar),
-        'fallback-src': 'http://dummyimage.com/400x400', // Load failed
+        'fallback-src': IMG_PLACEHOLDER, // 加载失败时用内联占位图, 不再请求外网
         'show-toolbar-tooltip': true,
       })
     },
@@ -116,30 +116,30 @@ const columns = [
       return [
         row.is_review
           ? h(
-            NButton,
-            {
-              size: 'small',
-              type: 'warning',
-              onClick: () => handleUpdateReview([row.id], false),
-            },
-            {
-              default: () => 'Revoke',
-              icon: () => h('i', { class: 'i-mi:circle-error' }),
-            },
-          )
+              NButton,
+              {
+                size: 'small',
+                type: 'warning',
+                onClick: () => handleUpdateReview([row.id], false),
+              },
+              {
+                default: () => 'Revoke',
+                icon: () => h('i', { class: 'i-mi:circle-error' }),
+              },
+            )
           : h(
-            NButton,
-            {
-              size: 'small',
-              type: 'success',
-              style: 'margin-left: 15px;',
-              onClick: () => handleUpdateReview([row.id], true),
-            },
-            {
-              default: () => 'Approve',
-              icon: () => h('i', { class: 'i-mi:circle-check' }),
-            },
-          ),
+              NButton,
+              {
+                size: 'small',
+                type: 'success',
+                style: 'margin-left: 15px;',
+                onClick: () => handleUpdateReview([row.id], true),
+              },
+              {
+                default: () => 'Approved',
+                icon: () => h('i', { class: 'i-mi:circle-check' }),
+              },
+            ),
         h(
           NPopconfirm,
           { onPositiveClick: () => handleDelete([row.id], false) },
@@ -165,7 +165,14 @@ async function handleUpdateReview(ids, is_review) {
     return
   }
 
-  await api.updateMessageReview(ids, is_review)
+  // 失败时拦截器已经弹过提示, 这里只要别让成功提示和列表刷新误报
+  try {
+    await api.updateMessageReview(ids, is_review)
+  }
+  catch (err) {
+    console.error(err)
+    return
+  }
   $message?.success(is_review ? 'Review successful' : 'Revoke successful')
   $table.value?.handleSearch()
 }

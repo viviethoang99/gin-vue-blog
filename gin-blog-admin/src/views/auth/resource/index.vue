@@ -1,15 +1,15 @@
 <script setup>
-import { h, onMounted, ref } from 'vue'
 import { NButton, NForm, NFormItem, NGradientText, NInput, NPopconfirm, NRadio, NRadioGroup, NSpace, NSwitch, NTag } from 'naive-ui'
+import { h, onMounted, ref } from 'vue'
 
+import api from '@/api'
 import CommonPage from '@/components/common/CommonPage.vue'
-import QueryItem from '@/components/crud/QueryItem.vue'
 import CrudModal from '@/components/crud/CrudModal.vue'
 import CrudTable from '@/components/crud/CrudTable.vue'
 
-import { formatDate } from '@/utils'
+import QueryItem from '@/components/crud/QueryItem.vue'
 import { useCRUD } from '@/composables'
-import api from '@/api'
+import { formatDate } from '@/utils'
 
 defineOptions({ name: 'Resource Management' })
 
@@ -85,15 +85,16 @@ const columns = [
       return row.children
         ? '-'
         : h(
-          NTag,
-          { type: tagType(row.request_method) }, // Note: using computed property here
-          { default: () => row.request_method },
-        )
+            NTag,
+            { type: tagType(row.request_method) }, // 注意这里使用计算属性
+            { default: () => row.request_method },
+          )
     },
   },
   {
     title: 'Anonymous Access',
-    key: 'is_hidden',
+    // key 只用于导出(CrudTable 按 item[key] 取值), 以前写的是不存在的 is_hidden
+    key: 'is_anonymous',
     width: 50,
     align: 'center',
     fixed: 'left',
@@ -101,12 +102,12 @@ const columns = [
       return row.children
         ? '-'
         : h(NSwitch, {
-          size: 'small',
-          rubberBand: false,
-          value: row.is_anonymous,
-          loading: !!row.publishing, // Loading animation
-          onUpdateValue: () => handleUpdateAnonymous(row),
-        })
+            size: 'small',
+            rubberBand: false,
+            value: row.is_anonymous,
+            loading: !!row.publishing, // 修改 ing 动画
+            onUpdateValue: () => handleUpdateAnonymous(row),
+          })
     },
   },
   {
@@ -203,9 +204,25 @@ function handleEditModule(row) {
   modalForm.value = { ...row }
   moduleModalVisible.value = true
 }
+// 保存模块
+//
+// 以前是 handleSave() 不 await 紧接着关掉弹窗: 请求还没回来弹窗就关了,
+// 保存失败也一样关, 用户以为成功了
 async function handleModuleSave() {
-  handleSave()
-  moduleModalVisible.value = false
+  try {
+    modalLoading.value = true
+    await modalFormRef.value?.validate()
+    await api.saveOrUpdateResource(modalForm.value)
+    $message.success(modalAction.value === 'add' ? '新增成功' : '编辑成功')
+    moduleModalVisible.value = false
+    $table.value?.handleSearch()
+  }
+  catch (err) {
+    console.error(err)
+  }
+  finally {
+    modalLoading.value = false
+  }
 }
 </script>
 
@@ -229,7 +246,7 @@ async function handleModuleSave() {
       :single-line="true"
     >
       <template #queryBar>
-        <QueryItem label="Resource Name" :label-width="100">
+        <QueryItem label="Resource Name" :label-width="50">
           <NInput
             v-model:value="queryItems.keyword"
             clearable
@@ -277,7 +294,7 @@ async function handleModuleSave() {
     <CrudModal
       v-model:visible="moduleModalVisible"
       :title="`${modalAction === 'add' ? 'Add' : 'Edit'} Module`"
-      :loading="modalVisible"
+      :loading="modalLoading"
       @save="handleModuleSave"
     >
       <NForm

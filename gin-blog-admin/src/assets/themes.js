@@ -1,10 +1,13 @@
-import { darkTheme, lightTheme } from 'naive-ui'
-
-function getNaiveThemeOverrides(darkMode) {
-  const baseTheme = darkMode ? darkTheme : lightTheme
-  const common = baseTheme.common
-
-  return {
+// TODO: 响应式
+export default {
+  header: {
+    height: 60,
+  },
+  tags: {
+    visible: true,
+    height: 50,
+  },
+  naiveThemeOverrides: {
     common: {
       primaryColor: '#316C72FF',
       primaryColorHover: '#316C72E3',
@@ -31,26 +34,5 @@ function getNaiveThemeOverrides(darkMode) {
       errorColorPressed: '#AB1F3FFF',
       errorColorSuppl: '#DE576DFF',
     },
-    Input: {
-      color: common.cardColor,
-      colorFocus: common.cardColor,
-      textColor: common.textColor2,
-      placeholderColor: common.placeholderColor,
-      border: `1px solid ${common.borderColor}`,
-      borderHover: `1px solid ${common.primaryColorHover}`,
-      borderFocus: `1px solid ${common.primaryColorHover}`,
-    },
-  }
-}
-
-// TODO: 响应式
-export default {
-  header: {
-    height: 60,
   },
-  tags: {
-    visible: true,
-    height: 50,
-  },
-  naiveThemeOverrides: getNaiveThemeOverrides,
 }

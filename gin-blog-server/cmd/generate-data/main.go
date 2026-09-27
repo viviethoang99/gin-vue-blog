@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"flag"
+	"fmt"
 	ginblog "gin-blog/internal"
 	g "gin-blog/internal/global"
 	"gin-blog/internal/model"
@@ -13,16 +15,24 @@ import (
 	"gorm.io/gorm"
 )
 
+// 种子数据里的图片: 原来指向 cdn.hahacode.cn, 该图床已经失效(连接超时),
+// 换成本仓库 images/ 目录下的图片, 由 GitHub 直接提供
+const imgBase = "https://raw.githubusercontent.com/szluyu99/gin-vue-blog/main/images"
+
 func main() {
 	configPath := flag.String("c", "../../config.yml", "Configuration file path")
-	typeName := flag.String("t", "all", "Data type to initialize: config | auth | page | all")
+	typeName := flag.String("t", "all", "要初始化的数据类型: config | auth | page | demo | all")
+	// 从 cmd/generate-data 目录运行时, sqlite 文件在上一级(与 server 的工作目录 cmd/ 一致);
+	// 容器里二进制和配置文件同级, 需要显式关掉
+	sqliteParent := flag.Bool("sqlite-parent", true, "sqlite 数据库文件是否在上级目录")
 	flag.Parse()
 
 	// Read configuration file based on command line parameters, other variable initialization depends on the configuration file object
 	conf := g.ReadConfig(*configPath)
 
-	//! Handle sqlite3 database path
-	conf.SQLite.Dsn = "../" + conf.SQLite.Dsn
+	if *sqliteParent {
+		conf.SQLite.Dsn = "../" + conf.SQLite.Dsn
+	}
 	conf.Server.DbLogMode = "silent"
 
 	db := ginblog.InitDatabase(conf)
@@ -34,6 +44,8 @@ func main() {
 		generateDefaultAuths(db)
 	case "page":
 		generateDefaultPages(db)
+	case "demo":
+		generateDemoContent(db)
 	case "all":
 		fallthrough
 	default:
@@ -41,6 +53,18 @@ func main() {
 		generateDefaultPages(db)
 		generateDefaultAuths(db)
 	}
+}
+
+// 生成样例内容: 分类, 标签, 文章, 评论, 留言, 友链, 说说
+//
+// 只在库里一篇文章都没有时才灌, 所以可以重复执行。
+// 内容数据只是本地测试用, 不放进 all 里, 需要时显式 -t demo。
+func generateDemoContent(db *gorm.DB) {
+	slog.Info("-----初始化样例内容 start-----")
+	if err := model.SeedDemoContent(db); err != nil {
+		slog.Error("样例内容初始化失败: " + err.Error())
+	}
+	slog.Info("-----初始化样例内容 end-----")
 }
 
 // Generate authentication-related information: roles, users, resources, menus
@@ -55,23 +79,24 @@ func generateDefaultPages(db *gorm.DB) {
 	slog.Info("-----Initialize blog pages start-----")
 
 	pages := []model.Page{
-		{Name: "Home", Label: "home", Cover: "https://cdn.hahacode.cn/page/home.jpg"},
-		{Name: "Archive", Label: "archive", Cover: "https://cdn.hahacode.cn/page/archive.png"},
-		{Name: "Category", Label: "category", Cover: "https://cdn.hahacode.cn/page/category.png"},
-		{Name: "Tag", Label: "tag", Cover: "https://cdn.hahacode.cn/page/tag.png"},
-		{Name: "Links", Label: "link", Cover: "https://cdn.hahacode.cn/page/link.jpg"},
-		{Name: "About", Label: "about", Cover: "https://cdn.hahacode.cn/page/about.jpg"},
-		{Name: "Message", Label: "message", Cover: "https://cdn.hahacode.cn/page/message.jpeg"},
-		{Name: "User Center", Label: "user", Cover: "https://cdn.hahacode.cn/page/user.jpg"},
-		{Name: "Album", Label: "album", Cover: "https://cdn.hahacode.cn/page/album.png"},
-		{Name: "Error Page", Label: "404", Cover: "https://cdn.hahacode.cn/page/404.jpg"},
-		{Name: "Article List", Label: "article_list", Cover: "https://cdn.hahacode.cn/page/article_list.jpg"},
+		{Name: "Home", Label: "home", Cover: imgBase + "/page/home.jpg"},
+		{Name: "Archive", Label: "archive", Cover: imgBase + "/page/archive.png"},
+		{Name: "Category", Label: "category", Cover: imgBase + "/page/category.png"},
+		{Name: "Tag", Label: "tag", Cover: imgBase + "/page/tag.png"},
+		{Name: "Links", Label: "link", Cover: imgBase + "/page/link.jpg"},
+		{Name: "About", Label: "about", Cover: imgBase + "/page/about.jpg"},
+		{Name: "Message", Label: "message", Cover: imgBase + "/page/message.jpeg"},
+		{Name: "Personal Center", Label: "user", Cover: imgBase + "/page/user.jpg"},
+		{Name: "Album", Label: "album", Cover: imgBase + "/page/album.png"},
+		{Name: "说说", Label: "talk", Cover: imgBase + "/page/talking.jpg"},
+		{Name: "Error Page", Label: "404", Cover: imgBase + "/page/404.jpg"},
+		{Name: "Article List", Label: "article_list", Cover: imgBase + "/page/article_list.jpg"},
 	}
 
 	for _, page := range pages {
 		if err := db.Create(&page).Error; err != nil {
-			if strings.Contains(err.Error(), "UNIQUE constraint failed") || strings.Contains(err.Error(), "Duplicate entry") {
-				slog.Info(page.Name + " page data already exists")
+			if isDuplicate(err) {
+				slog.Debug(page.Name + " page data already exists")
 			} else {
 				slog.Error(page.Name + " page initialization failed" + err.Error())
 			}
@@ -86,7 +111,7 @@ func generateDefaultConfigs(db *gorm.DB) {
 	slog.Info("-----Initialize blog configuration start-----")
 
 	configs := []model.Config{
-		{Key: "website_avatar", Value: "https://foruda.gitee.com/avatar/1677041571085433939/5221991_szluyu99_1614389421.png", Desc: "Website Avatar"},
+		{Key: "website_avatar", Value: imgBase + "/common/header.jpeg", Desc: "Website Avatar"},
 		{Key: "website_name", Value: "Zhenyu's Personal Blog", Desc: "Website Name"},
 		{Key: "website_author", Value: "Zhenyu", Desc: "Website Author"},
 		{Key: "website_intro", Value: "Let the past go with the wind", Desc: "Website Introduction"},
@@ -96,17 +121,19 @@ func generateDefaultConfigs(db *gorm.DB) {
 		{Key: "qq", Value: "123456789", Desc: "QQ"},
 		{Key: "github", Value: "https://github.com/szluyu99", Desc: "github"},
 		{Key: "gitee", Value: "https://gitee.com/szluyu99", Desc: "gitee"},
-		{Key: "tourist_avatar", Value: "https://cdn.hahacode.cn/config/tourist_avatar.png", Desc: "Default Tourist Avatar"},
-		{Key: "user_avatar", Value: "https://cdn.hahacode.cn/config/user_avatar.png", Desc: "Default User Avatar"},
-		{Key: "article_cover", Value: "https://cdn.hahacode.cn/config/default_article_cover.png", Desc: "Default Article Cover"},
-		{Key: "is_comment_review", Value: "true", Desc: "Comment Default Review"},
-		{Key: "is_message_review", Value: "true", Desc: "Message Default Review"},
+		{Key: "tourist_avatar", Value: imgBase + "/config/tourist_avatar.jpeg", Desc: "Default Tourist Avatar"},
+		{Key: "user_avatar", Value: imgBase + "/config/user_avatar.jpeg", Desc: "Default User Avatar"},
+		{Key: "article_cover", Value: imgBase + "/config/default_article_cover.png", Desc: "Default Article Cover"},
+		// 名字读起来像「需要审核」, 实际语义是「免审核」: true = 新内容直接展示,
+		// false = 要在后台点「通过」。Desc 写清楚, 免得照名字理解反了
+		{Key: "is_comment_review", Value: "true", Desc: "评论免审核(true 新评论直接展示, false 需后台通过)"},
+		{Key: "is_message_review", Value: "true", Desc: "留言免审核(true 新留言直接展示, false 需后台通过)"},
 	}
 
 	for _, config := range configs {
 		if err := db.Create(&config).Error; err != nil {
-			if strings.Contains(err.Error(), "UNIQUE constraint failed") || strings.Contains(err.Error(), "Duplicate entry") {
-				slog.Info(config.Key + " configuration already exists")
+			if isDuplicate(err) {
+				slog.Debug(config.Key + " configuration already exists")
 			} else {
 				slog.Error(config.Key + " configuration initialization failed" + err.Error())
 			}
@@ -127,8 +154,10 @@ func generateDefaultRolesAndUsers(db *gorm.DB) {
 
 	for i := range roles {
 		if err := db.Create(&roles[i]).Error; err != nil {
-			if strings.Contains(err.Error(), "UNIQUE constraint failed") || strings.Contains(err.Error(), "Duplicate entry") {
-				slog.Info(roles[i].Name + " role already exists")
+			if isDuplicate(err) {
+				slog.Debug(roles[i].Name + " role already exists")
+				// 取回已有 ID, 否则后面的关联关系会写成 0
+				db.Where("name", roles[i].Name).First(&roles[i])
 			} else {
 				slog.Error(roles[i].Name + " role initialization failed" + err.Error())
 			}
@@ -142,7 +171,7 @@ func generateDefaultRolesAndUsers(db *gorm.DB) {
 			Password: pwd,
 			UserInfo: &model.UserInfo{
 				Nickname: "admin",
-				Avatar:   "https://www.bing.com/rp/ar_9isCNU2Q-VG1yEDDHnx8HAFQ.png",
+				Avatar:   imgBase + "/config/user_avatar.jpeg",
 			},
 		},
 		{
@@ -150,177 +179,153 @@ func generateDefaultRolesAndUsers(db *gorm.DB) {
 			Password: pwd,
 			UserInfo: &model.UserInfo{
 				Nickname: "guest",
-				Avatar:   "https://www.bing.com/rp/ar_9isCNU2Q-VG1yEDDHnx8HAFQ.png",
+				Avatar:   imgBase + "/config/user_avatar.jpeg",
 			},
 		},
 	}
 
 	for i := range auths {
 		if err := db.Create(&auths[i]).Error; err != nil {
-			if strings.Contains(err.Error(), "UNIQUE constraint failed") || strings.Contains(err.Error(), "Duplicate entry") {
-				slog.Info(auths[i].Username + " user already exists")
+			if isDuplicate(err) {
+				slog.Debug(auths[i].Username + " user already exists")
+				// 取回已有 ID, 否则下面会插入 user_auth_id = 0 的脏数据
+				db.Where("username", auths[i].Username).First(&auths[i])
 			} else {
 				slog.Error(auths[i].Username + " user initialization failed" + err.Error())
 			}
 		}
 		// Create user role association
-		db.Create(&model.UserAuthRole{UserAuthId: auths[i].ID, RoleId: roles[i].ID})
+		if auths[i].ID != 0 && roles[i].ID != 0 {
+			db.Create(&model.UserAuthRole{UserAuthId: auths[i].ID, RoleId: roles[i].ID})
+		}
 	}
 
 	slog.Info("-----Initialize default roles and users end-----")
 }
 
 // Generate default interface resources
+//
+// 资源定义见 internal/model/seed_resource.go, 与后台路由一一对应。
+// 这里是对账而不是只增不删: 接口下线或改名后, 旧资源如果留在表里会继续
+// 挂在角色上, 之后路由被复用时权限就凭空对上了。
 func generateDefaultResources(db *gorm.DB) {
 	slog.Info("-----Initialize interface resources start-----")
 
-	parents := []model.Resource{
-		{Name: "Article Module"},
-		{Name: "Category Module"},
-		{Name: "Tag Module"},
-		{Name: "Page Module"},
-		{Name: "Link Module"},
-		{Name: "Menu Module"},
-		{Name: "Role Module"},
-		{Name: "Resource Module"},
-		{Name: "Comment Module"},
-		{Name: "Message Module"},
-		{Name: "File Module"},
-		{Name: "Blog Info Module"},
-		{Name: "User Info Module"},
-		{Name: "Operation Log Module"},
-	}
-	for i := range parents {
-		if err := db.Create(&parents[i]).Error; err != nil {
-			if strings.Contains(err.Error(), "UNIQUE constraint failed") || strings.Contains(err.Error(), "Duplicate entry") {
-				slog.Info(parents[i].Name + " resource already exists")
-			} else {
-				slog.Error(parents[i].Name + " resource initialization failed" + err.Error())
+	// 期望存在的接口资源, key 为 "METHOD URL"
+	wanted := make(map[string]model.Resource)
+	// 期望存在的模块(父资源)名称
+	moduleNames := make(map[string]bool)
+
+	for _, module := range model.AdminResources {
+		moduleNames[module.Name] = true
+
+		parent := model.Resource{Name: module.Name}
+		err := db.Where("name", module.Name).First(&parent).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			if err := db.Create(&parent).Error; err != nil {
+				slog.Error(module.Name + " resource initialization failed" + err.Error())
+				continue
+			}
+		} else if err != nil {
+			slog.Error(module.Name + " 资源查询失败" + err.Error())
+			continue
+		}
+
+		for _, item := range module.Items {
+			wanted[item.Method+" "+item.Url] = model.Resource{
+				Name:     item.Name,
+				ParentId: parent.ID,
+				Url:      item.Url,
+				Method:   item.Method,
 			}
 		}
 	}
 
-	resources := []model.Resource{
-		// Article Module
-		{Name: "Article List", ParentId: parents[0].ID, Url: "/article/list", Method: "GET"},
-		{Name: "Article Details", ParentId: parents[0].ID, Url: "/article/:id", Method: "GET"},
-		{Name: "Add/Edit Article", ParentId: parents[0].ID, Url: "/article", Method: "POST"},
-		{Name: "Update Article Soft Delete", ParentId: parents[0].ID, Url: "/article/soft-delete", Method: "PUT"},
-		{Name: "Delete Article", ParentId: parents[0].ID, Url: "/article", Method: "DELETE"},
-		{Name: "Modify Article Top", ParentId: parents[0].ID, Url: "/article/top", Method: "PUT"},
-		{Name: "Export Article", ParentId: parents[0].ID, Url: "/article/export", Method: "POST"},
-		{Name: "Import Article", ParentId: parents[0].ID, Url: "/article/import", Method: "POST"},
-		// Category Module
-		{Name: "Category List", ParentId: parents[1].ID, Url: "/category/list", Method: "GET"},
-		{Name: "Add/Edit Category", ParentId: parents[1].ID, Url: "/category", Method: "POST"},
-		{Name: "Delete Category", ParentId: parents[1].ID, Url: "/category", Method: "DELETE"},
-		{Name: "Category Option List", ParentId: parents[1].ID, Url: "/category/option", Method: "GET"},
-		// Tag Module
-		{Name: "Tag List", ParentId: parents[2].ID, Url: "/tag/list", Method: "GET"},
-		{Name: "Add/Edit Tag", ParentId: parents[2].ID, Url: "/tag", Method: "POST"},
-		{Name: "Delete Tag", ParentId: parents[2].ID, Url: "/tag", Method: "DELETE"},
-		{Name: "Tag Option List", ParentId: parents[2].ID, Url: "/tag/option", Method: "GET"},
-		// Page Module
-		{Name: "Page List", ParentId: parents[3].ID, Url: "/page/list", Method: "GET"},
-		{Name: "Add/Edit Page", ParentId: parents[3].ID, Url: "/page", Method: "POST"},
-		{Name: "Delete Page", ParentId: parents[3].ID, Url: "/page", Method: "DELETE"},
-		// Link Module
-		{Name: "Link List", ParentId: parents[4].ID, Url: "/link/list", Method: "GET"},
-		{Name: "Add/Edit Link", ParentId: parents[4].ID, Url: "/link", Method: "POST"},
-		{Name: "Delete Link", ParentId: parents[4].ID, Url: "/link", Method: "DELETE"},
-		// Menu Module
-		{Name: "Menu List", ParentId: parents[5].ID, Url: "/menu/list", Method: "GET"},
-		{Name: "Add/Edit Menu", ParentId: parents[5].ID, Url: "/menu", Method: "POST"},
-		{Name: "Delete Menu", ParentId: parents[5].ID, Url: "/menu", Method: "DELETE"},
-		{Name: "Menu Option List (Tree)", ParentId: parents[5].ID, Url: "/menu/option", Method: "GET"},
-		{Name: "Get Current User Menu", ParentId: parents[5].ID, Url: "/menu/user/list", Method: "GET"},
-		// Role Module
-		{Name: "Role List", ParentId: parents[6].ID, Url: "/role/list", Method: "GET"},
-		{Name: "Add/Edit Role", ParentId: parents[6].ID, Url: "/role", Method: "POST"},
-		{Name: "Delete Role", ParentId: parents[6].ID, Url: "/role", Method: "DELETE"},
-		{Name: "Role Option List", ParentId: parents[6].ID, Url: "/role/option", Method: "GET"},
-		// Resource Module
-		{Name: "Resource List", ParentId: parents[7].ID, Url: "/resource/list", Method: "GET"},
-		{Name: "Add/Edit Resource", ParentId: parents[7].ID, Url: "/resource", Method: "POST"},
-		{Name: "Delete Resource", ParentId: parents[7].ID, Url: "/resource", Method: "DELETE"},
-		{Name: "Resource Option List (Tree)", ParentId: parents[7].ID, Url: "/resource/option", Method: "GET"},
-		{Name: "Modify Resource Anonymous Access", ParentId: parents[7].ID, Url: "/resource/anonymous", Method: "PUT"},
-		// Comment Module
-		{Name: "Comment List", ParentId: parents[8].ID, Url: "/comment/list", Method: "GET"},
-		{Name: "Delete Comment", ParentId: parents[8].ID, Url: "/comment", Method: "DELETE"},
-		{Name: "Modify Comment Review", ParentId: parents[8].ID, Url: "/comment/review", Method: "PUT"},
-		// Message Module
-		{Name: "Message List", ParentId: parents[9].ID, Url: "/message/list", Method: "GET"},
-		{Name: "Delete Message", ParentId: parents[9].ID, Url: "/message", Method: "DELETE"},
-		{Name: "Modify Message Review", ParentId: parents[9].ID, Url: "/message/review", Method: "PUT"},
-		// File Module
-		{Name: "File Upload", ParentId: parents[10].ID, Url: "/upload", Method: "POST"},
-		// Blog Info Module
-		{Name: "Get Blog Settings", ParentId: parents[11].ID, Url: "/setting/blog-config", Method: "GET"},
-		{Name: "Get About Me", ParentId: parents[11].ID, Url: "/setting/about", Method: "GET"},
-		{Name: "Modify Blog Settings", ParentId: parents[11].ID, Url: "/setting/blog-config", Method: "PUT"},
-		{Name: "Modify About Me", ParentId: parents[11].ID, Url: "/setting/about", Method: "PUT"},
-		{Name: "Get Backend Home Info", ParentId: parents[11].ID, Url: "/home", Method: "GET"},
-		// User Info Module
-		{Name: "User List", ParentId: parents[12].ID, Url: "/user/list", Method: "GET"},
-		{Name: "Get Current User Info", ParentId: parents[12].ID, Url: "/user/info", Method: "GET"},
-		{Name: "Modify User Info", ParentId: parents[12].ID, Url: "/user", Method: "PUT"},
-		{Name: "Get Online User List", ParentId: parents[12].ID, Url: "/user/online", Method: "GET"},
-		{Name: "Force User Offline", ParentId: parents[12].ID, Url: "/user/offline", Method: "DELETE"},
-		{Name: "Modify Current User Password", ParentId: parents[12].ID, Url: "/user/current/password", Method: "PUT"},
-		{Name: "Modify Current User Info", ParentId: parents[12].ID, Url: "/user/current", Method: "PUT"},
-		{Name: "Modify User Disable", ParentId: parents[12].ID, Url: "/user/disable", Method: "PUT"},
-		// Operation Log Module
-		{Name: "Log List", ParentId: parents[13].ID, Url: "/operation/log/list", Method: "GET"},
-		{Name: "Delete Operation Log", ParentId: parents[13].ID, Url: "/operation/log", Method: "DELETE"},
-	}
-
-	for i := range resources {
-		if err := db.Create(&resources[i]).Error; err != nil {
-			if strings.Contains(err.Error(), "UNIQUE constraint failed") || strings.Contains(err.Error(), "Duplicate entry") {
-				slog.Info(resources[i].Name + " resource already exists")
-			} else {
-				slog.Error(resources[i].Name + " resource initialization failed" + err.Error())
+	// 新增或更新: 以 url + method 定位, 名称和所属模块允许变更
+	for _, want := range wanted {
+		var exist model.Resource
+		err := db.Where(&model.Resource{Url: want.Url, Method: want.Method}).First(&exist).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			if err := db.Create(&want).Error; err != nil {
+				slog.Error(want.Name + " resource initialization failed" + err.Error())
+			}
+			continue
+		}
+		if err != nil {
+			slog.Error(want.Name + " 资源查询失败" + err.Error())
+			continue
+		}
+		if exist.Name != want.Name || exist.ParentId != want.ParentId {
+			if err := db.Model(&exist).
+				Updates(map[string]any{"name": want.Name, "parent_id": want.ParentId}).Error; err != nil {
+				slog.Error(want.Name + " 资源更新失败" + err.Error())
 			}
 		}
 	}
 
-	// Load all resources
-	db.Find(&resources)
+	// 清理代码中已经不存在的资源, 连同它的角色关联
+	// 注意只删资源本身, 不动管理员在后台手动给角色配的其他权限
+	var all []model.Resource
+	if err := db.Find(&all).Error; err != nil {
+		slog.Error("资源列表查询失败" + err.Error())
+		return
+	}
+
+	var stale []int
+	for _, r := range all {
+		if r.Url == "" && r.Method == "" { // 模块(父资源)
+			if !moduleNames[r.Name] {
+				stale = append(stale, r.ID)
+			}
+			continue
+		}
+		if _, ok := wanted[r.Method+" "+r.Url]; !ok {
+			stale = append(stale, r.ID)
+		}
+	}
+
+	if len(stale) > 0 {
+		if err := db.Delete(&model.RoleResource{}, "resource_id in ?", stale).Error; err != nil {
+			slog.Error("清理过期资源的角色关联失败" + err.Error())
+		}
+		if err := db.Delete(&model.Resource{}, "id in ?", stale).Error; err != nil {
+			slog.Error("清理过期资源失败" + err.Error())
+		}
+		slog.Info(fmt.Sprintf("清理了 %d 条代码中已不存在的资源", len(stale)))
+	}
+
+	// 重新加载, 下面按最新的资源表建立角色关联
+	if err := db.Find(&all).Error; err != nil {
+		slog.Error("资源列表查询失败" + err.Error())
+		return
+	}
 
 	// Add all resource access permissions to admin role
 	var adminRole model.Role
 	if err := db.Where("name", "admin").First(&adminRole).Error; err == nil {
-		for _, resource := range resources {
-			if resource.ID != 0 {
-				if err := db.Create(&model.RoleResource{RoleId: adminRole.ID, ResourceId: resource.ID}).Error; err != nil {
-					if strings.Contains(err.Error(), "UNIQUE constraint failed") || strings.Contains(err.Error(), "Duplicate entry") {
-						slog.Info("admin role menu association initialization failed" + err.Error())
-					} else {
-						slog.Error("admin role menu association initialization failed" + err.Error())
-					}
-				}
-			}
-		}
+		bindRoleResources(db, adminRole, all, func(model.Resource) bool { return true })
 	}
 
 	// Add query resource access permissions to guest
 	var guestRole model.Role
 	if err := db.Where("name", "guest").First(&guestRole).Error; err == nil {
-		for _, resource := range resources {
-			if resource.ID != 0 && resource.Method == "GET" {
-				if err := db.Create(&model.RoleResource{RoleId: guestRole.ID, ResourceId: resource.ID}).Error; err != nil {
-					if strings.Contains(err.Error(), "UNIQUE constraint failed") || strings.Contains(err.Error(), "Duplicate entry") {
-						slog.Info("guest role menu association initialization failed" + err.Error())
-					} else {
-						slog.Error("guest role menu association initialization failed" + err.Error())
-					}
-				}
-			}
-		}
+		bindRoleResources(db, guestRole, all, func(r model.Resource) bool { return r.Method == "GET" })
 	}
 
 	slog.Info("-----Initialize interface resources end-----")
+}
+
+// 把满足 match 的资源挂到角色下, 已经存在的关联跳过
+func bindRoleResources(db *gorm.DB, role model.Role, resources []model.Resource, match func(model.Resource) bool) {
+	for _, resource := range resources {
+		if resource.ID == 0 || !match(resource) {
+			continue
+		}
+		err := db.Create(&model.RoleResource{RoleId: role.ID, ResourceId: resource.ID}).Error
+		if err != nil && !isDuplicate(err) {
+			slog.Error(role.Name + " 角色资源关联关系初始化失败" + err.Error())
+		}
+	}
 }
 
 // Generate default menus
@@ -340,8 +345,19 @@ func generateDefaultMenus(db *gorm.DB) {
 
 	for i := range parents {
 		if err := db.Create(&parents[i]).Error; err != nil {
-			if strings.Contains(err.Error(), "UNIQUE constraint failed") || strings.Contains(err.Error(), "Duplicate entry") {
-				slog.Info(parents[i].Name + " menu already exists")
+			if isDuplicate(err) {
+				slog.Debug(parents[i].Name + " menu already exists")
+				/*
+					把已存在的父菜单查回来, 拿到真实 ID
+
+					Create 撞唯一索引时 parents[i].ID 会留在 0, 下面的子菜单
+					ParentId 就成了 0 —— 菜单变成孤儿, 前端菜单树不渲染它,
+					对应路由直接 404。首次灌库时父子一起建所以看不出问题,
+					往已有库里加新子菜单才会暴露(「前端错误」就是这么踩到的)。
+				*/
+				if err := db.Where("name = ?", parents[i].Name).First(&parents[i]).Error; err != nil {
+					slog.Error(parents[i].Name + " 菜单已存在但查询失败" + err.Error())
+				}
 			} else {
 				slog.Error(parents[i].Name + " menu initialization failed" + err.Error())
 			}
@@ -354,6 +370,7 @@ func generateDefaultMenus(db *gorm.DB) {
 		{Name: "Article List", Path: "list", Component: "/article/list", Icon: "material-symbols:format-list-bulleted", OrderNum: 2, ParentId: parents[1].ID},
 		{Name: "Category Management", Path: "category", Component: "/article/category", Icon: "tabler:category", OrderNum: 3, ParentId: parents[1].ID},
 		{Name: "Tag Management", Path: "tag", Component: "/article/tag", Icon: "tabler:tag", OrderNum: 4, ParentId: parents[1].ID},
+		{Name: "说说管理", Path: "talk", Component: "/article/talk", Icon: "mdi:message-text-outline", OrderNum: 5, ParentId: parents[1].ID},
 		{Name: "Edit Article", Path: "write/:id", Component: "/article/write", Icon: "icon-park-outline:write", OrderNum: 1, ParentId: parents[1].ID, Hidden: true},
 		// Permission Management
 		{Name: "Menu Management", Path: "menu", Component: "/auth/menu", Icon: "ic:twotone-menu-book", OrderNum: 1, ParentId: parents[2].ID},
@@ -368,6 +385,7 @@ func generateDefaultMenus(db *gorm.DB) {
 		// Log Management
 		{Name: "Operation Log", Path: "operation", Component: "/log/operation", Icon: "mdi:book-open-page-variant-outline", OrderNum: 1, ParentId: parents[5].ID},
 		{Name: "Login Log", Path: "login", Component: "/log/login", Icon: "material-symbols:login", OrderNum: 2, ParentId: parents[5].ID},
+		{Name: "前端错误", Path: "error", Component: "/log/error", Icon: "mdi:bug-outline", OrderNum: 3, ParentId: parents[5].ID},
 		// System Management
 		{Name: "Website Management", Path: "website", Component: "/setting/website", Icon: "el:website", OrderNum: 1, ParentId: parents[6].ID},
 		{Name: "Page Management", Path: "page", Component: "/setting/page", Icon: "iconoir:journal-page", OrderNum: 2, ParentId: parents[6].ID},
@@ -377,8 +395,8 @@ func generateDefaultMenus(db *gorm.DB) {
 
 	for i := range menus {
 		if err := db.Create(&menus[i]).Error; err != nil {
-			if strings.Contains(err.Error(), "UNIQUE constraint failed") || strings.Contains(err.Error(), "Duplicate entry") {
-				slog.Info(menus[i].Name + " menu already exists")
+			if isDuplicate(err) {
+				slog.Debug(menus[i].Name + " menu already exists")
 			} else {
 				slog.Error(menus[i].Name + " menu initialization failed" + err.Error())
 			}
@@ -388,37 +406,36 @@ func generateDefaultMenus(db *gorm.DB) {
 	// Load all menus
 	db.Find(&menus)
 
-	// Add all menu access permissions to admin role
-	var adminRole model.Role
-	if err := db.Where("name", "admin").First(&adminRole).Error; err == nil {
-		for _, menu := range menus {
-			if menu.ID != 0 {
-				if err := db.Create(&model.RoleMenu{RoleId: adminRole.ID, MenuId: menu.ID}).Error; err != nil {
-					if strings.Contains(err.Error(), "UNIQUE constraint failed") || strings.Contains(err.Error(), "Duplicate entry") {
-						slog.Info("admin role menu association initialization failed" + err.Error())
-					} else {
-						slog.Error("admin role menu association initialization failed" + err.Error())
-					}
-				}
-			}
+	// 给 admin 和 guest 角色添加所有菜单访问权限
+	for _, name := range []string{"admin", "guest"} {
+		var role model.Role
+		if err := db.Where("name", name).First(&role).Error; err != nil {
+			continue
 		}
-	}
-
-	// Add all menu access permissions to guest role
-	var guestRole model.Role
-	if err := db.Where("name", "guest").First(&guestRole).Error; err == nil {
-		for _, menu := range menus {
-			if menu.ID != 0 {
-				if err := db.Create(&model.RoleMenu{RoleId: guestRole.ID, MenuId: menu.ID}).Error; err != nil {
-					if strings.Contains(err.Error(), "UNIQUE constraint failed") || strings.Contains(err.Error(), "Duplicate entry") {
-						slog.Info("guest role menu association initialization failed" + err.Error())
-					} else {
-						slog.Error("guest role menu association initialization failed" + err.Error())
-					}
-				}
-			}
-		}
+		bindRoleMenus(db, role, menus)
 	}
 
 	slog.Info("-----Initialize menus end-----")
+}
+
+// 把菜单挂到角色下, 已经存在的关联跳过
+// 重复执行是正常的(每次容器启动都会跑一遍), 不要为此刷一堆日志
+func bindRoleMenus(db *gorm.DB, role model.Role, menus []model.Menu) {
+	for _, menu := range menus {
+		if menu.ID == 0 {
+			continue
+		}
+		err := db.Create(&model.RoleMenu{RoleId: role.ID, MenuId: menu.ID}).Error
+		if err != nil && !isDuplicate(err) {
+			slog.Error(role.Name + " 角色菜单关联关系初始化失败" + err.Error())
+		}
+	}
+}
+
+// sqlite 和 MySQL 的唯一约束冲突错误文案不同, 统一判断
+// 种子数据允许重复执行, 冲突说明已经初始化过, 不算失败
+func isDuplicate(err error) bool {
+	msg := err.Error()
+	return strings.Contains(msg, "UNIQUE constraint failed") ||
+		strings.Contains(msg, "Duplicate entry")
 }

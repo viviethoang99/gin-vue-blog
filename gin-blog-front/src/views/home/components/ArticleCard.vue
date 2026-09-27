@@ -1,6 +1,6 @@
 <script setup>
-import { computed } from 'vue'
 import dayjs from 'dayjs'
+import { computed } from 'vue'
 
 import { convertImgUrl } from '@/utils'
 
@@ -9,18 +9,33 @@ const props = defineProps({
   article: {},
 })
 
+// 与首页 params.page_size 保持一致
+const PAGE_SIZE = 8
+
 // 判断图片放置位置 (左 or 右)
 const isRightClass = computed(() => props.idx % 2 === 0
   ? 'rounded-t-xl md:order-0 md:rounded-l-xl md:rounded-tr-0'
   : 'rounded-t-xl md:order-1 md:rounded-r-xl md:rounded-tl-0')
+
+// 入场错峰的序号: idx 是全列表下标, 滚动加载后会一直涨,
+// 按每页条数取模才能让每批新追加的卡片各自从 0 开始错峰
+const enterIndex = computed(() => props.idx % PAGE_SIZE)
 </script>
 
 <template>
-  <div class="group h-[430px] w-full flex flex-col animate-zoom-in animate-duration-700 items-center rounded-xl bg-white shadow-md transition-600 md:h-[280px] md:flex-row hover:shadow-2xl">
+  <div
+    class="card-enter group h-[430px] w-full flex flex-col items-center rounded-xl bg-surface shadow-md transition-600 md:h-[280px] md:flex-row hover:shadow-2xl"
+    :style="{ '--i': enterIndex }"
+  >
     <!-- 封面图 -->
-    <div :class="isRightClass" class="h-[230px] w-full overflow-hidden md:h-full md:w-45/100">
+    <!-- 图区给个底色: 封面没加载出来时(图床挂了/懒加载还没到)这里是一块白洞 -->
+    <div :class="isRightClass" class="h-[230px] w-full overflow-hidden bg-surface-soft md:h-full md:w-45/100">
       <RouterLink :to="`/article/${article.id}`">
-        <img class="h-full w-full transition-600 hover:scale-110" :src="convertImgUrl(article.img)">
+        <!-- object-cover: 原来是默认的 fill(实测), 封面比例和容器不一致时会被拉伸变形 -->
+        <img
+          class="h-full w-full object-cover transition-600 hover:scale-110"
+          loading="lazy" :src="convertImgUrl(article.img)" :alt="article.title"
+        >
       </RouterLink>
     </div>
     <!-- 文章信息 -->
@@ -30,12 +45,13 @@ const isRightClass = computed(() => props.idx % 2 === 0
           {{ article.title }}
         </span>
       </RouterLink>
-      <div class="flex flex-wrap text-sm color-[#858585]">
+      <div class="flex flex-wrap text-sm color-muted">
         <!-- 置顶 -->
-        <span v-if="article.is_top === 1" class="flex items-center color-[#ff7242]">
+        <!-- 后端 Article.IsTop 是 bool, JSON 里是 true/false, 之前写的 === 1 永远为假 -->
+        <span v-if="article.is_top" class="flex items-center text-accent">
           <span class="i-carbon:align-vertical-top mr-1" /> 置顶
         </span>
-        <span v-if="article.is_top === 1" class="mx-1.5">|</span>
+        <span v-if="article.is_top" class="mx-1.5">|</span>
         <!-- 日期 -->
         <span class="flex items-center">
           <span class="i-mdi-calendar-month-outline mr-1" /> {{ dayjs(article.created_at).format('YYYY-MM-DD') }}

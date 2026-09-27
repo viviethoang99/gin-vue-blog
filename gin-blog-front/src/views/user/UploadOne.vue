@@ -1,7 +1,7 @@
 <script setup>
-import { computed, ref } from 'vue'
-import { convertImgUrl } from '@/utils'
+import { computed, ref, watch } from 'vue'
 import { useUserStore } from '@/store'
+import { convertImgUrl } from '@/utils'
 
 const props = defineProps({
   preview: {
@@ -12,6 +12,10 @@ const props = defineProps({
 
 const emit = defineEmits(['update:preview'])
 const previewImg = ref(props.preview) // Image preview
+
+// getUserInfo 是在 onMounted 里异步拿的, 父组件的 preview 会晚于本组件创建才有值,
+// 不 watch 的话这里永远停在默认头像
+watch(() => props.preview, val => previewImg.value = val)
 
 // Determine whether the image is local upload or web resource
 // Local file upload is fine in development; use cloud storage in production
@@ -40,7 +44,7 @@ async function handleFileChange() {
     }
 
     previewImg.value = responseJSON.data
-    emit('update:preview', previewImg)
+    emit('update:preview', previewImg.value)
   }
   catch (err) {
     console.error(err)
@@ -51,11 +55,11 @@ async function handleFileChange() {
 
 <template>
   <!-- TODO: Drag-and-drop file upload -->
-  <main class="flex items-center justify-center bg-gray-100 font-sans">
-    <label for="dropzone-file" class="mx-auto max-w-[300px] w-full cursor-pointer items-center border-1 border-blue-400 rounded-xl border-dashed bg-white p-2 text-center">
+  <main class="flex items-center justify-center bg-surface-soft font-sans">
+    <label for="dropzone-file" class="mx-auto max-w-[300px] w-full cursor-pointer items-center border-1 border-blue-400 rounded-xl border-dashed bg-surface p-2 text-center">
       <template v-if="previewImg">
         <div class="group relative">
-          <img class="lg:h-[160px] lg:w-[160px]" :src="imgUrl" alt="user avatar">
+          <img class="h-[160px] w-[160px] object-cover" :src="imgUrl" alt="user avatar">
           <div class="absolute bottom-0 left-0 right-0 top-0 f-c-c cursor-pointer">
             <button class="i-mdi:upload pointer-events-none inline-block text-[50px] text-white opacity-35 duration-200 group-hover:opacity-80" />
           </div>
@@ -65,11 +69,18 @@ async function handleFileChange() {
         <div class="f-c-c lg:h-[160px] lg:w-[160px]">
           <div class="flex flex-col items-center">
             <span class="i-mdi:upload text-[58px] text-blue-500" />
-            <span class="text-blue-400"> Click to upload file</span>
+            <span class="text-blue-400"> 点击上传文件</span>
           </div>
         </div>
       </template>
-      <input id="dropzone-file" ref="fileRef" type="file" class="hidden" @change="handleFileChange">
+      <input
+        id="dropzone-file"
+        ref="fileRef"
+        type="file"
+        class="hidden"
+        accept="image/jpeg,image/png,image/gif,image/webp,image/bmp"
+        @change="handleFileChange"
+      >
     </label>
   </main>
 </template>

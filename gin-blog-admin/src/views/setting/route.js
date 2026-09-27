@@ -25,7 +25,7 @@ export default {
       },
     },
     {
-      name: 'PageManagement',
+      name: 'Page Management',
       path: 'page',
       component: () => import('./page/index.vue'),
       meta: {

@@ -1,11 +1,11 @@
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import vueDanmaku from 'vue3-danmaku'
 
 import api from '@/api'
-import { convertImgUrl } from '@/utils'
 import { useAppStore, useUserStore } from '@/store'
+import { convertImgUrl } from '@/utils'
 
 const userStore = useUserStore()
 const { pageList } = storeToRefs(useAppStore())
@@ -19,15 +19,20 @@ const isLoop = ref(false) // 循环播放
 
 // 弹幕列表
 const danmus = ref([{
-  avatar: 'https://www.bing.com/rp/ar_9isCNU2Q-VG1yEDDHnx8HAFQ.png',
+  avatar: 'https://raw.githubusercontent.com/szluyu99/gin-vue-blog/main/images/config/user_avatar.jpeg',
   content: '大家好，我是作者，欢迎给我点一颗 Star!',
   nickname: '阵、雨',
 }])
 
 onMounted(async () => {
-  const resp = await api.getMessages()
-  await nextTick()
-  danmus.value = [...danmus.value, ...resp.data]
+  try {
+    const resp = await api.getMessages()
+    await nextTick()
+    danmus.value = [...danmus.value, ...(resp.data ?? [])]
+  }
+  catch (err) {
+    console.error(err)
+  }
 })
 
 async function send() {
@@ -41,8 +46,15 @@ async function send() {
     nickname: userStore.nickname,
     content: content.value,
   }
-  await api.saveMessage(data)
-  dmRef.value.push(data)
+  // 以前是裸 await: 发送失败会留下未捕获的 rejection, 输入框也不该被清空
+  try {
+    await api.saveMessage(data)
+  }
+  catch (err) {
+    console.error(err)
+    return
+  }
+  dmRef.value?.push(data)
   content.value = ''
 }
 
@@ -53,7 +65,7 @@ const coverStyle = computed(() => {
   const page = pageList.value.find(e => e.label === 'message')
   return page
     ? `background: url('${page?.cover}') center center / cover no-repeat;`
-    : 'background: url("https://static.talkxj.com/config/83be0017d7f1a29441e33083e7706936.jpg") center center / cover no-repeat;'
+    : 'background: url("https://raw.githubusercontent.com/szluyu99/gin-vue-blog/main/images/page/message.jpeg") center center / cover no-repeat;'
 })
 </script>
 
@@ -118,7 +130,7 @@ const coverStyle = computed(() => {
       >
         <template #dm="{ danmu }">
           <div class="flex items-center rounded-3xl bg-#00000060 px-2 py-1 text-white lg:px-4 lg:py-2">
-            <img class="h-[28px] rounded-full" :src="convertImgUrl(danmu.avatar)" alt="avatar">
+            <img class="h-[28px] rounded-full" :src="convertImgUrl(danmu.avatar)" alt="avatar" loading="lazy">
             <span class="ml-2 text-sm"> {{ `${danmu.nickname} : ${danmu.content}` }}</span>
           </div>
         </template>

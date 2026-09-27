@@ -6,6 +6,8 @@ export default {
   logout: () => baseRequest.get('/logout'),
   /** 发送验证码 */
   sendCode: params => baseRequest.get('/code', { params }),
+  /** 上报访客信息: 统计访问量与访客地域, 匿名接口 */
+  report: () => baseRequest.post('/report'),
 
   /** 关于我 */
   about: () => request.get('/about'),
@@ -30,6 +32,10 @@ export default {
   getMessages: () => request.get('/message/list'),
   /** 友链列表 */
   getLinks: () => request.get('/link/list'),
+  /** 说说列表 */
+  getTalks: (params = {}) => request.get('/talk/list', { params }),
+  /** 说说详情 */
+  getTalk: id => request.get(`/talk/${id}`),
   /** 评论列表 */
   getComments: (params = {}) => request.get('/comment/list', { params }),
   /** 评论回复列表 */
@@ -48,4 +54,10 @@ export default {
   saveLikeComment: id => request.get(`/comment/like/${id}`, { needToken: true }),
   /** 点赞文章 */
   saveLikeArticle: id => request.get(`/article/like/${id}`, { needToken: true }),
+  /** 站内通知列表 */
+  getNotifications: (params = {}) => request.get('/notification/list', { params, needToken: true }),
+  /** 未读通知数 */
+  getUnreadNotificationCount: () => request.get('/notification/unread', { needToken: true }),
+  /** 标记通知已读, ids 为空表示全部已读 */
+  readNotifications: (ids = []) => request.put('/notification/read', { ids }, { needToken: true }),
 }

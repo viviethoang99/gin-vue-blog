@@ -1,12 +1,12 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { MdEditor } from 'md-editor-v3'
 import { NButton } from 'naive-ui'
 
-import { MdEditor } from 'md-editor-v3'
-import 'md-editor-v3/lib/style.css'
+import { onMounted, ref } from 'vue'
+import api from '@/api'
 
 import CommonPage from '@/components/common/CommonPage.vue'
-import api from '@/api'
+import 'md-editor-v3/lib/style.css'
 
 defineOptions({ name: 'About Me' })
 
@@ -14,8 +14,14 @@ const aboutContent = ref('')
 const btnLoading = ref(false)
 
 onMounted(async () => {
-  const resp = await api.getAbout()
-  aboutContent.value = resp.data
+  // 裸 await 会在接口失败时留下未捕获的 rejection
+  try {
+    const resp = await api.getAbout()
+    aboutContent.value = resp.data ?? ''
+  }
+  catch (err) {
+    console.error(err)
+  }
 })
 
 async function handleSave() {
@@ -23,6 +29,9 @@ async function handleSave() {
     btnLoading.value = true
     await api.updateAbout({ content: aboutContent.value })
     window.$message.success('Update successful')
+  }
+  catch (err) {
+    console.error(err)
   }
   finally {
     btnLoading.value = false

@@ -3,6 +3,13 @@ Server:
   Port: :8765
   DbType: "mysql" # mysql | sqlite
   DbAutoMigrate: true # Auto-migrate DB schema (skip if unchanged to speed startup)
+  DbLogMode: "error" # GORM 日志级别 silent, error, warn, info, 默认 info
+  # 只有来自这些网段的请求才采信 X-Real-IP / X-Forwarded-For, 留空默认只信任内网
+  # (compose 里 nginx 和后端在同一 docker 网络, 内网兜底就够)
+  trusted-proxies: []
+  # 允许跨域的前端来源, 如 ["https://blog.example.com"], 留空只放行本机与内网
+  # compose 部署下前端和 /api 同源, 不需要跨域
+  allowed-origins: []
 JWT:
   Secret: "abc123321"
   Expire: 24 # hour
@@ -14,7 +21,6 @@ Mysql:
   Dbname: "gvb"
   Username: "root"
   Password: "123456"
-  LogMode: "error" # Log level: silent | error | warn | info (default info)
 Sqlite:
   Dsn: "gvb.db"
 Redis:
@@ -25,6 +31,7 @@ Session:
   Name: "mysession"
   Salt: "salt"
   MaxAge: 600 # second
+  Secure: false # 部署在 https 之后时置 true, session cookie 只走加密连接
 Log:
   Level: "error" # debug | info | warn | error
   Format: "text" # text | json
@@ -33,12 +40,14 @@ Email:
   Host: "smtp.163.com" # SMTP server host (e.g., smtp.qq.com)
   Port: 465 # SMTP port (commonly 465)
   From: "" # Sender email address
-  IsSSL: true # Enable SSL
-  Secret: "" # SMTP auth code/token (not the mailbox login password)
-  Nickname: "" # Sender nickname (usually your mailbox name)
+  # 下面两个键名必须和 g.Config.Email 对齐, 原来写的 Secret / Nickname 不会被绑定上
+  SmtpPass: "" # 密钥, 不是邮箱登录密码, 是开启 smtp 服务后获取的一串验证码
+  SmtpUser: "" # 发件人昵称, 通常为自己的邮箱名
 Captcha:
-  SendEmail: true # Send verification code by email
-  ExpireTime: 15  # Expiration time (minutes)
+  # false: 注册直接创建用户, 不发邮件, 也不需要配上面的 Email 段
+  # true: 注册只发验证邮件, 用户点击链接后才真正创建, 必须先把 Email 段配全
+  SendEmail: false
+  ExpireTime: 15  # 验证链接过期时间 (分钟)
 Upload:
   OssType: "local" # local | qiniu
   Path: "public/uploaded"      # Public URL path (effective when OssType="local")
@@ -51,9 +60,3 @@ Qiniu:
   SecretKey: ""
   UseHttps: false
   UseCdnDomains: false
-Aws:
-  ImgPath: "" # Public image base URL
-  AccessKey: ""
-  SecretKey: ""
-  Bucket: ""
-  Region: ""

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
-import { convertImgUrl } from '@/utils'
 import api from '@/api'
+import { convertImgUrl } from '@/utils'
 
 // User global variables
 export const useUserStore = defineStore('user', {

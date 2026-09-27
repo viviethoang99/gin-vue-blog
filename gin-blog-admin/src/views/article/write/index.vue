@@ -1,18 +1,17 @@
 <script setup>
+import { MdEditor } from 'md-editor-v3'
+import { NButton, NDynamicTags, NForm, NFormItem, NInput, NRadio, NRadioGroup, NSelect, NSpace, NSwitch, NTag } from 'naive-ui'
 import { h, nextTick, onActivated, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { NButton, NDynamicTags, NForm, NFormItem, NInput, NRadio, NRadioGroup, NSelect, NSpace, NSwitch, NTag } from 'naive-ui'
-import { MdEditor } from 'md-editor-v3'
-import 'md-editor-v3/lib/style.css'
-
-import CommonPage from '@/components/common/CommonPage.vue'
-import CrudModal from '@/components/crud/CrudModal.vue'
-import UploadOne from '@/components//UploadOne.vue'
+import api from '@/api'
 
 import { articleTypeOptions } from '@/assets/config'
+import UploadOne from '@/components//UploadOne.vue'
+import CommonPage from '@/components/common/CommonPage.vue'
+
+import CrudModal from '@/components/crud/CrudModal.vue'
 import { useTagStore } from '@/store'
-import api from '@/api'
-import { request, convertImgUrl } from '@/utils'
+import 'md-editor-v3/lib/style.css'
 
 defineOptions({ name: 'Publish Article' })
 
@@ -25,7 +24,9 @@ const tagOptions = ref([]) // Tag options
 let backTagOptions = [] // Backup tag options
 
 // Fix the issue where viewing multiple articles at the same time, switching tabs doesn't refresh
-watch(route, async () => tagStore.reloadTag())
+// watch 的必须是 getter 而不是 route 本身: useRoute() 返回的是响应式对象的浅代理,
+// 直接传进 watch 会报 "Invalid watch source" 并且完全不触发
+watch(() => route.fullPath, async () => tagStore.reloadTag())
 
 onMounted(async () => {
   fetchData()
@@ -37,13 +38,14 @@ onActivated(async () => {
 
 async function fetchData() {
   getArticleInfo()
+  // 拦截器已经弹过错误提示, 这里补 catch 只是别留下 unhandled rejection
   api.getCategoryOption().then((resp) => {
     categoryOptions.value = resp.data.map(e => ({ value: e.label, label: e.label }))
-  })
+  }).catch(err => console.error(err))
   api.getTagOption().then((resp) => {
     tagOptions.value = resp.data.map(e => ({ value: e.label, label: e.label }))
     backTagOptions = tagOptions.value
-  })
+  }).catch(err => console.error(err))
   await nextTick()
 }
 
@@ -70,8 +72,9 @@ async function getArticleInfo() {
   const id = route.params.id // Get parameter from route
 
   // No id means creating new article
+  // 必须带上 tag_names 和 category_name, 否则 watch tag_names 的回调会拿到 undefined
   if (!id) {
-    formModel.value = { status: 1, is_top: false, title: '', type: 1 }
+    formModel.value = { status: 1, is_top: false, title: '', type: 1, tag_names: [], category_name: '' }
     return
   }
 
@@ -81,11 +84,12 @@ async function getArticleInfo() {
     const resp = await api.getArticleById(id)
     const { category, tags } = resp.data
     formModel.value = resp.data
-    formModel.value.tag_names = tags.map(e => e.name)
-    formModel.value.category_name = category.name
+    // 导入生成的草稿没有分类和标签, category 为 null
+    formModel.value.tag_names = tags?.map(e => e.name) ?? []
+    formModel.value.category_name = category?.name ?? ''
     window.$loadingBar?.finish()
   }
-  catch (err) {
+  catch {
     window.$loadingBar?.error()
     $message?.error('Loading failed')
   }
@@ -133,7 +137,7 @@ async function handleSave() {
 const rules = {
   category_name: {
     required: true,
-    message: 'Please select article category',
+    message: 'Please select article type',
     trigger: ['blur', 'change'],
   },
   tag_names: {
@@ -154,29 +158,6 @@ function renderTag(tag, index) {
     },
     { default: () => tag },
   )
-}
-
-// MdEditor image upload handler
-async function handleEditorUpload(files, callback) {
-  try {
-    const urls = await Promise.all(
-      files.map(async (file) => {
-        const formData = new FormData()
-        formData.append('file', file)
-        // Backend route is /api/upload (not /api/upload/file)
-        const resp = await request.post('/upload', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        })
-        // resp.data is relative path; convert to absolute if needed
-        return convertImgUrl(resp.data)
-      }),
-    )
-    callback(urls)
-  }
-  catch (err) {
-    console.error('Image upload failed', err)
-    window.$message?.error('Image upload failed')
-  }
 }
 </script>
 
@@ -199,17 +180,12 @@ async function handleEditorUpload(files, callback) {
         <template #icon>
           <span v-if="!btnLoading" class="i-line-md:confirm-circle" />
         </template>
-        Publish
+        Publish Article
       </NButton>
     </div>
 
     <!-- TODO: File upload -->
-    <MdEditor
-      v-model="formModel.content"
-      style="height: calc(100vh - 245px)"
-      language="en-US"
-      :on-upload-img="handleEditorUpload"
-    />
+    <MdEditor v-model="formModel.content" style="height: calc(100vh - 245px)" />
 
     <CrudModal
       v-model:visible="modalVisible"

@@ -21,7 +21,6 @@ func main() {
 	configPath := flag.String("c", "../../config.yml", "configuration file path")
 	flag.Parse()
 
-	// 根据命令行参数读取配置文件, 其他变量的初始化依赖于配置文件对象
 	// Read configuration file based on command-line parameters; other variable initialization depends on the config object
 	conf := g.ReadConfig(*configPath)
 
@@ -65,7 +64,7 @@ func createSuperAdmin(db *gorm.DB, username, password string) {
 			IsSuper:  true,
 			UserInfo: &model.UserInfo{
 				Nickname: username,
-				Avatar:   "https://cdn.hahacode.cn/config/superadmin_avatar.jpg",
+				Avatar:   "https://raw.githubusercontent.com/szluyu99/gin-vue-blog/main/images/config/superadmin_avatar.jpg",
 				Intro:    "This person is lazy and left nothing.",
 				Website:  "https://www.hahacode.cn",
 			},

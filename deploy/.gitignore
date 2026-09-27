@@ -1,6 +1,9 @@
 # Mapped container data; do not commit to VCS
 start/gvb
 
-# Built static assets
+# bootstrap.sh 生成的本机签名密钥 (JWT / session)
+start/.env.secrets
+
+# dist
 build/web/dist_admin
 build/web/dist_blog

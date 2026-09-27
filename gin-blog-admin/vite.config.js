@@ -1,9 +1,9 @@
 import path from 'node:path'
-import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import unocss from 'unocss/vite'
-import viteCompression from 'vite-plugin-compression'
 import { visualizer } from 'rollup-plugin-visualizer'
+import unocss from 'unocss/vite'
+import { defineConfig, loadEnv } from 'vite'
+import viteCompression from 'vite-plugin-compression'
 
 export default defineConfig((configEnv) => {
   const env = loadEnv(configEnv.mode, process.cwd())
@@ -15,12 +15,6 @@ export default defineConfig((configEnv) => {
         '@': path.resolve(process.cwd(), 'src'),
         '~': path.resolve(process.cwd()),
       },
-      dedupe: [
-        '@codemirror/state',
-        '@codemirror/view', 
-        '@codemirror/commands',
-        '@codemirror/autocomplete'
-      ],
     },
     plugins: [
       vue(),
@@ -30,10 +24,15 @@ export default defineConfig((configEnv) => {
     ],
     server: {
       host: '0.0.0.0',
-      port: 3000,
+      port: 8889,
       open: false,
       proxy: {
         '/api': {
+          target: env.VITE_SERVER_URL,
+          changeOrigin: true,
+        },
+        // 本地上传的图片由后端静态服务提供, 走代理才能从别的机器访问页面时正常加载
+        '/public': {
           target: env.VITE_SERVER_URL,
           changeOrigin: true,
         },

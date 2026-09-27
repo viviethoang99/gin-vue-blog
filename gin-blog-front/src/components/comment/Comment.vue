@@ -1,20 +1,19 @@
 <script setup>
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
 import dayjs from 'dayjs'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 
-// import EmojiList from '@/assets/emoji'
-import CommentField from './CommentField.vue'
-
-// 评论 / 回复 框
-import Paging from './Paging.vue'
+import api from '@/api'
 
 // 分页
 import ULoading from '@/components/ui/ULoading.vue'
 
-import { convertImgUrl } from '@/utils'
 import { useAppStore, useUserStore } from '@/store'
-import api from '@/api'
+
+import { convertImgUrl } from '@/utils'
+import CommentField from './CommentField.vue'
+// 评论 / 回复 框
+import Paging from './Paging.vue'
 
 const { type } = defineProps({
   // 评论类型: 1-文章, 2-友链, 3-说说
@@ -23,112 +22,171 @@ const { type } = defineProps({
 
 const [userStore, appStore] = [useUserStore(), useAppStore()]
 
-onMounted(() => {
-  getComments()
-})
+const route = useRoute()
 
 // url 中存在 id 参数则为 topic_id, 否则为 0
-const topicId = +(useRoute().params.id ?? 0)
+const topicId = +(route.params.id ?? 0)
+// 站内通知点进来时带 ?comment=xxx, 要翻到那条评论并高亮
+const targetCommentId = +(route.query.comment ?? 0)
 
 // 加载评论
 const commentList = ref([]) // 评论列表 (分页加载)
 const commentCount = ref(0) // 评论总数量
 const listLoading = ref(false) // 列表加载状态
+const highlightId = ref(0) // 通知定位到的评论, 高亮几秒后自动褪去
 const params = reactive({ type, page_size: 10, page_num: 1, topic_id: topicId }) // 加载评论的参数
+
+// 延时定时器: 卸载时清掉, 否则会在组件销毁后改状态
+let loadTimer = null
+let highlightTimer = null
+onUnmounted(() => {
+  clearTimeout(loadTimer)
+  clearTimeout(highlightTimer)
+})
 
 async function getComments() {
   listLoading.value = true
   try {
     const resp = await api.getComments(params)
-    console.log(resp.data.page_data)
 
     // * 全局加载更多, 0.8s 延时
-    setTimeout(() => {
-      params.page_num === 1
-        ? commentList.value = resp.data.page_data
-        : commentList.value.push(...resp.data.page_data)
-      commentCount.value = resp.data.total
-      console.log(commentCount.value)
-      params.page_num++
-      listLoading.value = false
-    }, 800)
+    await new Promise((resolve) => {
+      loadTimer = setTimeout(() => {
+        params.page_num === 1
+          ? commentList.value = resp.data.page_data
+          : commentList.value.push(...resp.data.page_data)
+        commentCount.value = resp.data.total
+        params.page_num++
+        listLoading.value = false
+        resolve()
+      }, 800)
+    })
   }
   catch (err) {
+    // 不复位 listLoading 的话, "点击加载更多" (v-if="!listLoading") 会永久消失
+    listLoading.value = false
     console.error(err)
   }
 }
+
+// 这条评论(或某条回复)是否已经加载出来了
+function isLoaded(id) {
+  return commentList.value.some(
+    c => c.id === id || (c.reply_list ?? []).some(r => r.id === id),
+  )
+}
+
+/*
+定位到通知里那条评论: 它可能在第二页往后, 所以一页页加载直到找到
+
+翻页上限防的是 id 对不上的情况(评论被删、或者手改 url), 否则会一直翻到底。
+找不到就静默放弃, 停在文章页顶部, 不比原来更差。
+*/
+async function locateComment(id) {
+  for (let i = 0; i < 10; i++) {
+    if (isLoaded(id) || commentList.value.length >= commentCount.value) {
+      break
+    }
+    await getComments()
+  }
+
+  await nextTick()
+  const el = document.getElementById(`comment-${id}`)
+  if (!el) {
+    return
+  }
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  highlightId.value = id
+  // 4s: 平滑滚动本身要花掉一点时间, 太短的话滚到位高亮就快没了
+  highlightTimer = setTimeout(() => (highlightId.value = 0), 4000)
+}
+
+onMounted(async () => {
+  await getComments()
+  if (targetCommentId) {
+    await locateComment(targetCommentId)
+  }
+})
+
+/*
+已经在这篇文章页上时再点通知, 只有 query 变了
+
+App.vue 的 <RouterView :key="route.path"> 不含 query, 所以路径相同这一跳不会重建组件,
+onMounted 不会再跑一次 —— 得靠 watch 补上, 否则表现就是"点了没反应"。
+*/
+watch(() => route.query.comment, (val) => {
+  const id = +(val ?? 0)
+  if (id) {
+    locateComment(id)
+  }
+})
+
 // 重新加载评论(提交评论以后)
 function reloadComments() {
   params.page_num = 1 // 页数重置
   getComments()
 }
 
-// * 解决新增评论后刷新数据, 点击回复的顺序错乱问题
-const refresh = ref(true) // 重新刷新整个评论列表
-watch(commentList, () => {
-  refresh.value = false
-  nextTick(() => {
-    refresh.value = true
-  })
-}, { deep: false }) // deep = false 防止 "查看更多" 时刷新整个数据
+// 回复相关的状态一律按评论 id 记, 不再按 v-for 下标访问模板 ref:
+// Vue 不保证模板 ref 数组的顺序与源数组一致, 新增评论后刷新列表就会点到别人的回复框
+// (原来靠 watch commentList + nextTick 整体重建列表来打补丁, 现在不需要了)
+const activeReply = ref(null) // 当前打开的回复框 { commentId, nickname, replyUserId, parentId }
+const expandedIds = reactive(new Set()) // 已经点过"查看更多回复"的评论 id
+const replyPages = reactive({}) // 评论 id -> 回复列表当前页
 
-// 回复相关
-// ! 可以获取 v-for 循环中的 DOM 数组
-const replyFieldRefs = ref(null)
-// 回复评论
-function replyComment(idx, obj) {
-  // 关闭所有回复框
-  replyFieldRefs.value.forEach(e => e.setReply(false))
-  // 打开当前点击的回复框
-  const curRef = replyFieldRefs.value[idx]
-  if (curRef) {
-    curRef.setReply(true)
-    // * 将值传给回复框
-    curRef.data.nickname = obj.nickname // 用户昵称
-    curRef.data.reply_user_id = obj.user_id // 回复用户 id
-    curRef.data.parent_id = commentList.value[idx].id // 父评论 id
+// 回复评论: target 可能是评论本身, 也可能是某条回复
+function replyComment(comment, target) {
+  activeReply.value = {
+    commentId: comment.id,
+    // 原来取的是 obj.nickname, 而接口返回的昵称在 user.info.nickname 下,
+    // 所以回复框一直拿不到昵称, 既没有 "回复 @xxx" 提示也没有取消按钮
+    nickname: target.user?.info?.nickname ?? '',
+    replyUserId: target.user_id,
+    parentId: comment.id,
   }
 }
 
-// 提交回复后, 重新加载评论回复
-const pageRefs = ref([]) // 分页
-const checkRefs = ref([]) // 查看
-async function reloadReplies(idx) {
-  const { data } = await api.getCommentReplies(
-    commentList.value[idx].id,
-    { page_size: 5, page_num: pageRefs.value[idx].current },
-  )
-  // * 局部更新某个评论的回复
-  commentList.value[idx].reply_list = data
-  commentList.value[idx].reply_count++ // 数量 + 1
-  // 回复大于 5 条展示评论分页
-  commentList.value[idx].reply_count > 5 && (pageRefs.value[idx].setShow(true))
-  // 直接隐藏查看
-  checkRefs.value[idx].style.display = 'none' // * dom 操作隐藏 "查看"
+// 提交回复后, 重新加载该评论的回复
+async function reloadReplies(comment) {
+  try {
+    const { data } = await api.getCommentReplies(
+      comment.id,
+      { page_size: 5, page_num: replyPages[comment.id] ?? 1 },
+    )
+    // * 局部更新某个评论的回复
+    comment.reply_list = data
+    comment.reply_count++ // 数量 + 1
+    expandedIds.add(comment.id)
+  }
+  catch (err) {
+    console.error(err)
+  }
 }
 
 // "点击查看" 显示更多回复
-async function checkReplies(idx, obj) {
-  // 查第一页 (5 条数据)
-  const { data } = await api.getCommentReplies(
-    obj.id,
-    { page_num: 1, page_size: 5 },
-  )
-  // 更新对应楼评论的回复列表
-  obj.reply_list = data
-  // 超过 5 条数据显示分页
-  obj.reply_count > 5 && (pageRefs.value[idx].setShow(true))
-  // 隐藏 "点击查看"
-  checkRefs.value[idx].style.display = 'none' // * dom 操作隐藏 "查看"
+async function checkReplies(comment) {
+  try {
+    // 查第一页 (5 条数据)
+    const { data } = await api.getCommentReplies(comment.id, { page_num: 1, page_size: 5 })
+    comment.reply_list = data
+    replyPages[comment.id] = 1
+    expandedIds.add(comment.id)
+  }
+  catch (err) {
+    console.error(err)
+  }
 }
 
 // 修改回复分页中当前页数
-async function changeReplyCurrent(pageNum, idx, commentId) {
-  const { data } = await api.getCommentReplies(
-    commentId,
-    { page_num: pageNum, page_size: 5 },
-  )
-  commentList.value[idx].reply_list = data
+async function changeReplyCurrent(comment, pageNum) {
+  try {
+    const { data } = await api.getCommentReplies(comment.id, { page_num: pageNum, page_size: 5 })
+    comment.reply_list = data
+    replyPages[comment.id] = pageNum
+  }
+  catch (err) {
+    console.error(err)
+  }
 }
 
 // TODO: 点赞
@@ -175,7 +233,7 @@ const isLike = computed(() => id => userStore.commentLikeSet.includes(id))
       @after-submit="reloadComments"
     />
     <!-- 评论详情 -->
-    <div v-if="commentCount && refresh">
+    <div v-if="commentCount">
       <!-- 评论数量 -->
       <p class="mb-4 mt-7 flex items-center text-xl font-bold">
         <span> {{ commentCount }} 评论 </span>
@@ -186,8 +244,13 @@ const isLike = computed(() => id => userStore.commentLikeSet.includes(id))
         />
       </p>
       <!-- 评论列表 -->
-      <div v-for="(comment, idx) of commentList" :key="comment.id" class="my-1 flex">
-        <img :src="convertImgUrl(comment.user?.info?.avatar)" class="h-[40px] w-[40px] duration-600 hover:rotate-360">
+      <div
+        v-for="(comment, idx) of commentList" :id="`comment-${comment.id}`"
+        :key="comment.id"
+        class="my-1 flex scroll-mt-24 rounded-lg p-1 transition-300"
+        :class="highlightId === comment.id ? 'bg-primary/8 ring-2 ring-primary/40' : ''"
+      >
+        <img :src="convertImgUrl(comment.user?.info?.avatar)" class="h-[40px] w-[40px] duration-600 hover:rotate-360" loading="lazy">
         <div class="ml-3 flex flex-1 flex-col">
           <!-- 评论人名称: 根据是否有 website 显示不同效果 -->
           <div>
@@ -204,7 +267,7 @@ const isLike = computed(() => id => userStore.commentLikeSet.includes(id))
           </div>
           <!-- 楼层 + 时间 + 点赞 + 回复按钮 -->
           <div class="flex justify-between text-sm">
-            <div class="flex items-center gap-2 py-1 color-#b3b3b3">
+            <div class="flex items-center gap-2 py-1 color-muted">
               <span> {{ commentCount - idx }}楼 </span>
               <span> {{ dayjs(comment.created_at).format('YYYY-MM-DD') }} </span>
               <button
@@ -214,15 +277,20 @@ const isLike = computed(() => id => userStore.commentLikeSet.includes(id))
               />
               <span v-show="comment.like_count"> {{ comment.like_count }} </span>
             </div>
-            <button class="color-#ef2f11" @click="replyComment(idx, comment)">
+            <button class="color-#ef2f11" @click="replyComment(comment, comment)">
               回复
             </button>
           </div>
           <!-- 评论内容 -->
           <div class="my-1" v-html="comment.content" />
           <!-- 评论回复 start -->
-          <div v-for="reply of comment.reply_list" :key="reply.id" class="mt-2 flex">
-            <img :src="convertImgUrl(reply.user?.info?.avatar)" class="h-[40px] w-[40px] duration-600 hover:rotate-360">
+          <div
+            v-for="reply of comment.reply_list" :id="`comment-${reply.id}`"
+            :key="reply.id"
+            class="mt-2 flex scroll-mt-24 rounded-lg p-1 transition-300"
+            :class="highlightId === reply.id ? 'bg-primary/8 ring-2 ring-primary/40' : ''"
+          >
+            <img :src="convertImgUrl(reply.user?.info?.avatar)" class="h-[40px] w-[40px] duration-600 hover:rotate-360" loading="lazy">
             <div class="ml-2 flex flex-1 flex-col">
               <!-- 回复人名称 -->
               <div>
@@ -240,7 +308,7 @@ const isLike = computed(() => id => userStore.commentLikeSet.includes(id))
               </div>
               <!-- 时间 + 点赞 + 回复按钮 -->
               <div class="flex justify-between text-sm">
-                <div class="flex items-center gap-2 py-1 color-#b3b3b3">
+                <div class="flex items-center gap-2 py-1 color-muted">
                   <span> {{ dayjs(reply.created_at).format('YYYY-MM-DD') }} </span>
                   <button
                     class="i-mdi:thumb-up hover-bg-red"
@@ -249,19 +317,20 @@ const isLike = computed(() => id => userStore.commentLikeSet.includes(id))
                   />
                   <span v-show="reply.like_count"> {{ reply.like_count }} </span>
                 </div>
-                <button class="color-#ef2f11" @click="replyComment(idx, reply)">
+                <button class="color-#ef2f11" @click="replyComment(comment, reply)">
                   回复
                 </button>
               </div>
               <!-- 回复内容 -->
               <div>
-                <!-- 回复用户名: 自己回复自己不显示 "@名称" -->
-                <template v-if="reply.user_id !== comment.user_id">
-                  <a v-if="reply.user?.info?.website" :href="reply.reply_website" target="_blank">
-                    @{{ reply.user?.info?.nickname }}
+                <!-- "@名称" 是被回复者(reply_user), 不是回复者自己;
+                     回复自己 / 直接回复顶级评论(reply_user_id 为空)时不显示 -->
+                <template v-if="reply.reply_user_id && reply.reply_user_id !== reply.user_id">
+                  <a v-if="reply.reply_user?.info?.website" :href="reply.reply_user?.info?.website" target="_blank" class="color-#1abc9c">
+                    @{{ reply.reply_user?.info?.nickname }}
                   </a>
                   <span v-else>
-                    @{{ reply.user?.info?.nickname }}
+                    @{{ reply.reply_user?.info?.nickname }}
                   </span>，
                 </template>
                 <span class="my-3" v-html="reply.content" />
@@ -272,33 +341,35 @@ const isLike = computed(() => id => userStore.commentLikeSet.includes(id))
 
           <!-- 回复数量 -->
           <div
-            v-show="comment.reply_count > 3"
-            ref="checkRefs"
-            class="mt-4 text-[13px] color-#6d757a"
+            v-show="comment.reply_count > 3 && !expandedIds.has(comment.id)"
+            class="mt-4 text-[13px] color-muted"
           >
             共 <b> {{ comment.reply_count }} </b>  条回复
-            <button class="color-#00a1d6" @click="checkReplies(idx, comment)">
+            <button class="color-#00a1d6" @click="checkReplies(comment)">
               ，点击查看
             </button>
           </div>
-          <!-- 回复分页 -->
+          <!-- 回复分页: 展开后且回复超过 5 条才有分页 -->
           <Paging
-            ref="pageRefs"
+            v-if="expandedIds.has(comment.id) && comment.reply_count > 5"
             :page-total="Math.ceil(comment.reply_count / 5)"
-            :index="idx"
-            :comment-id="comment.id"
-            @change-current="changeReplyCurrent"
+            :current="replyPages[comment.id] ?? 1"
+            @change-current="page => changeReplyCurrent(comment, page)"
           />
-          <!-- 回复框 -->
+          <!-- 回复框: 同一时刻只打开一个 -->
           <CommentField
-            ref="replyFieldRefs"
-            :show="false"
+            v-if="activeReply?.commentId === comment.id"
+            :show="true"
             :type="type"
             :topic-id="topicId"
-            @after-submit="reloadReplies(idx)"
+            :nickname="activeReply.nickname"
+            :reply-user-id="activeReply.replyUserId"
+            :parent-id="activeReply.parentId"
+            @cancel="activeReply = null"
+            @after-submit="reloadReplies(comment)"
           />
-          <!-- 分隔线: 注意最后一个评论没有线 -->
-          <div v-if="(idx + 1) !== commentCount" class="my-2.5 h-0.5 bg-light-500" />
+          <!-- 分隔线: 注意最后一个评论没有线 (比的是已加载条数, 不是总数) -->
+          <div v-if="(idx + 1) !== commentList.length" class="my-2.5 h-0.5 bg-light-500" />
         </div>
       </div>
       <!-- 加载更多 -->

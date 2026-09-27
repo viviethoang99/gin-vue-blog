@@ -1,16 +1,16 @@
 <script setup>
-import { h, onMounted, ref } from 'vue'
 import { NButton, NCheckbox, NCheckboxGroup, NForm, NFormItem, NImage, NInput, NSelect, NSpace, NSwitch, NTag } from 'naive-ui'
+import { h, onMounted, ref } from 'vue'
 
-import CommonPage from '@/components/common/CommonPage.vue'
-import QueryItem from '@/components/crud/QueryItem.vue'
-import CrudModal from '@/components/crud/CrudModal.vue'
-import CrudTable from '@/components/crud/CrudTable.vue'
-
-import { loginTypeMap, loginTypeOptions } from '@/assets/config'
-import { convertImgUrl, formatDate } from '@/utils'
-import { useCRUD } from '@/composables'
 import api from '@/api'
+import { loginTypeMap, loginTypeOptions } from '@/assets/config'
+import CommonPage from '@/components/common/CommonPage.vue'
+import CrudModal from '@/components/crud/CrudModal.vue'
+
+import CrudTable from '@/components/crud/CrudTable.vue'
+import QueryItem from '@/components/crud/QueryItem.vue'
+import { useCRUD } from '@/composables'
+import { convertImgUrl, formatDate, IMG_PLACEHOLDER } from '@/utils'
 
 defineOptions({ name: 'User List' })
 
@@ -37,7 +37,8 @@ const {
 const roleOptions = ref([])
 
 onMounted(() => {
-  api.getRoleOption().then(resp => roleOptions.value = resp.data)
+  // 拦截器已经弹过错误提示, 这里补 catch 只是别留下 unhandled rejection
+  api.getRoleOption().then(resp => roleOptions.value = resp.data).catch(err => console.error(err))
   $table.value?.handleSearch()
 })
 
@@ -52,7 +53,7 @@ const columns = [
         'height': 30,
         'imgProps': { style: { 'border-radius': '3px' } },
         'src': convertImgUrl(row.info?.avatar),
-        'fallback-src': 'http://dummyimage.com/400x400', // Load failed
+        'fallback-src': IMG_PLACEHOLDER, // 加载失败时用内联占位图, 不再请求外网
         'show-toolbar-tooltip': true,
       })
     },
@@ -180,14 +181,14 @@ const columns = [
             type: 'primary',
             onClick: () => {
               row.nickname = row.info?.nickname
-              // roles => role_ids
-              row.role_ids = row.roles.map(e => e.id)
+              // roles => role_ids, 没有任何角色的用户 roles 可能是 null
+              row.role_ids = row.roles?.map(e => e.id) ?? []
               handleEdit(row)
             },
           },
           {
             default: () => 'Edit',
-            icon: () => h('i', { class: 'i-material-symbols:delete-outline' }),
+            icon: () => h('i', { class: 'i-material-symbols:edit-outline' }),
           },
         ),
       ]

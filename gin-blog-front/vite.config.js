@@ -1,9 +1,9 @@
 import path from 'node:path'
-import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import unocss from 'unocss/vite'
-import viteCompression from 'vite-plugin-compression'
 import { visualizer } from 'rollup-plugin-visualizer'
+import unocss from 'unocss/vite'
+import { defineConfig, loadEnv } from 'vite'
+import viteCompression from 'vite-plugin-compression'
 
 export default defineConfig((configEnv) => {
   const env = loadEnv(configEnv.mode, process.cwd())
@@ -14,6 +14,10 @@ export default defineConfig((configEnv) => {
       alias: {
         '@': path.resolve(path.resolve(process.cwd()), 'src'),
         '~': path.resolve(process.cwd()),
+        // v3-infinite-loading 的 browser 字段指向 UMD 产物, 里面 require('vue') 会
+        // 解析到带编译器的完整版 Vue, 白白往首页 chunk 塞进 150KB 的 compiler-core。
+        // 这里强制走它的 ESM 产物。
+        'v3-infinite-loading': 'v3-infinite-loading/lib/v3-infinite-loading.es.js',
       },
     },
     plugins: [
@@ -24,10 +28,15 @@ export default defineConfig((configEnv) => {
     ],
     server: {
       host: '0.0.0.0',
-      port: 3333,
+      port: 8888,
       open: false,
       proxy: {
         '/api': {
+          target: env.VITE_BACKEND_URL,
+          changeOrigin: true,
+        },
+        // 本地上传的图片由后端静态服务提供, 走代理才能从别的机器访问页面时正常加载
+        '/public': {
           target: env.VITE_BACKEND_URL,
           changeOrigin: true,
         },

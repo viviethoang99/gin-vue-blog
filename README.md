@@ -121,6 +121,8 @@ gin-blog-server
 
 **本地开发见 [quick_start.md](./quick_start.md)**，含 Mock 模式（不启动后端）和完整启动两种方式、访问地址、默认账号和常见问题。
 
+Hướng dẫn tiếng Việt đầy đủ về chạy local, deploy Docker/VPS, HTTPS, backup/restore, cập nhật và xử lý sự cố: [HUONG_DAN_CHAY_VA_DEPLOY.md](./HUONG_DAN_CHAY_VA_DEPLOY.md).
+
 初始化数据只含系统基础数据（菜单 / 接口 / 角色 / 配置），不含文章。要一批能点得动的内容（分类、标签、15 篇文章、评论与回复、留言、友链）用 `./dev.sh fresh --demo`，或 `cd gin-blog-server/cmd/generate-data && go run main.go -t demo`。
 
 只想看效果，用 Docker Compose 一键运行（需要 Docker + Docker Compose，Windows 请用 GitBash）：

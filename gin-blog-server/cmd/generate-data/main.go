@@ -333,78 +333,50 @@ func generateDefaultMenus(db *gorm.DB) {
 	slog.Info("-----Initialize menus start-----")
 
 	parents := []model.Menu{
-		{Name: "Home", Path: "/home", Icon: "ic:sharp-home", OrderNum: 0, Component: "/home", Redirect: "/home", Catalogue: true}, // catalogue
-		{Name: "Article Management", Path: "/article", Icon: "ic:twotone-article", OrderNum: 1, Component: "Layout", Redirect: "/article/list"},
-		{Name: "Permission Management", Path: "/auth", Icon: "cib:adguard", OrderNum: 3, Component: "Layout", Redirect: "/auth/menu"},
-		{Name: "Message Management", Path: "/message", Icon: "ic:twotone-email", OrderNum: 2, Component: "Layout", Redirect: "/message/comment"},
-		{Name: "User Management", Path: "/user", Icon: "ph:user-list-bold", OrderNum: 4, Component: "Layout", Redirect: "/user/list"},
-		{Name: "Log Management", Path: "/log", Icon: "material-symbols:receipt-long-outline-rounded", OrderNum: 6, Component: "Layout", Redirect: "/log/operation"},
-		{Name: "System Management", Path: "/setting", Icon: "ion:md-settings", OrderNum: 5, Component: "Layout", Redirect: "/setting/website"},
-		{Name: "Personal Center", Path: "/profile", Icon: "mdi:account", OrderNum: 7, Component: "/profile", Redirect: "/profile", Catalogue: true}, // catalogue
+		{Name: "Trang chủ", Path: "/home", Icon: "ic:sharp-home", OrderNum: 0, Component: "/home", Redirect: "/home", Catalogue: true}, // catalogue
+		{Name: "Quản lý bài viết", Path: "/article", Icon: "ic:twotone-article", OrderNum: 1, Component: "Layout", Redirect: "/article/list"},
+		{Name: "Quản lý phân quyền", Path: "/auth", Icon: "cib:adguard", OrderNum: 3, Component: "Layout", Redirect: "/auth/menu"},
+		{Name: "Quản lý tin nhắn", Path: "/message", Icon: "ic:twotone-email", OrderNum: 2, Component: "Layout", Redirect: "/message/comment"},
+		{Name: "Quản lý người dùng", Path: "/user", Icon: "ph:user-list-bold", OrderNum: 4, Component: "Layout", Redirect: "/user/list"},
+		{Name: "Quản lý log", Path: "/log", Icon: "material-symbols:receipt-long-outline-rounded", OrderNum: 6, Component: "Layout", Redirect: "/log/operation"},
+		{Name: "Quản lý hệ thống", Path: "/setting", Icon: "ion:md-settings", OrderNum: 5, Component: "Layout", Redirect: "/setting/website"},
+		{Name: "Trung tâm cá nhân", Path: "/profile", Icon: "mdi:account", OrderNum: 7, Component: "/profile", Redirect: "/profile", Catalogue: true}, // catalogue
 	}
 
 	for i := range parents {
-		if err := db.Create(&parents[i]).Error; err != nil {
-			if isDuplicate(err) {
-				slog.Debug(parents[i].Name + " menu already exists")
-				/*
-					把已存在的父菜单查回来, 拿到真实 ID
-
-					Create 撞唯一索引时 parents[i].ID 会留在 0, 下面的子菜单
-					ParentId 就成了 0 —— 菜单变成孤儿, 前端菜单树不渲染它,
-					对应路由直接 404。首次灌库时父子一起建所以看不出问题,
-					往已有库里加新子菜单才会暴露(「前端错误」就是这么踩到的)。
-				*/
-				if err := db.Where("name = ?", parents[i].Name).First(&parents[i]).Error; err != nil {
-					slog.Error(parents[i].Name + " 菜单已存在但查询失败" + err.Error())
-				}
-			} else {
-				slog.Error(parents[i].Name + " menu initialization failed" + err.Error())
-			}
+		if err := upsertSeedParentMenu(db, &parents[i]); err != nil {
+			slog.Error(parents[i].Name + " menu initialization failed: " + err.Error())
 		}
 	}
 
 	menus := []model.Menu{
-		// Article Management
-		{Name: "Publish Article", Path: "write", Component: "/article/write", Icon: "icon-park-outline:write", OrderNum: 1, ParentId: parents[1].ID},
-		{Name: "Article List", Path: "list", Component: "/article/list", Icon: "material-symbols:format-list-bulleted", OrderNum: 2, ParentId: parents[1].ID},
-		{Name: "Category Management", Path: "category", Component: "/article/category", Icon: "tabler:category", OrderNum: 3, ParentId: parents[1].ID},
-		{Name: "Tag Management", Path: "tag", Component: "/article/tag", Icon: "tabler:tag", OrderNum: 4, ParentId: parents[1].ID},
-		{Name: "说说管理", Path: "talk", Component: "/article/talk", Icon: "mdi:message-text-outline", OrderNum: 5, ParentId: parents[1].ID},
-		{Name: "Edit Article", Path: "write/:id", Component: "/article/write", Icon: "icon-park-outline:write", OrderNum: 1, ParentId: parents[1].ID, Hidden: true},
-		// Permission Management
-		{Name: "Menu Management", Path: "menu", Component: "/auth/menu", Icon: "ic:twotone-menu-book", OrderNum: 1, ParentId: parents[2].ID},
-		{Name: "Interface Management", Path: "resource", Component: "/auth/resource", Icon: "mdi:api", OrderNum: 2, ParentId: parents[2].ID},
-		{Name: "Role Management", Path: "role", Component: "/auth/role", Icon: "carbon:user-role", OrderNum: 3, ParentId: parents[2].ID},
-		// Message Management
-		{Name: "Comment Management", Path: "comment", Component: "/message/comment", Icon: "ic:twotone-comment", OrderNum: 1, ParentId: parents[3].ID},
-		{Name: "Message Management", Path: "leave-msg", Component: "/message/leave-msg", Icon: "ic:twotone-message", OrderNum: 2, ParentId: parents[3].ID},
-		// User Management
-		{Name: "User List", Path: "list", Component: "/user/list", Icon: "mdi:account", OrderNum: 1, ParentId: parents[4].ID},
-		{Name: "Online Users", Path: "online", Component: "/user/online", Icon: "ic:outline-online-prediction", OrderNum: 2, ParentId: parents[4].ID},
-		// Log Management
-		{Name: "Operation Log", Path: "operation", Component: "/log/operation", Icon: "mdi:book-open-page-variant-outline", OrderNum: 1, ParentId: parents[5].ID},
-		{Name: "Login Log", Path: "login", Component: "/log/login", Icon: "material-symbols:login", OrderNum: 2, ParentId: parents[5].ID},
-		{Name: "前端错误", Path: "error", Component: "/log/error", Icon: "mdi:bug-outline", OrderNum: 3, ParentId: parents[5].ID},
-		// System Management
-		{Name: "Website Management", Path: "website", Component: "/setting/website", Icon: "el:website", OrderNum: 1, ParentId: parents[6].ID},
-		{Name: "Page Management", Path: "page", Component: "/setting/page", Icon: "iconoir:journal-page", OrderNum: 2, ParentId: parents[6].ID},
-		{Name: "Link Management", Path: "link", Component: "/setting/link", Icon: "mdi:telegram", OrderNum: 3, ParentId: parents[6].ID},
-		{Name: "About Me", Path: "about", Component: "/setting/about", Icon: "cib:about-me", OrderNum: 4, ParentId: parents[6].ID},
+		{Name: "Đăng bài viết", Path: "write", Component: "/article/write", Icon: "icon-park-outline:write", OrderNum: 1, ParentId: parents[1].ID},
+		{Name: "Danh sách bài viết", Path: "list", Component: "/article/list", Icon: "material-symbols:format-list-bulleted", OrderNum: 2, ParentId: parents[1].ID},
+		{Name: "Quản lý danh mục", Path: "category", Component: "/article/category", Icon: "tabler:category", OrderNum: 3, ParentId: parents[1].ID},
+		{Name: "Quản lý tag", Path: "tag", Component: "/article/tag", Icon: "tabler:tag", OrderNum: 4, ParentId: parents[1].ID},
+		{Name: "Quản lý bài đăng ngắn", Path: "talk", Component: "/article/talk", Icon: "mdi:message-text-outline", OrderNum: 5, ParentId: parents[1].ID},
+		{Name: "Sửa bài viết", Path: "write/:id", Component: "/article/write", Icon: "icon-park-outline:write", OrderNum: 1, ParentId: parents[1].ID, Hidden: true},
+		{Name: "Quản lý menu", Path: "menu", Component: "/auth/menu", Icon: "ic:twotone-menu-book", OrderNum: 1, ParentId: parents[2].ID},
+		{Name: "Quản lý API", Path: "resource", Component: "/auth/resource", Icon: "mdi:api", OrderNum: 2, ParentId: parents[2].ID},
+		{Name: "Quản lý role", Path: "role", Component: "/auth/role", Icon: "carbon:user-role", OrderNum: 3, ParentId: parents[2].ID},
+		{Name: "Quản lý bình luận", Path: "comment", Component: "/message/comment", Icon: "ic:twotone-comment", OrderNum: 1, ParentId: parents[3].ID},
+		{Name: "Quản lý lời nhắn", Path: "leave-msg", Component: "/message/leave-msg", Icon: "ic:twotone-message", OrderNum: 2, ParentId: parents[3].ID},
+		{Name: "Danh sách người dùng", Path: "list", Component: "/user/list", Icon: "mdi:account", OrderNum: 1, ParentId: parents[4].ID},
+		{Name: "Người dùng online", Path: "online", Component: "/user/online", Icon: "ic:outline-online-prediction", OrderNum: 2, ParentId: parents[4].ID},
+		{Name: "Operation log", Path: "operation", Component: "/log/operation", Icon: "mdi:book-open-page-variant-outline", OrderNum: 1, ParentId: parents[5].ID},
+		{Name: "Login log", Path: "login", Component: "/log/login", Icon: "material-symbols:login", OrderNum: 2, ParentId: parents[5].ID},
+		{Name: "Lỗi frontend", Path: "error", Component: "/log/error", Icon: "mdi:bug-outline", OrderNum: 3, ParentId: parents[5].ID},
+		{Name: "Cấu hình website", Path: "website", Component: "/setting/website", Icon: "el:website", OrderNum: 1, ParentId: parents[6].ID},
+		{Name: "Quản lý trang", Path: "page", Component: "/setting/page", Icon: "iconoir:journal-page", OrderNum: 2, ParentId: parents[6].ID},
+		{Name: "Quản lý friend link", Path: "link", Component: "/setting/link", Icon: "mdi:telegram", OrderNum: 3, ParentId: parents[6].ID},
+		{Name: "Giới thiệu", Path: "about", Component: "/setting/about", Icon: "cib:about-me", OrderNum: 4, ParentId: parents[6].ID},
 	}
 
 	for i := range menus {
-		if err := db.Create(&menus[i]).Error; err != nil {
-			if isDuplicate(err) {
-				slog.Debug(menus[i].Name + " menu already exists")
-			} else {
-				slog.Error(menus[i].Name + " menu initialization failed" + err.Error())
-			}
+		if err := upsertSeedChildMenu(db, &menus[i]); err != nil {
+			slog.Error(menus[i].Name + " menu initialization failed: " + err.Error())
 		}
 	}
-
-	// Load all menus
-	db.Find(&menus)
 
 	// 给 admin 和 guest 角色添加所有菜单访问权限
 	for _, name := range []string{"admin", "guest"} {
@@ -416,6 +388,75 @@ func generateDefaultMenus(db *gorm.DB) {
 	}
 
 	slog.Info("-----Initialize menus end-----")
+}
+
+// Menu names are display text and may change when translating the UI. Seed by
+// stable route path instead of name, otherwise every translation creates a new
+// route tree beside the old one.
+func upsertSeedParentMenu(db *gorm.DB, desired *model.Menu) error {
+	var matches []model.Menu
+	if err := db.Where("parent_id = 0 AND path = ?", desired.Path).Order("id").Find(&matches).Error; err != nil {
+		return err
+	}
+	if len(matches) == 0 {
+		return db.Create(desired).Error
+	}
+
+	canonical := matches[0]
+	for _, duplicate := range matches[1:] {
+		if err := db.Model(&model.Menu{}).Where("parent_id = ?", duplicate.ID).Update("parent_id", canonical.ID).Error; err != nil {
+			return err
+		}
+		if err := mergeMenuRoleBindings(db, canonical.ID, duplicate.ID); err != nil {
+			return err
+		}
+		if err := db.Delete(&duplicate).Error; err != nil {
+			return err
+		}
+	}
+
+	desired.ID = canonical.ID
+	return model.SaveOrUpdateMenu(db, desired)
+}
+
+func upsertSeedChildMenu(db *gorm.DB, desired *model.Menu) error {
+	var matches []model.Menu
+	// parent_id = 0 also catches orphan rows produced when an older parent seed
+	// failed (for example /menu after "Permission Management" exceeded varchar(20)).
+	if err := db.Where("path = ? AND (parent_id = ? OR (parent_id = 0 AND component = ?))", desired.Path, desired.ParentId, desired.Component).
+		Order("id").Find(&matches).Error; err != nil {
+		return err
+	}
+	if len(matches) == 0 {
+		return db.Create(desired).Error
+	}
+
+	canonical := matches[0]
+	for _, duplicate := range matches[1:] {
+		if err := mergeMenuRoleBindings(db, canonical.ID, duplicate.ID); err != nil {
+			return err
+		}
+		if err := db.Delete(&duplicate).Error; err != nil {
+			return err
+		}
+	}
+
+	desired.ID = canonical.ID
+	return model.SaveOrUpdateMenu(db, desired)
+}
+
+func mergeMenuRoleBindings(db *gorm.DB, keepMenuID, removeMenuID int) error {
+	var roleIDs []int
+	if err := db.Model(&model.RoleMenu{}).Where("menu_id = ?", removeMenuID).Pluck("role_id", &roleIDs).Error; err != nil {
+		return err
+	}
+	for _, roleID := range roleIDs {
+		binding := model.RoleMenu{RoleId: roleID, MenuId: keepMenuID}
+		if err := db.Where(binding).FirstOrCreate(&binding).Error; err != nil {
+			return err
+		}
+	}
+	return db.Where("menu_id = ?", removeMenuID).Delete(&model.RoleMenu{}).Error
 }
 
 // 把菜单挂到角色下, 已经存在的关联跳过

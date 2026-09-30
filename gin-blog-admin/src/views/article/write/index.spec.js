@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import api from '@/api'
+import { request } from '@/utils'
 import ArticleWrite from './index.vue'
 
 vi.mock('@/api', () => ({
@@ -21,7 +22,11 @@ vi.mock('vue-router', async importOriginal => ({
   useRouter: () => ({ push: vi.fn() }),
 }))
 
-vi.mock('md-editor-v3', () => ({ MdEditor: { template: '<div />' } }))
+vi.mock('md-editor-v3', () => ({
+  config: vi.fn(),
+  en_US: {},
+  MdEditor: { template: '<div />' },
+}))
 
 function mountPage() {
   return mount(ArticleWrite, {
@@ -71,5 +76,45 @@ describe('写文章', () => {
 
     expect(wrapper.vm.formModel.tag_names).toEqual([])
     expect(wrapper.vm.formModel.category_name).toBe('')
+  })
+
+  it('上传 Markdown 图片并把可访问 URL 传回编辑器', async () => {
+    const files = [
+      new File(['first'], 'first.png', { type: 'image/png' }),
+      new File(['second'], 'second.jpg', { type: 'image/jpeg' }),
+    ]
+    const post = vi.spyOn(request, 'post')
+      .mockResolvedValueOnce({ data: 'public/uploaded/first.png' })
+      .mockResolvedValueOnce({ data: 'https://cdn.test/second.jpg' })
+    const callback = vi.fn()
+    const wrapper = mountPage()
+
+    await wrapper.vm.handleEditorUpload(files, callback)
+
+    expect(post).toHaveBeenCalledTimes(2)
+    expect(post).toHaveBeenNthCalledWith(1, '/upload', expect.any(FormData))
+    expect(post.mock.calls[0][1].get('file')).toBe(files[0])
+    expect(post.mock.calls[1][1].get('file')).toBe(files[1])
+    expect(callback).toHaveBeenCalledWith([
+      '/public/uploaded/first.png',
+      'https://cdn.test/second.jpg',
+    ])
+
+    post.mockRestore()
+  })
+
+  it('上传 Markdown 图片失败时不向编辑器插入地址', async () => {
+    const post = vi.spyOn(request, 'post').mockRejectedValue(new Error('upload failed'))
+    const callback = vi.fn()
+    const wrapper = mountPage()
+
+    await wrapper.vm.handleEditorUpload([
+      new File(['bad'], 'bad.png', { type: 'image/png' }),
+    ], callback)
+
+    expect(callback).not.toHaveBeenCalled()
+    expect(window.$message.error).toHaveBeenCalledWith('Tải ảnh thất bại')
+
+    post.mockRestore()
   })
 })

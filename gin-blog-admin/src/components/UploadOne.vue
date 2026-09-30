@@ -23,6 +23,12 @@ const previewImg = ref(props.preview)
 
 watch(() => props.preview, val => previewImg.value = val)
 
+function handleUploadError({ event }) {
+  const status = event?.target?.status
+  const res = parseJson(event?.target?.response)
+  $message?.error(res?.message || `Tải ảnh thất bại${status ? ` (HTTP ${status})` : ': lỗi kết nối'}`)
+}
+
 // Upload image
 function handleImgUpload({ event }) {
   // 网关拦截或鉴权失败时响应不是 JSON, 不能直接 JSON.parse
@@ -49,6 +55,7 @@ defineExpose({ previewImg })
       :headers="{ Authorization: `Bearer ${authStore.token}` }"
       accept="image/jpeg,image/png,image/gif,image/webp,image/bmp"
       :show-file-list="false"
+      @error="handleUploadError"
       @finish="handleImgUpload"
     >
       <template v-if="previewImg">
@@ -57,7 +64,7 @@ defineExpose({ previewImg })
           class="cursor-pointer border-2 rounded-lg border-dashed hover:border-color-lightblue"
           :style="{ width: `${props.width}px` }"
           :src="imgUrl"
-          alt="Article Cover"
+          alt="Ảnh bài viết"
         >
       </template>
       <template v-else>
@@ -68,7 +75,7 @@ defineExpose({ previewImg })
             </NIcon>
           </div>
           <NText>
-            Click or drag file to this area to upload
+            Nhấn hoặc kéo thả ảnh vào đây để tải lên
           </NText>
         </NUploadDragger>
       </template>

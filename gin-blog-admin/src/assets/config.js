@@ -13,15 +13,15 @@ export const loginTypeMap = {
 
 // Article type options
 export const articleTypeOptions = [
-  { label: 'Original', value: 1 },
-  { label: 'Repost', value: 2 },
-  { label: 'Translation', value: 3 },
+  { label: 'Nguyên bản', value: 1 },
+  { label: 'Đăng lại', value: 2 },
+  { label: 'Bản dịch', value: 3 },
 ]
 
 export const articleTypeMap = {
-  1: { name: 'Original', tag: 'error' },
-  2: { name: 'Repost', tag: 'success' },
-  3: { name: 'Translation', tag: 'warning' },
+  1: { name: 'Nguyên bản', tag: 'error' },
+  2: { name: 'Đăng lại', tag: 'success' },
+  3: { name: 'Bản dịch', tag: 'warning' },
 }
 
 // Comment type options

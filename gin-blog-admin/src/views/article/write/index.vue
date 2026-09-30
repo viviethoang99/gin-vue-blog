@@ -1,5 +1,5 @@
 <script setup>
-import { MdEditor } from 'md-editor-v3'
+import { config as configureMdEditor, en_US, MdEditor } from 'md-editor-v3'
 import { NButton, NDynamicTags, NForm, NFormItem, NInput, NRadio, NRadioGroup, NSelect, NSpace, NSwitch, NTag } from 'naive-ui'
 import { h, nextTick, onActivated, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -11,9 +11,86 @@ import CommonPage from '@/components/common/CommonPage.vue'
 
 import CrudModal from '@/components/crud/CrudModal.vue'
 import { useTagStore } from '@/store'
+import { convertImgUrl, request } from '@/utils'
 import 'md-editor-v3/lib/style.css'
 
 defineOptions({ name: 'Publish Article' })
+
+configureMdEditor({
+  editorConfig: {
+    languageUserDefined: {
+      'vi-VN': {
+        ...en_US,
+        toolbarTips: {
+          bold: 'In đậm',
+          underline: 'Gạch chân',
+          italic: 'In nghiêng',
+          strikeThrough: 'Gạch ngang',
+          title: 'Tiêu đề',
+          sub: 'Chỉ số dưới',
+          sup: 'Chỉ số trên',
+          quote: 'Trích dẫn',
+          unorderedList: 'Danh sách không thứ tự',
+          orderedList: 'Danh sách có thứ tự',
+          task: 'Danh sách công việc',
+          codeRow: 'Mã nội dòng',
+          code: 'Khối mã',
+          link: 'Liên kết',
+          image: 'Hình ảnh',
+          table: 'Bảng',
+          mermaid: 'Sơ đồ Mermaid',
+          katex: 'Công thức',
+          revoke: 'Hoàn tác',
+          next: 'Làm lại',
+          save: 'Lưu',
+          prettier: 'Định dạng',
+          pageFullscreen: 'Toàn màn hình trong trang',
+          fullscreen: 'Toàn màn hình',
+          preview: 'Xem trước',
+          previewOnly: 'Chỉ xem trước',
+          htmlPreview: 'Xem mã HTML',
+          catalog: 'Mục lục',
+          github: 'Mã nguồn',
+        },
+        titleItem: {
+          h1: 'Tiêu đề cấp 1',
+          h2: 'Tiêu đề cấp 2',
+          h3: 'Tiêu đề cấp 3',
+          h4: 'Tiêu đề cấp 4',
+          h5: 'Tiêu đề cấp 5',
+          h6: 'Tiêu đề cấp 6',
+        },
+        imgTitleItem: {
+          link: 'Thêm liên kết ảnh',
+          upload: 'Tải ảnh lên',
+          clip2upload: 'Cắt và tải lên',
+        },
+        linkModalTips: {
+          linkTitle: 'Thêm liên kết',
+          imageTitle: 'Thêm ảnh',
+          descLabel: 'Mô tả:',
+          descLabelPlaceHolder: 'Nhập mô tả...',
+          urlLabel: 'Liên kết:',
+          urlLabelPlaceHolder: 'Nhập liên kết...',
+          buttonOK: 'Đồng ý',
+        },
+        clipModalTips: {
+          title: 'Cắt ảnh',
+          buttonUpload: 'Tải lên',
+        },
+        copyCode: {
+          text: 'Sao chép',
+          successTips: 'Đã sao chép!',
+          failTips: 'Sao chép thất bại!',
+        },
+        footer: {
+          markdownTotal: 'Số ký tự',
+          scrollAuto: 'Cuộn đồng bộ',
+        },
+      },
+    },
+  },
+})
 
 const route = useRoute()
 // const router = useRouter()
@@ -91,20 +168,20 @@ async function getArticleInfo() {
   }
   catch {
     window.$loadingBar?.error()
-    $message?.error('Loading failed')
+    $message?.error('Tải dữ liệu thất bại')
   }
 }
 
 // TODO: Save draft
 function handleDraft() {
-  $message.info('Save draft feature is under development')
+  $message.info('Tính năng lưu nháp đang được phát triển')
 }
 
 // Publish article
 function handlePublish() {
   if (!formModel.value.title || !formModel.value.title?.trim()) {
     formModel.value.title = formModel.value.title?.trim()
-    $message.info('Please enter title')
+    $message.info('Vui lòng nhập tiêu đề')
     return
   }
   modalVisible.value = true
@@ -119,7 +196,7 @@ async function handleSave() {
       try {
         await api.saveOrUpdateArticle(formModel.value)
         modalVisible.value = false
-        $message.success('Operation successful!')
+        $message.success('Thao tác thành công!')
         // Close current tab and return to article list
         tagStore.removeTag(route.path)
         // await router.replace({ path: '/article/list', query: { needRefresh: true } })
@@ -137,12 +214,12 @@ async function handleSave() {
 const rules = {
   category_name: {
     required: true,
-    message: 'Please select article type',
+    message: 'Vui lòng chọn danh mục',
     trigger: ['blur', 'change'],
   },
   tag_names: {
     required: true,
-    message: 'Please select article tags',
+    message: 'Vui lòng chọn thẻ',
   },
 }
 
@@ -159,38 +236,67 @@ function renderTag(tag, index) {
     { default: () => tag },
   )
 }
+
+// MdEditor only supplies the selected files. Upload them through the same Axios
+// instance as the rest of the admin app so JWT and business-error handling are
+// applied consistently, then give the resulting URLs back to the editor.
+async function handleEditorUpload(files, callback) {
+  try {
+    const urls = await Promise.all(files.map(async (file) => {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      // Do not set Content-Type manually: Axios/browser must append the
+      // multipart boundary for the Go server to parse FormFile("file").
+      const resp = await request.post('/upload', formData)
+      const url = convertImgUrl(resp.data)
+      return url
+    }))
+
+    callback(urls)
+  }
+  catch {
+    $message?.error('Tải ảnh thất bại')
+  }
+}
 </script>
 
 <template>
-  <CommonPage :show-header="false" title="Write Article">
+  <CommonPage :show-header="false" title="Viết bài">
     <div class="mb-4 flex items-center bg-white space-x-2">
       <NInput
         v-model:value="formModel.title"
         type="text"
         class="mr-5 flex-1 py-1 text-lg color-primary font-bold"
-        placeholder="Enter article title..."
+        placeholder="Nhập tiêu đề bài viết..."
       />
       <NButton ghost type="error" :loading="btnLoading" @click="handleDraft">
         <template #icon>
           <span v-if="!btnLoading" class="i-line-md:uploading-loop" />
         </template>
-        Save Draft
+        Lưu nháp
       </NButton>
       <NButton type="error" :loading="btnLoading" @click="handlePublish">
         <template #icon>
           <span v-if="!btnLoading" class="i-line-md:confirm-circle" />
         </template>
-        Publish Article
+        Xuất bản
       </NButton>
     </div>
 
-    <!-- TODO: File upload -->
-    <MdEditor v-model="formModel.content" style="height: calc(100vh - 245px)" />
+    <MdEditor
+      v-model="formModel.content"
+      style="height: calc(100vh - 245px)"
+      language="vi-VN"
+      @on-upload-img="handleEditorUpload"
+    />
 
     <CrudModal
       v-model:visible="modalVisible"
-      title="Publish Article"
+      title="Xuất bản bài viết"
       :loading="btnLoading"
+      cancel-text="Hủy"
+      ok-text="Xác nhận"
       show-footer
       @save="handleSave"
     >
@@ -202,16 +308,16 @@ function renderTag(tag, index) {
         :model="formModel"
         :rules="rules"
       >
-        <NFormItem label="Category" path="category_name">
+        <NFormItem label="Danh mục" path="category_name">
           <NSelect
             v-model:value="formModel.category_name"
             style="width: 50%"
             clearable filterable tag
-            placeholder="Search keywords, press enter to add"
+            placeholder="Tìm kiếm, nhấn Enter để thêm"
             :options="categoryOptions"
           />
         </NFormItem>
-        <NFormItem label="Tags" path="tag_names">
+        <NFormItem label="Thẻ" path="tag_names">
           <NDynamicTags
             v-model:value="formModel.tag_names"
             :render-tag="renderTag"
@@ -222,7 +328,7 @@ function renderTag(tag, index) {
                 v-model:value="newTag"
                 size="small" filterable tag clearable
                 :options="tagOptions"
-                placeholder="Tag name"
+                placeholder="Tên thẻ"
                 @update:value="{
                   submit($event);
                   newTag = null;
@@ -230,17 +336,17 @@ function renderTag(tag, index) {
                 @blur="deactivate"
               >
                 <template #action>
-                  Enter tag name to search, press enter to add custom tag
+                  Nhập tên thẻ để tìm kiếm, nhấn Enter để thêm thẻ mới
                 </template>
               </NSelect>
             </template>
           </NDynamicTags>
         </NFormItem>
-        <NFormItem label="Type" path="type">
+        <NFormItem label="Loại bài viết" path="type">
           <NSelect
             v-model:value="formModel.type"
             style="width: 50%"
-            placeholder="Please select article type"
+            placeholder="Chọn loại bài viết"
             :options="articleTypeOptions"
           />
         </NFormItem>
@@ -254,31 +360,31 @@ function renderTag(tag, index) {
         </n-form-item> -->
         <NFormItem
           v-if="(formModel.type === 2 || formModel.type === 3)"
-          label="Original URL" path="original_url"
+          label="Liên kết gốc" path="original_url"
         >
           <NInput
             v-model:value="formModel.original_url"
             type="text"
-            placeholder="Please enter original article link"
+            placeholder="Nhập liên kết bài viết gốc"
           />
         </NFormItem>
-        <NFormItem label="Thumbnail" path="img">
+        <NFormItem label="Ảnh đại diện" path="img">
           <UploadOne
             v-model:preview="formModel.img"
             :width="220"
           />
         </NFormItem>
-        <NFormItem label="Pin to Top" path="is_top">
+        <NFormItem label="Ghim lên đầu" path="is_top">
           <NSwitch v-model:value="formModel.is_top" />
         </NFormItem>
-        <NFormItem label="Status" path="status">
+        <NFormItem label="Trạng thái" path="status">
           <NRadioGroup v-model:value="formModel.status" name="radiogroup">
             <NSpace>
               <NRadio :value="1">
-                Public
+                Công khai
               </NRadio>
               <NRadio :value="2">
-                Private
+                Riêng tư
               </NRadio>
             </NSpace>
           </NRadioGroup>

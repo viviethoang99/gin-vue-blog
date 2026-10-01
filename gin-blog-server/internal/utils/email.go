@@ -89,9 +89,9 @@ func GetEmailVerifyURL(info string) string {
 // 生成邮件数据
 func GetEmailData(email string, info string) *EmailData {
 	return &EmailData{
-		URL:      template.URL(GetEmailVerifyURL(info)), // 验证链接
-		UserName: email,                                 // 用户邮箱地址
-		Subject:  "Please complete account registration",                             // 邮件主题
+		URL:      template.URL(GetEmailVerifyURL(info)),  // 验证链接
+		UserName: email,                                  // 用户邮箱地址
+		Subject:  "Please complete account registration", // 邮件主题
 	}
 }
 

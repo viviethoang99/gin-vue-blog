@@ -21,7 +21,7 @@ concurrency:
 jobs:
   server:
     name: Server (Go)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
 
@@ -73,7 +73,7 @@ jobs:
 
   frontend:
     name: Frontend (${{ matrix.project }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -122,7 +122,7 @@ jobs:
   #   - 顺带把 `bootstrap.sh dev` 用的这个 Dockerfile 也纳入验证, 之前没人测过
   docker:
     name: Docker
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: frontend
     # 发布镜像要写 packages, 默认的 GITHUB_TOKEN 只有读权限
     permissions:
@@ -226,7 +226,7 @@ jobs:
   # 一键部署的端到端验证: 起完整的 compose 栈, 校验权限种子数据的不变式
   deploy:
     name: Deploy (compose)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
 

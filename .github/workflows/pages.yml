@@ -22,7 +22,7 @@ permissions:
 jobs:
   build:
     name: Build mock pages
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # 项目站点的 URL 前缀是仓库名, 如 https://<user>.github.io/gin-vue-blog/
     env:
       BASE: /${{ github.event.repository.name }}/
@@ -79,7 +79,7 @@ jobs:
   deploy:
     name: Deploy to Pages
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

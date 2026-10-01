@@ -28,7 +28,7 @@ type Article struct {
 	Desc        string `json:"desc"`
 	Content     string `json:"content"`
 	Img         string `json:"img"`
-	Type        int    `gorm:"type:tinyint;comment:Type (1-Original 2-Reprint 3-Translation)" json:"type"`                                // 1-原创 2-转载 3-翻译
+	Type        int    `gorm:"type:tinyint;comment:Type (1-Original 2-Reprint 3-Translation)" json:"type"`         // 1-原创 2-转载 3-翻译
 	Status      int    `gorm:"type:tinyint;index:idx_article_list,priority:2;comment:状态(1-公开 2-私密)" json:"status"` // 1-公开 2-私密
 	IsTop       bool   `json:"is_top"`
 	IsDelete    bool   `gorm:"index:idx_article_list,priority:1" json:"is_delete"`

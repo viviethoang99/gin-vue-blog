@@ -1,0 +1,22 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Jaspr: serve",
+      "type": "shell",
+      "command": "jaspr",
+      "args": [
+        "serve",
+        "--dart-define-from-file=.env"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "isBackground": true,
+      "problemMatcher": [],
+      "runOptions": {
+        "instanceLimit": 1
+      }
+    }
+  ]
+}

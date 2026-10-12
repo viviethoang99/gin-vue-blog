@@ -5,7 +5,7 @@ Tài liệu này áp dụng cho cấu trúc hiện tại của repository, gồm
 | Thành phần | Thư mục | Công nghệ | Cổng local |
 | --- | --- | --- | --- |
 | Backend API | `gin-blog-server` | Go 1.26, Gin, GORM | `8765` |
-| Blog frontend | `gin-blog-front` | Vue 3, Vite | `8888` |
+| Blog frontend | `irohasu_jaspr` | Dart, Jaspr SSR | `8888` |
 | Admin frontend | `gin-blog-admin` | Vue 3, Vite, Naive UI | `8889` |
 
 Các địa chỉ mặc định khi chạy local:
@@ -22,7 +22,7 @@ Các địa chỉ mặc định khi chạy local:
 | --- | --- |
 | Phát triển trên Linux/WSL | `./dev.sh start --demo` |
 | Phát triển trên macOS hoặc máy không có `setsid` | Chạy thủ công theo mục 4 |
-| Chỉ xem giao diện, không chạy backend | Frontend Mock mode |
+| Chỉ xem admin, không chạy backend | Admin Mock mode |
 | Muốn hiểu và chạy từng thành phần | Chạy thủ công |
 | Deploy lên VPS/server | `cd deploy && ./bootstrap.sh` |
 
@@ -32,6 +32,7 @@ Các địa chỉ mặc định khi chạy local:
 
 - Git
 - Go `1.26+`
+- Flutter stable (kèm Dart) và Jaspr CLI `0.23.5`
 - Node.js `>=20.19`; Node 22 khuyến nghị
 - pnpm (`11` là phiên bản dùng trong Dockerfile)
 - Redis 7, hoặc Docker để script tự chạy Redis
@@ -50,12 +51,20 @@ Hoặc:
 npm install -g pnpm@11
 ```
 
+Cài Jaspr CLI:
+
+```bash
+dart pub global activate jaspr_cli 0.23.5
+```
+
 Kiểm tra môi trường:
 
 ```bash
 go version
 node --version
 pnpm --version
+flutter --version
+jaspr --version
 ```
 
 ### 2.2. Khởi động toàn bộ hệ thống
@@ -81,7 +90,7 @@ Lệnh này sẽ:
 3. Tự tạo bảng và dữ liệu hệ thống khi chưa có database.
 4. Nạp thêm dữ liệu demo do có cờ `--demo`.
 5. Build và chạy backend.
-6. Chạy blog frontend và admin frontend với API thật, tự tắt Mock mode.
+6. Chạy blog frontend Jaspr và admin frontend với API thật.
 
 Nếu không cần bài viết và bình luận demo:
 
@@ -123,17 +132,9 @@ mv gin-blog-server/cmd/gvb.db.bak gin-blog-server/cmd/gvb.db
 ./dev.sh start
 ```
 
-## 3. Chạy frontend bằng Mock mode
+## 3. Chạy admin bằng Mock mode
 
-Cách này không cần Go, Redis hay database. Dữ liệu nằm trong `src/mock`; các thay đổi sẽ mất khi reload trang.
-
-Blog frontend:
-
-```bash
-cd gin-blog-front
-pnpm install
-pnpm dev
-```
+Cách này không cần Go, Redis hay database. Jaspr frontend không có Mock mode; chế độ này chỉ dành cho admin.
 
 Admin frontend:
 
@@ -143,7 +144,7 @@ pnpm install
 pnpm dev
 ```
 
-Hai file `.env.development` hiện đặt `VITE_USE_MOCK=true`, nên chạy trực tiếp `pnpm dev` sẽ dùng Mock mode. Admin Mock mode chấp nhận bất kỳ tài khoản/mật khẩu nào.
+File `gin-blog-admin/.env.development` đặt `VITE_USE_MOCK=true`, nên chạy trực tiếp `pnpm dev` sẽ dùng Mock mode và chấp nhận bất kỳ tài khoản/mật khẩu nào.
 
 ## 4. Chạy thủ công với backend thật
 
@@ -192,17 +193,16 @@ go run main.go
 
 ### 4.4. Chạy hai frontend với API thật
 
-Trong cả hai file sau, đổi `VITE_USE_MOCK` thành `false`:
-
-- `gin-blog-front/.env.development`
-- `gin-blog-admin/.env.development`
+Trong `gin-blog-admin/.env.development`, đổi `VITE_USE_MOCK` thành `false`.
 
 Sau đó chạy ở hai terminal:
 
 ```bash
-cd gin-blog-front
-pnpm install
-pnpm dev
+cd irohasu_jaspr
+flutter pub get
+jaspr serve --port 8888 \
+  --dart-define=API_BASE_URL=http://localhost:8765/ \
+  --dart-define=PUBLIC_API_BASE_URL=http://localhost:8765/
 ```
 
 ```bash
@@ -211,7 +211,7 @@ pnpm install
 pnpm dev
 ```
 
-Vite proxy `/api` và `/public` về `http://localhost:8765`, nên local không cần cấu hình CORS bổ sung. Vite chỉ đọc `.env*` lúc khởi động; thay đổi biến môi trường xong phải restart `pnpm dev`.
+Jaspr dùng `API_BASE_URL` cho SSR và `PUBLIC_API_BASE_URL` cho tìm kiếm/ảnh trên trình duyệt. Backend mặc định cho phép origin local. Vite của admin vẫn proxy `/api` và `/public` về `http://localhost:8765`.
 
 ## 5. Cấu hình backend
 
@@ -392,16 +392,16 @@ Nginx sẽ redirect HTTP sang HTTPS. Không dùng certificate mẫu cho producti
 
 Nếu dùng Caddy, Traefik hoặc Nginx Proxy Manager ở ngoài stack để tự cấp Let's Encrypt, có thể giữ `USE_HTTPS=false` và để proxy ngoài terminate TLS. Khi proxy không nằm trong mạng private mặc định, bổ sung IP/CIDR của proxy vào `Server.trusted-proxies`.
 
-### 6.6. Build frontend bằng pnpm trên host
+### 6.6. Build frontend trên host
 
-Mặc định frontend được build trong Docker. Nếu server đã có Node và pnpm:
+Mặc định frontend được build trong Docker. Nếu server đã có Flutter/Jaspr, Node và pnpm:
 
 ```bash
 cd /duong-dan/toi/gin-vue-blog/deploy
 ./bootstrap.sh dev
 ```
 
-Lệnh này tạo `deploy/build/web/dist_blog` và `deploy/build/web/dist_admin`, sau đó Nginx image copy static assets đã build sẵn.
+Lệnh này tạo bundle Jaspr server trong `deploy/build/web/dist_blog` và static admin trong `deploy/build/web/dist_admin`.
 
 ## 7. Cập nhật phiên bản đang deploy
 
@@ -511,10 +511,11 @@ Docker mount upload vào `deploy/start/gvb/file/uploaded`. Nginx proxy `/public/
 cd gin-blog-server
 go test ./...
 
-cd ../gin-blog-front
-pnpm install --frozen-lockfile
-pnpm test
-pnpm build
+cd ../irohasu_jaspr
+flutter pub get
+dart analyze
+flutter test
+jaspr build --dart-define=API_BASE_URL=http://gvb-server:8765/ --dart-define=PUBLIC_API_BASE_URL=/
 
 cd ../gin-blog-admin
 pnpm install --frozen-lockfile

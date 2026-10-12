@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 本地端到端联调用: 一键启动 / 重启 Redis + 后端 + 博客前台 + 博客后台
+# 本地端到端联调用: 一键启动 / 重启 Redis + 后端 + Jaspr 博客前台 + Vue 博客后台
 # 用法: ./dev.sh [start|stop|restart|fresh|status|seed|logs <name>] [--force] [--demo]
 # 日志与 pid 放在 .dev/ 下, 已 gitignore
 
@@ -172,8 +172,7 @@ start_server() {
   wait_port "$SERVER_PORT" server 30
 }
 
-# 前端: .env.development 里 VITE_USE_MOCK 默认是 true(纯前端预览用),
-# 联调要打到真后端, 所以在命令行覆盖 —— vite 里 shell 环境变量优先级高于 .env 文件
+# Vue 管理后台: 联调时在命令行关闭默认 Mock 模式。
 start_web() {
   local name=$1 dir=$2 port=$3
   [ -d "$dir/node_modules" ] || {
@@ -183,6 +182,15 @@ start_web() {
   info "启动 $name :$port (VITE_USE_MOCK=false)"
   spawn "$name" "$dir" env VITE_USE_MOCK=false pnpm dev
   wait_port "$port" "$name" 60
+}
+
+start_blog() {
+  info "启动 Jaspr 博客前台 :$FRONT_PORT"
+  spawn front "$ROOT/irohasu_jaspr" jaspr serve \
+    --port "$FRONT_PORT" \
+    --dart-define "API_BASE_URL=http://localhost:$SERVER_PORT/" \
+    --dart-define "PUBLIC_API_BASE_URL=http://localhost:$SERVER_PORT/"
+  wait_port "$FRONT_PORT" front 60
 }
 
 stop_one() {
@@ -255,6 +263,8 @@ do_seed() {
 do_start() {
   command -v go >/dev/null 2>&1 || die "未找到 go"
   command -v pnpm >/dev/null 2>&1 || die "未找到 pnpm"
+  command -v flutter >/dev/null 2>&1 || die "未找到 flutter"
+  command -v jaspr >/dev/null 2>&1 || die "未找到 jaspr (dart pub global activate jaspr_cli 0.23.5)"
 
   start_redis
   # 没有库文件就先灌基础数据: generate-data 自己会 AutoMigrate 建表,
@@ -268,7 +278,7 @@ do_start() {
   ensure_free "$FRONT_PORT" front
   ensure_free "$ADMIN_PORT" admin
   start_server
-  start_web front "$ROOT/gin-blog-front" "$FRONT_PORT"
+  start_blog
   start_web admin "$ROOT/gin-blog-admin" "$ADMIN_PORT"
 
   echo

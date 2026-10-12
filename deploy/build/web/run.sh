@@ -7,6 +7,8 @@ if [ "$USE_HTTPS" = "true" ]; then
 else
 	envsubst '${SERVER_NAME} ${BACKEND_HOST} ${SERVER_PORT}' < /etc/nginx/conf.d/default.conf.template > /etc/nginx/conf.d/default.conf
 fi
-# rm /etc/nginx/conf.d/default.conf.template
-# rm /etc/nginx/conf.d/default.conf.ssl.template
+
+# Jaspr serves the dynamic public site on the loopback interface. Nginx keeps
+# the external routes (/api and /admin) compatible with the previous frontend.
+PORT=8080 /opt/irohasu/app &
 exec "$@"

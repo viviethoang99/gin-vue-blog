@@ -1,0 +1,24 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "irohasu_jaspr",
+      "request": "launch",
+      "type": "jaspr",
+      "args": [
+        "--dart-define-from-file=.env",
+        "--no-launch-in-chrome"
+      ]
+    },
+    {
+      "name": "irohasu_jaspr (release mode)",
+      "request": "launch",
+      "type": "jaspr",
+      "args": [
+        "--release",
+        "--dart-define-from-file=.env",
+        "--no-launch-in-chrome"
+      ]
+    }
+  ]
+}

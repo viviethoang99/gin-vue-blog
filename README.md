@@ -8,12 +8,12 @@
   <img src="https://img.shields.io/badge/Go-1.26-blue"/>
   <img src="https://img.shields.io/badge/Gin-v1.12-blue"/>
   <img src="https://img.shields.io/badge/GORM-v1.31-blue"/>
+  <img src="https://img.shields.io/badge/Jaspr-v0.23-orange"/>
+  <img src="https://img.shields.io/badge/Dart-v3.10-blue"/>
   <img src="https://img.shields.io/badge/Vue-v3.5-green"/>
-  <img src="https://img.shields.io/badge/Vite-v8-green"/>
-  <img src="https://img.shields.io/badge/UnoCSS-v66-green"/>
 </p>
 
-一个前后端分离的博客项目：Go + Gin 后端，Vue 3 前台 + Vue 3 后台。代码轻量、注释完善，适合学习全栈开发。
+一个前后端分离的博客项目：Go + Gin 后端，Jaspr 博客前台 + Vue 3 管理后台。
 
 - Github: [szluyu99/gin-vue-blog](https://github.com/szluyu99/gin-vue-blog)
 - Gitee: [szluyu99/gin-vue-blog](https://gitee.com/szluyu99/gin-vue-blog)
@@ -23,7 +23,7 @@
 
 ## Live Demo
 
-纯前端 Mock 数据，不依赖后端，由 GitHub Actions 自动部署：
+旧版 Vue 纯前端 Mock 数据（仅保留作迁移参考，需手动触发 GitHub Actions 部署）：
 
 - 博客前台: <https://szluyu99.github.io/gin-vue-blog/>
 - 博客后台: <https://szluyu99.github.io/gin-vue-blog/admin/> （任意账号密码均可登录）
@@ -39,7 +39,7 @@
 
 ## 功能
 
-前台（`gin-blog-front`）：
+前台（`irohasu_jaspr`）：
 
 - 界面参考 Hexo 主题 Butterfly，响应式适配移动端
 - 暗色模式：首次访问跟随系统偏好，可手动切换并记住选择，刷新无闪屏
@@ -69,7 +69,7 @@
 
 后端：Go / Gin / GORM / SQLite（默认，可换 MySQL）/ Redis / Viper / `log/slog`
 
-前端：Vue 3 / Vite / Vue Router / Pinia / UnoCSS / VueUse / Axios，后台额外使用 Naive UI，包管理用 pnpm
+博客前台：Dart / Jaspr / Jaspr Router / Dio，使用服务端渲染；管理后台：Vue 3 / Vite / Pinia / Naive UI / Axios
 
 其他：Docker Compose 一键部署、Nginx 静态资源与反向代理、七牛云对象存储、腾讯云人机验证（可选，默认关闭）
 
@@ -78,7 +78,8 @@
 ```bash
 gin-vue-blog
 ├── gin-blog-admin      # 博客后台前端
-├── gin-blog-front      # 博客前台前端
+├── irohasu_jaspr       # Jaspr 博客前台
+├── gin-blog-front      # 旧版 Vue 博客前台（保留作迁移参考）
 ├── gin-blog-server     # 博客后端
 └── deploy              # Docker 部署
 ```
@@ -145,7 +146,7 @@ cd gin-vue-blog/deploy
 
 ```bash
 cd gin-blog-server && go test ./...   # 后端: model / handle / middleware / global / utils / 路由注册, 8 个包
-cd gin-blog-front  && pnpm test       # 前台: vitest, 32 个文件 197 条
+cd irohasu_jaspr && flutter test      # Jaspr 博客前台
 cd gin-blog-admin  && pnpm test       # 后台: vitest, 27 个文件 165 条
 ```
 
@@ -154,7 +155,7 @@ cd gin-blog-admin  && pnpm test       # 后台: vitest, 27 个文件 165 条
 `.github/workflows/ci.yml` 在 push 和 PR 时跑四组任务：
 
 - Server：`gofmt` / `go vet` / `go test`，并校验 `docs/` 与 Swagger 注解是否一致
-- Frontend：两个前端各跑 `pnpm lint` / `pnpm test` / `pnpm build`
+- Frontend：Jaspr 前台跑 `dart analyze` / `flutter test` / `jaspr build`，Vue 后台跑 `pnpm lint` / `pnpm test` / `pnpm build`
 - Docker：构建 web 与 server 镜像并启动做健康检查。web 镜像直接用 Frontend job 的产物 + `deploy/build/web/Dockerfile`（不在容器里重新打包前端），server 镜像走 buildx + GitHub Actions 缓存。main 有新提交时，冒烟测试通过后把两个镜像推到 GHCR（`latest` 与 `main-<短 sha>`）
 - Deploy：起完整的 compose 栈，校验权限种子数据的不变式（admin 能改配置、guest 不能、未登录被拦，重复执行不新增资源）
 

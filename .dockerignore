@@ -1,6 +1,11 @@
 # 构建镜像时不需要, 且体积大 / 会覆盖镜像内安装结果的目录
 **/node_modules
 **/dist
+**/.dart_tool
+**/.widget_preview
+**/.agents
+irohasu_jaspr/build
+**/.env
 .git
 .github
 images

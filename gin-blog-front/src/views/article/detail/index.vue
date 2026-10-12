@@ -52,7 +52,7 @@ const data = ref({
   recommend_articles: [],
 })
 
-// 文章内容
+// Nội dung bài viết
 const previewRef = ref(null)
 const loading = ref(true)
 
@@ -62,8 +62,9 @@ onMounted(async () => {
     if (!resp.data) {
       return
     }
-    // 后端这些字段可能是 null(未分类、没有上一篇、没有推荐), 子组件里直接取 .length / .name,
-    // 所以在这里统一退化成默认值, 而不是把 resp.data 整个盖上去
+    // Các trường này từ backend có thể là null (chưa phân loại, không có bài trước, không có đề xuất),
+    // trong khi component con truy cập trực tiếp .length / .name, nên chuẩn hóa về giá trị mặc định tại đây
+    // thay vì ghi đè toàn bộ bằng resp.data
     data.value = {
       ...data.value,
       ...resp.data,
@@ -73,15 +74,15 @@ onMounted(async () => {
       category: resp.data.category ?? {},
       last_article: resp.data.last_article ?? {},
       next_article: resp.data.next_article ?? {},
-      // marked 解析 markdown 文本, 正文为空时不能直接丢给 marked
+      // marked phân tích văn bản Markdown; không truyền trực tiếp nội dung rỗng vào marked
       content: await marked.parse(resp.data.content ?? '', { async: true }),
     }
     await nextTick()
-    // highlight.js 代码高亮
+    // Tô sáng mã nguồn bằng highlight.js
     document.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el))
-    // 代码块加「复制」按钮
+    // Thêm nút "Sao chép" vào khối mã
     addCopyButtons(previewRef.value)
-    // 正文里有公式才加载 MathJax
+    // Chỉ tải MathJax khi nội dung có công thức
     await typesetMath(data.value.content)
   }
   catch (err) {
@@ -92,12 +93,12 @@ onMounted(async () => {
   }
 })
 
-// 阅读进度: 顶部细线, 按滚动位置占可滚动高度的比例
+// Tiến độ đọc: đường mảnh ở đầu trang, tính theo tỷ lệ vị trí cuộn trên tổng chiều cao có thể cuộn
 const { y } = useWindowScroll()
 const { height: windowHeight } = useWindowSize()
 const readProgress = computed(() => {
-  // y 必须在提前 return 之前读: 首屏正文还没渲染完时页面撑不出滚动条,
-  // 一旦先 return 就没把 y 记成依赖, 之后滚动也不会重算, 进度条会永远停在 0
+  // Phải đọc y trước khi return sớm: khi nội dung ở màn hình đầu chưa render xong, trang chưa có thanh cuộn;
+  // nếu return trước thì y không được ghi nhận là dependency, các lần cuộn sau sẽ không tính lại và thanh tiến độ luôn ở 0
   const scrolled = y.value
   const total = document.documentElement.scrollHeight - windowHeight.value
   if (total <= 0) {
@@ -106,7 +107,7 @@ const readProgress = computed(() => {
   return Math.min(100, Math.max(0, (scrolled / total) * 100))
 })
 
-// 太久没更新的文章给个提示: 技术文章过期得快, 免得读者照着老内容踩坑
+// Cảnh báo với bài viết lâu chưa cập nhật: nội dung kỹ thuật nhanh lỗi thời, tránh để độc giả làm theo thông tin cũ
 const STALE_DAYS = 90
 const staleDays = computed(() => {
   if (!data.value.updated_at) {
@@ -124,72 +125,72 @@ const styleVal = computed(() =>
 </script>
 
 <template>
-  <!-- 阅读进度 -->
+  <!-- Tiến độ đọc -->
   <div
     class="fixed inset-x-0 top-0 z-999 h-0.5 bg-#49b1f5"
     :style="{ width: `${readProgress}%`, transition: 'width .1s linear' }"
   />
-  <!-- 头部 -->
+  <!-- Phần đầu trang -->
   <div :style="styleVal" class="banner-fade-down absolute inset-x-0 top-0 h-[360px] f-c-c lg:h-[400px]">
     <BannerInfo v-if="!loading" :article="data" />
   </div>
-  <!-- 主体内容 -->
+  <!-- Nội dung chính -->
   <main class="flex-1">
     <div class="card-fade-up grid grid-cols-12 mx-auto mb-3 mt-[380px] gap-4 px-1 lg:mt-[440px] lg:max-w-[1200px]">
-      <!-- 文章主体 -->
+      <!-- Phần chính của bài viết -->
       <div class="card-view col-span-12 mx-2 pt-7 lg:col-span-9 lg:mx-0">
-        <!-- 文章内容 -->
-        <!-- 老文章提示 -->
+        <!-- Nội dung bài viết -->
+        <!-- Cảnh báo bài viết cũ -->
         <div
           v-if="!loading && staleDays"
           class="mb-5 border-l-4 border-#f0ad4e rounded bg-#f0ad4e/10 px-4 py-2 text-sm lg:mx-10"
         >
-          本文最后更新于 {{ staleDays }} 天前，部分内容可能已经过时。
+          Bài viết này được cập nhật lần cuối cách đây {{ staleDays }} ngày. Một số nội dung có thể đã lỗi thời.
         </div>
         <article
           ref="previewRef"
           class="max-w-none prose prose-truegray lg:mx-10 dark:prose-invert"
           v-html="data.content"
         />
-        <!-- 版权声明 -->
+        <!-- Thông báo bản quyền -->
         <Copyright class="my-5 lg:mx-5" />
-        <!-- 标签、转发 -->
+        <!-- Thẻ và chia sẻ -->
         <Forward :tag-list="data.tags" class="mb-12 lg:mx-5" />
-        <!-- 点赞、打赏 -->
+        <!-- Thích và ủng hộ -->
         <Reward
           :article-id="data.id"
           :like-count="data.like_count"
           class="mb-10"
         />
-        <!-- 上一篇、下一篇 -->
+        <!-- Bài trước và bài tiếp theo -->
         <LastNext
           :last-article="data.last_article"
           :next-article="data.next_article"
           class="lg:mx-5"
         />
-        <!-- 推荐文章 -->
+        <!-- Bài viết đề xuất -->
         <Recommend
           :recommend-list="data.recommend_articles"
           class="mt-7 lg:mx-5"
         />
-        <!-- 分隔线 -->
+        <!-- Đường phân cách -->
         <hr class="my-10 border-2 border-color-divider border-dashed lg:mx-5">
-        <!-- 文章评论 -->
+        <!-- Bình luận bài viết -->
         <Comment :type="1" class="lg:mx-5" />
       </div>
-      <!-- 文章侧边栏 -->
+      <!-- Thanh bên bài viết -->
       <div class="col-span-0 lg:col-span-3">
         <div class="sticky top-5 hidden lg:block space-y-4">
-          <!-- 目录 -->
-          <!-- TODO: v-if 的方法不太好, 想办法解决父组件接口获取数据, 子组件渲染问题 -->
+          <!-- Mục lục -->
+          <!-- TODO: Cách dùng v-if chưa tối ưu; cần xử lý việc component cha lấy dữ liệu từ API và component con render -->
           <Catalogue v-if="!loading" :preview-ref="previewRef" />
-          <!-- 最新文章 -->
+          <!-- Bài viết mới nhất -->
           <LatestList :article-list="data.newest_articles" />
         </div>
       </div>
     </div>
   </main>
-  <!-- 底部 -->
+  <!-- Chân trang -->
   <footer>
     <AppFooter />
   </footer>

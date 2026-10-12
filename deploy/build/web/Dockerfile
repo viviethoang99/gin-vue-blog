@@ -1,18 +1,18 @@
-# 与根目录 Dockerfile 使用同一个 nginx 版本
-FROM nginx:1.24.0-alpine
+# Jaspr's prebuilt server executable requires glibc.
+FROM nginx:1.24.0
 # Dockerfile for building the image from local static assets
 
 # Copy Nginx config templates into container
 COPY default.conf.template /etc/nginx/conf.d/default.conf.template
 COPY default.conf.ssl.template /etc/nginx/conf.d/default.conf.ssl.template
 
-# Copy static assets into container
-ADD dist_blog/ /usr/share/nginx/html/
+# Copy the Jaspr server executable and its web assets.
+ADD dist_blog/ /opt/irohasu/
 ADD dist_admin/ /usr/share/nginx/html/admin
 
 # Init script: render Nginx config from templates and env vars
 COPY ./run.sh /docker-entrypoint.sh
-RUN chmod a+x /docker-entrypoint.sh
+RUN chmod a+x /docker-entrypoint.sh /opt/irohasu/app
 ENTRYPOINT ["/docker-entrypoint.sh"]
 
 # Run on container start

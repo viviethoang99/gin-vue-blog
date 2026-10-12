@@ -1,7 +1,7 @@
 最新版：有以下几个脚本
-- `bootstrap.sh`：一键部署，用 docker 里的 node 打包前端静态资源
-- `bootstrap.sh dev`：一键部署，改用本机的 pnpm 打包前端静态资源（内部会调 `build_web.sh`）
-- `build_web.sh`：用本机的 pnpm 打包两个前端项目，产物分别放到 `build/web/dist_blog` 和 `build/web/dist_admin`
+- `bootstrap.sh`：一键部署，在 Docker 中构建 Jaspr 前台服务和 Vue 管理后台
+- `bootstrap.sh dev`：一键部署，改用本机 Flutter/Jaspr 与 pnpm 打包前端（内部会调 `build_web.sh`）
+- `build_web.sh`：产物分别放到 `build/web/dist_blog` 和 `build/web/dist_admin`
 - `clean_docker.sh`：清理本项目相关的旧 Docker 容器
 
 一般来说，直接运行 `bootstrap.sh` 即可，每次自动清理旧容器，打包最新代码，并构建新容器。第一次会比较耗时，但是后面会有缓存就会快很多
@@ -115,10 +115,9 @@ For production, edit important values (like DB passwords) in `start/.env`.
 
 Backend: Modify `gin-blog-server` directly; the backend image is built from its Dockerfile.
 
-前端源码同理，直接重新执行 `bootstrap.sh` 就会用容器里的 node 重新打包。
+前端源码同理，直接重新执行 `bootstrap.sh` 就会在容器里重新打包。
 
-如果想用本机的 pnpm 打包（更快，但需要本机有 node），执行 `bootstrap.sh dev`，它会调 `build_web.sh`
-把 gin-blog-front 的产物放到 `build/web/dist_blog`、gin-blog-admin 的产物放到 `build/web/dist_admin`。
+如果想在本机打包（需要 Flutter、Jaspr CLI、Node 和 pnpm），执行 `bootstrap.sh dev`。脚本会把 `irohasu_jaspr/build/jaspr` 放到 `build/web/dist_blog`，并把管理后台产物放到 `build/web/dist_admin`。
 
 只想重启容器不重新打包，可以进 start 目录：
 

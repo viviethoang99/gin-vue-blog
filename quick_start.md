@@ -1,8 +1,8 @@
 # 快速开始
 
-三个子项目：`gin-blog-server`（后端）、`gin-blog-front`（博客前台）、`gin-blog-admin`（博客后台）。
+三个运行项目：`gin-blog-server`（后端）、`irohasu_jaspr`（博客前台）、`gin-blog-admin`（博客后台）。`gin-blog-front` 是迁移前的 Vue 前台，仅保留作参考。
 
-前台和后台都内置 Mock 模式，只想看前端效果的话不需要启动后端。
+Jaspr 前台读取 Gin API；Vue 管理后台仍带 Mock 模式。
 
 | 项目 | 地址 | 说明 |
 | --- | --- | --- |
@@ -12,7 +12,11 @@
 
 ## 方式一：一键启动（联调推荐）
 
-前置依赖：Go 1.26+、pnpm、Redis（没装的话脚本会用 docker 起一个）。数据库默认 SQLite，无需额外安装。
+前置依赖：Go 1.26+、Flutter（含 Dart）、Jaspr CLI 0.23.5、pnpm、Redis（没装的话脚本会用 docker 起一个）。数据库默认 SQLite，无需额外安装。
+
+```bash
+dart pub global activate jaspr_cli 0.23.5
+```
 
 ```bash
 ./dev.sh            # 启动 Redis + 后端 + 前台 + 后台
@@ -28,27 +32,18 @@
 
 几个实现上的点：
 
-- 两个前端的 `VITE_USE_MOCK` 由脚本在命令行覆盖为 `false`（vite 里 shell 环境变量优先级高于 `.env` 文件），所以不用改文件就能打到真后端。
+- Jaspr 前台由脚本注入 Gin API 地址；管理后台的 `VITE_USE_MOCK` 会被覆盖为 `false`。
 - Redis：端口上已经有就直接复用；否则优先本机 `redis-server`，都没有则用 docker 起 `redis:7.0-alpine`，`stop` 时一并清掉。
 - 首次启动（检测不到 `gin-blog-server/cmd/gvb.db`）会先执行一次 `generate_data.sh`，它自己会 AutoMigrate 建表，再正式启动。
 - `--demo` 在基础数据之外再灌一批样例内容（3 个分类、6 个标签、15 篇文章、评论与回复、留言、友链），可以加在 `start` / `fresh` / `seed` 后面。文章刻意超过前台每页 9 条并跨多个月份，分页、归档分组、标签云、评论回复这些必须有数据才看得出问题的地方才验证得到；库里只要已经有文章就跳过，不会灌重复。
 - `fresh` 用来从零验证一遍流程：把旧库改名成 `gvb.db.bak`（不是删除，测试数据攒久了手一抖就没了）、清掉 Redis 的 DB 7、然后走首次启动。要恢复就把 `.bak` 改回来。上传的图片不动。
 - 后端是先 `go build` 再跑二进制，记录的 pid 就是服务进程本身；前端用独立进程组启动，`stop` 整组杀，不会留下孤儿占端口。
-- 端口被别的进程占着会直接报错退出，不会让 vite 悄悄换到 8890。
+- 端口被别的进程占着会直接报错退出。
 - 日志和 pid 在 `.dev/` 下（已 gitignore）。
 
-## 方式二：只启动前端（Mock 模式）
+## 方式二：只启动管理后台（Mock 模式）
 
 不需要 Go、MySQL、Redis。
-
-博客前台：
-
-```bash
-cd gin-blog-front
-pnpm install
-# .env.development 中设置 VITE_USE_MOCK = true
-pnpm dev
-```
 
 博客后台：
 
@@ -59,7 +54,7 @@ pnpm install
 pnpm dev
 ```
 
-Mock 模式下数据来自各项目的 `src/mock/`，增删改会写入内存、刷新浏览器后重置；后台登录不校验账号密码。
+Mock 数据来自管理后台的 `src/mock/`，增删改会写入内存、刷新浏览器后重置；登录不校验账号密码。
 
 ## 方式三：完整启动（前端 + 后端，手动）
 
@@ -84,14 +79,19 @@ sh generate_data.sh
 
 生成默认用户 `admin` 和 `guest`，密码都是 `123456`。脚本可重复执行，已存在的数据会跳过。
 
-3. 启动前端（把 `.env.development` 中的 `VITE_USE_MOCK` 设为 `false`）：
+3. 启动 Jaspr 前台和 Vue 管理后台（把管理后台 `.env.development` 中的 `VITE_USE_MOCK` 设为 `false`）：
 
 ```bash
-cd gin-blog-front && pnpm install && pnpm dev
+cd irohasu_jaspr
+flutter pub get
+jaspr serve --port 8888 \
+  --dart-define=API_BASE_URL=http://localhost:8765/ \
+  --dart-define=PUBLIC_API_BASE_URL=http://localhost:8765/
+
 cd gin-blog-admin && pnpm install && pnpm dev
 ```
 
-`/api` 请求由 vite 代理到后端 `:8765`，前端不需要配置跨域。
+Jaspr SSR 通过 `API_BASE_URL` 调用后端；浏览器中的搜索和文章图片使用 `PUBLIC_API_BASE_URL`。
 
 ## 常见问题
 

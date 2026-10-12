@@ -71,13 +71,47 @@ jobs:
             exit 1
           fi
 
-  frontend:
-    name: Frontend (${{ matrix.project }})
+  blog:
+    name: Blog (Jaspr)
     runs-on: ubuntu-24.04
-    strategy:
-      fail-fast: false
-      matrix:
-        project: [gin-blog-front, gin-blog-admin]
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.44.0
+          cache: true
+
+      - name: Install
+        working-directory: irohasu_jaspr
+        run: |
+          dart pub global activate jaspr_cli 0.23.5
+          flutter pub get
+
+      - name: Analyze
+        working-directory: irohasu_jaspr
+        run: dart analyze
+
+      - name: Test
+        working-directory: irohasu_jaspr
+        run: flutter test
+
+      - name: Build
+        working-directory: irohasu_jaspr
+        run: |
+          jaspr build \
+            --dart-define=API_BASE_URL=http://gvb-server:8765/ \
+            --dart-define=PUBLIC_API_BASE_URL=/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-irohasu-jaspr
+          path: irohasu_jaspr/build/jaspr
+          retention-days: 1
+
+  frontend:
+    name: Admin (Vue)
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
 
@@ -89,29 +123,29 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-          cache-dependency-path: ${{ matrix.project }}/pnpm-lock.yaml
+          cache-dependency-path: gin-blog-admin/pnpm-lock.yaml
 
       - name: Install
-        working-directory: ${{ matrix.project }}
+        working-directory: gin-blog-admin
         run: pnpm install --frozen-lockfile --prefer-offline
 
       - name: Lint
-        working-directory: ${{ matrix.project }}
+        working-directory: gin-blog-admin
         run: pnpm lint
 
       - name: Test
-        working-directory: ${{ matrix.project }}
+        working-directory: gin-blog-admin
         run: pnpm test
 
       - name: Build
-        working-directory: ${{ matrix.project }}
+        working-directory: gin-blog-admin
         run: pnpm build
 
       # 产物给 docker job 复用: 原来 web 镜像在 Docker 里重新 pnpm install + build 了一遍
       - uses: actions/upload-artifact@v4
         with:
-          name: dist-${{ matrix.project }}
-          path: ${{ matrix.project }}/dist
+          name: dist-gin-blog-admin
+          path: gin-blog-admin/dist
           retention-days: 1
 
   # 镜像构建依赖网络与基础镜像, 只在 CI 里验证能否构建并正常启动
@@ -123,7 +157,7 @@ jobs:
   docker:
     name: Docker
     runs-on: ubuntu-24.04
-    needs: frontend
+    needs: [blog, frontend]
     # 发布镜像要写 packages, 默认的 GITHUB_TOKEN 只有读权限
     permissions:
       contents: read
@@ -140,12 +174,13 @@ jobs:
 
       - name: Assemble web build context
         run: |
-          # upload-artifact 会把上传路径的公共前缀剥掉, 所以下载下来的
-          # dist-gin-blog-front/ 里直接就是 index.html 和 assets/, 没有多一层 dist/
-          mv dist-gin-blog-front deploy/build/web/dist_blog
+          # Jaspr artifact contains app + web/, while the admin artifact
+          # contains index.html + assets/.
+          mv dist-irohasu-jaspr deploy/build/web/dist_blog
           mv dist-gin-blog-admin deploy/build/web/dist_admin
-          # 目录结构一旦对不上, 在这里就报错, 而不是等 nginx 返回 404
-          test -f deploy/build/web/dist_blog/index.html
+          # Fail early if artifact layout changes.
+          test -x deploy/build/web/dist_blog/app
+          test -f deploy/build/web/dist_blog/web/main.client.dart.js
           test -f deploy/build/web/dist_admin/index.html
 
       - name: Build web image

@@ -20,8 +20,7 @@ dependencies:
 
 dev_dependencies:
   build_runner: ^2.10.0
-  # Newer 4.8.x releases require analyzer 13+, while jaspr_builder 0.23.5
-  # currently requires analyzer 12.x.
+  # 4.8.6+ requires analyzer 13, while jaspr_builder 0.23.5 uses analyzer 12.
   build_web_compilers: 4.8.5
   flutter_lints: ^6.0.0
   flutter_test:

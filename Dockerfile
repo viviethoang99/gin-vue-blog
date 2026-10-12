@@ -1,12 +1,27 @@
 # Build the public Jaspr application as a server executable. Server-side
 # rendering keeps the article list in sync with Gin instead of baking it into
 # the image at build time.
-FROM ghcr.io/cirruslabs/flutter:3.44.0 AS BLOG_BUILD
+FROM debian:bookworm-slim AS BLOG_BUILD
+
+ARG FLUTTER_VERSION=3.47.7
+ARG FLUTTER_SHA256=af7455f540df951184c7953fbe3cf884766e7541dacf8571f9f582db03dd6230
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl git unzip xz-utils \
+    && curl -fsSLo /tmp/flutter.tar.xz \
+        "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz" \
+    && echo "${FLUTTER_SHA256}  /tmp/flutter.tar.xz" | sha256sum -c - \
+    && tar --no-same-owner -xJf /tmp/flutter.tar.xz -C /opt \
+    && rm -f /tmp/flutter.tar.xz \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 ARG API_BASE_URL=http://gvb-server:8765/
 ARG PUBLIC_API_BASE_URL=/
 
-ENV PATH="/root/.pub-cache/bin:${PATH}"
+ENV PATH="/opt/flutter/bin:/root/.pub-cache/bin:${PATH}" \
+    CI=true \
+    FLUTTER_SUPPRESS_ANALYTICS=true
 RUN dart pub global activate jaspr_cli 0.23.5
 
 WORKDIR /app/blog

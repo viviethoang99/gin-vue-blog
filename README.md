@@ -13,120 +13,120 @@
   <img src="https://img.shields.io/badge/Vue-v3.5-green"/>
 </p>
 
-一个前后端分离的博客项目：Go + Gin 后端，Jaspr 博客前台 + Vue 3 管理后台。
+Dự án blog tách biệt frontend và backend: backend Go + Gin, giao diện blog dùng Jaspr và giao diện quản trị dùng Vue 3.
 
-- Github: [szluyu99/gin-vue-blog](https://github.com/szluyu99/gin-vue-blog)
+- GitHub: [szluyu99/gin-vue-blog](https://github.com/szluyu99/gin-vue-blog)
 - Gitee: [szluyu99/gin-vue-blog](https://gitee.com/szluyu99/gin-vue-blog)
-- 交流 QQ 群: 777260310
+- Nhóm trao đổi QQ: 777260310
 
-欢迎 Star 和 PR。
+Hoan nghênh bạn Star và gửi PR.
 
-## Live Demo
+## Bản demo trực tuyến
 
-旧版 Vue 纯前端 Mock 数据（仅保留作迁移参考，需手动触发 GitHub Actions 部署）：
+Phiên bản Vue cũ dùng dữ liệu giả lập hoàn toàn ở frontend (chỉ giữ lại để tham khảo khi chuyển đổi, cần kích hoạt GitHub Actions thủ công để triển khai):
 
-- 博客前台: <https://szluyu99.github.io/gin-vue-blog/>
-- 博客后台: <https://szluyu99.github.io/gin-vue-blog/admin/> （任意账号密码均可登录）
-- 接口文档: <https://szluyu99.github.io/gin-vue-blog/api-docs/> （Swagger 注解生成，静态托管无法在线调用）
+- Giao diện blog: <https://szluyu99.github.io/gin-vue-blog/>
+- Giao diện quản trị: <https://szluyu99.github.io/gin-vue-blog/admin/> (có thể đăng nhập bằng tài khoản và mật khẩu bất kỳ)
+- Tài liệu API: <https://szluyu99.github.io/gin-vue-blog/api-docs/> (được tạo từ chú thích Swagger; bản lưu trữ tĩnh không hỗ trợ gọi API trực tuyến)
 
-> 演示数据来自前端内置假数据（`src/mock`），改动仅存在于当前页面，刷新即还原。
+> Dữ liệu demo là dữ liệu giả được tích hợp trong frontend (`src/mock`). Các thay đổi chỉ tồn tại trên trang hiện tại và sẽ được đặt lại khi tải lại trang.
 
-![前台首页](./images/前台首页.png)
+![Trang chủ blog](./images/前台首页.png)
 
-![前台文章列表](./images/前台文章列表.png)
+![Danh sách bài viết trên blog](./images/前台文章列表.png)
 
-![后台文章列表](./images/后台文章列表.png)
+![Danh sách bài viết trong trang quản trị](./images/后台文章列表.png)
 
-## 功能
+## Tính năng
 
-前台（`irohasu_jaspr`）：
+Giao diện blog (`irohasu_jaspr`):
 
-- 界面参考 Hexo 主题 Butterfly，响应式适配移动端
-- 暗色模式：首次访问跟随系统偏好，可手动切换并记住选择，刷新无闪屏
-- 文章详情支持目录锚点、推荐文章
-- 说说：轻量短内容，支持置顶、公开/私密和评论，首页头部轮播展示最新说说
-- 阅读体验：顶部阅读进度条、代码块一键复制、超过 90 天的文章提示内容可能过时
-- 文章列表分页（分类 / 标签下同样分页）；首页文章流滚动加载, 提前预取下一页
-- 归档按年月分组的时间轴；标签云字号按文章数映射
-- 评论 + 回复，留言弹幕墙
-- 站内通知：评论被回复 / 自己的文章被评论时头部铃铛提醒，有独立通知页；点通知直接跳到文章里那条评论并高亮（开了评论审核时，在后台点「通过」那一刻才补发通知）
-- 点赞、访客统计（在 Redis 里累加，每 10 分钟与退出前落库备份，启动时补回缺的键）
-- 用户注册：默认直接建号，可开启邮箱验证码注册（`config.yml` 的 `Captcha.SendEmail`）
+- Giao diện tham khảo chủ đề Butterfly của Hexo, tự điều chỉnh để phù hợp với thiết bị di động
+- Chế độ tối: lần truy cập đầu tiên theo tùy chọn của hệ thống, cho phép chuyển đổi thủ công và ghi nhớ lựa chọn, không nhấp nháy khi tải lại trang
+- Trang chi tiết bài viết hỗ trợ mục lục có liên kết đến từng phần và bài viết đề xuất
+- Trạng thái ngắn: nội dung ngắn gọn, hỗ trợ ghim, công khai/riêng tư và bình luận; phần đầu trang chủ luân phiên hiển thị các trạng thái mới nhất
+- Trải nghiệm đọc: thanh tiến độ đọc ở đầu trang, sao chép khối mã bằng một lần nhấp, cảnh báo nội dung có thể đã lỗi thời đối với bài viết hơn 90 ngày
+- Phân trang danh sách bài viết (áp dụng cả khi lọc theo danh mục/nhãn); danh sách bài viết ở trang chủ tải thêm khi cuộn và tải trước trang tiếp theo
+- Trang lưu trữ hiển thị dòng thời gian theo năm, tháng; kích thước chữ trong đám mây nhãn thay đổi theo số bài viết
+- Bình luận và trả lời, tường lời nhắn chạy ngang màn hình
+- Thông báo trong trang: biểu tượng chuông ở đầu trang báo khi bình luận được trả lời hoặc bài viết của mình có bình luận, kèm trang thông báo riêng; nhấp thông báo sẽ chuyển thẳng đến bình luận tương ứng trong bài viết và tô nổi bật (nếu bật duyệt bình luận, thông báo chỉ được gửi khi quản trị viên nhấn «Duyệt»)
+- Lượt thích và thống kê khách truy cập (cộng dồn trong Redis, sao lưu vào cơ sở dữ liệu mỗi 10 phút và trước khi thoát, khôi phục các khóa còn thiếu khi khởi động)
+- Đăng ký người dùng: mặc định tạo tài khoản trực tiếp; có thể bật đăng ký bằng mã xác minh email (`Captcha.SendEmail` trong `config.yml`)
 
-后台（`gin-blog-admin`）：
+Giao diện quản trị (`gin-blog-admin`):
 
-- JWT 鉴权 + 基于角色的权限控制，菜单和接口权限均可在后台动态配置
-- 首页仪表盘：待审核评论 / 留言、最新文章、分类分布、访客地域、最近登录、近 14 天访问趋势，接口并行拉取且单个失败不拖垮整页
-- 前端菜单由后端下发（动态路由）
-- Markdown 文章编辑，支持 `.md` / `.markdown` 导入、`.md` 导出
-- 操作日志、登录日志（含失败记录）、在线用户监听与强制下线
-- 前端错误日志：前后台的未捕获异常自动上报到后台列表，同类错误按指纹聚合只累加次数（不引 Sentry）
-- 用户与角色可禁用：禁用后登录被拒、已签发的 token 立即失效、只靠该角色拿到的权限被收回
-- 文件上传支持本地和七牛云
-- CRUD 操作封装为通用 Hook
+- Xác thực JWT và phân quyền theo vai trò; quyền truy cập menu và API đều có thể cấu hình động trong trang quản trị
+- Bảng tổng quan: bình luận/lời nhắn chờ duyệt, bài viết mới nhất, phân bố danh mục, khu vực của khách truy cập, các lần đăng nhập gần đây và xu hướng truy cập trong 14 ngày; gọi API song song, một API lỗi không làm hỏng toàn bộ trang
+- Menu frontend do backend cung cấp (định tuyến động)
+- Soạn thảo bài viết bằng Markdown, hỗ trợ nhập `.md` / `.markdown` và xuất `.md`
+- Nhật ký thao tác, nhật ký đăng nhập (bao gồm các lần thất bại), theo dõi người dùng trực tuyến và buộc đăng xuất
+- Nhật ký lỗi frontend: các ngoại lệ chưa được xử lý ở cả giao diện blog và quản trị tự động được gửi về danh sách lỗi trong trang quản trị; các lỗi cùng loại được gộp theo dấu vân tay và chỉ tăng số lần xuất hiện (không dùng Sentry)
+- Có thể vô hiệu hóa người dùng và vai trò: sau khi vô hiệu hóa, đăng nhập bị từ chối, token đã cấp lập tức mất hiệu lực và các quyền chỉ được cấp qua vai trò đó bị thu hồi
+- Tải tệp lên bộ nhớ cục bộ hoặc Qiniu Cloud
+- Các thao tác CRUD được đóng gói thành Hook dùng chung
 
-## 技术栈
+## Công nghệ sử dụng
 
-后端：Go / Gin / GORM / SQLite（默认，可换 MySQL）/ Redis / Viper / `log/slog`
+Backend: Go / Gin / GORM / SQLite (mặc định, có thể đổi sang MySQL) / Redis / Viper / `log/slog`
 
-博客前台：Dart / Jaspr / Jaspr Router / Dio，使用服务端渲染；管理后台：Vue 3 / Vite / Pinia / Naive UI / Axios
+Giao diện blog: Dart / Jaspr / Jaspr Router / Dio, sử dụng kết xuất phía máy chủ; giao diện quản trị: Vue 3 / Vite / Pinia / Naive UI / Axios
 
-其他：Docker Compose 一键部署、Nginx 静态资源与反向代理、七牛云对象存储、腾讯云人机验证（可选，默认关闭）
+Khác: triển khai bằng một lệnh với Docker Compose, Nginx phục vụ tài nguyên tĩnh và làm proxy ngược, lưu trữ đối tượng Qiniu Cloud, xác minh người dùng của Tencent Cloud (tùy chọn, mặc định tắt)
 
-## 目录结构
+## Cấu trúc thư mục
 
 ```bash
 gin-vue-blog
-├── gin-blog-admin      # 博客后台前端
-├── irohasu_jaspr       # Jaspr 博客前台
-├── gin-blog-front      # 旧版 Vue 博客前台（保留作迁移参考）
-├── gin-blog-server     # 博客后端
-└── deploy              # Docker 部署
+├── gin-blog-admin      # Frontend quản trị blog
+├── irohasu_jaspr       # Giao diện blog dùng Jaspr
+├── gin-blog-front      # Giao diện blog Vue cũ (giữ lại để tham khảo khi chuyển đổi)
+├── gin-blog-server     # Backend của blog
+└── deploy              # Triển khai bằng Docker
 ```
 
-后端：
+Backend:
 
 ```bash
 gin-blog-server
-├── cmd                 # 程序入口, 数据初始化脚本
+├── cmd                 # Điểm khởi chạy chương trình, script khởi tạo dữ liệu
 ├── internal
-│   ├── handle          # 接口处理
-│   ├── model           # 数据模型 + 数据库操作
-│   ├── middleware      # 中间件
-│   ├── global          # 全局配置、错误码
-│   └── utils           # 工具方法
-├── docs                # Swagger 文档
-├── assets              # 资源文件
-├── config.yml          # 配置文件
+│   ├── handle          # Xử lý API
+│   ├── model           # Mô hình dữ liệu và thao tác cơ sở dữ liệu
+│   ├── middleware      # Middleware
+│   ├── global          # Cấu hình toàn cục, mã lỗi
+│   └── utils           # Các hàm tiện ích
+├── docs                # Tài liệu Swagger
+├── assets              # Tệp tài nguyên
+├── config.yml          # Tệp cấu hình
 └── Dockerfile
 ```
 
-前端（两个项目大体一致，后台额外有 `layout`、`composables`）：
+Frontend (hai dự án Vue có cấu trúc tương tự, giao diện quản trị có thêm `layout` và `composables`):
 
 ```bash
 ├── src
-│   ├── api.js          # 接口
-│   ├── assets          # 静态资源（仅后台）
-│   ├── components      # 组件
-│   ├── mock            # Mock 数据
-│   ├── router          # 路由（前台为单文件 router.js）
-│   ├── store           # 状态管理
-│   ├── utils           # 工具方法
-│   └── views           # 页面
-├── .env.*              # 环境变量（development / production / mock）
-├── uno.config.js       # UnoCSS 配置
-└── vite.config.js      # Vite 配置
+│   ├── api.js          # API
+│   ├── assets          # Tài nguyên tĩnh (chỉ có ở giao diện quản trị)
+│   ├── components      # Các thành phần giao diện
+│   ├── mock            # Dữ liệu giả lập
+│   ├── router          # Định tuyến (giao diện blog dùng một tệp router.js)
+│   ├── store           # Quản lý trạng thái
+│   ├── utils           # Các hàm tiện ích
+│   └── views           # Các trang
+├── .env.*              # Biến môi trường (development / production / mock)
+├── uno.config.js       # Cấu hình UnoCSS
+└── vite.config.js      # Cấu hình Vite
 ```
 
-## Quick Start
+## Bắt đầu nhanh
 
-**本地开发见 [quick_start.md](./quick_start.md)**，含 Mock 模式（不启动后端）和完整启动两种方式、访问地址、默认账号和常见问题。
+**Xem hướng dẫn phát triển cục bộ tại [quick_start.md](./quick_start.md)**, bao gồm hai cách chạy: chế độ giả lập (không khởi động backend) và khởi động đầy đủ, cùng địa chỉ truy cập, tài khoản mặc định và các vấn đề thường gặp.
 
 Hướng dẫn tiếng Việt đầy đủ về chạy local, deploy Docker/VPS, HTTPS, backup/restore, cập nhật và xử lý sự cố: [HUONG_DAN_CHAY_VA_DEPLOY.md](./HUONG_DAN_CHAY_VA_DEPLOY.md).
 
-初始化数据只含系统基础数据（菜单 / 接口 / 角色 / 配置），不含文章。要一批能点得动的内容（分类、标签、15 篇文章、评论与回复、留言、友链）用 `./dev.sh fresh --demo`，或 `cd gin-blog-server/cmd/generate-data && go run main.go -t demo`。
+Dữ liệu khởi tạo chỉ gồm dữ liệu hệ thống cơ bản (menu / API / vai trò / cấu hình), không có bài viết. Để tạo nội dung dùng thử (danh mục, nhãn, 15 bài viết, bình luận và trả lời, lời nhắn, liên kết bạn bè), dùng `./dev.sh fresh --demo` hoặc `cd gin-blog-server/cmd/generate-data && go run main.go -t demo`.
 
-只想看效果，用 Docker Compose 一键运行（需要 Docker + Docker Compose，Windows 请用 GitBash）：
+Nếu chỉ muốn xem thử, có thể chạy bằng một lệnh với Docker Compose (cần Docker + Docker Compose; trên Windows hãy dùng GitBash):
 
 ```bash
 git clone https://github.com/szluyu99/gin-vue-blog
@@ -134,48 +134,48 @@ cd gin-vue-blog/deploy
 ./bootstrap.sh
 ```
 
-前台 [localhost](http://localhost/)，后台 [localhost/admin](http://localhost/admin)，默认账号 `admin / 123456`。
+Giao diện blog: [localhost](http://localhost/), giao diện quản trị: [localhost/admin](http://localhost/admin), tài khoản mặc định: `admin / 123456`.
 
-详细部署文档见 [deploy/README.md](./deploy/README.md)。
+Xem tài liệu triển khai chi tiết tại [deploy/README.md](./deploy/README.md).
 
-> Windows 下 clone 前建议执行 `git config --global core.autocrlf false`，本项目使用 lf 换行符，crlf 会导致 Docker 构建异常。
+> Trên Windows, nên chạy `git config --global core.autocrlf false` trước khi clone. Dự án sử dụng ký tự xuống dòng LF; CRLF có thể gây lỗi khi dựng Docker.
 >
-> Docker 部署若开启了邮箱验证注册（`Captcha.SendEmail: true`），需要把 `gin-blog-server/internal/utils/email.go` 中 `GetEmailVerifyURL` 的 localhost 换成自己的域名。
+> Nếu bật đăng ký xác minh email khi triển khai bằng Docker (`Captcha.SendEmail: true`), cần thay localhost trong hàm `GetEmailVerifyURL` tại `gin-blog-server/internal/utils/email.go` bằng tên miền của bạn.
 
-## 测试与 CI
+## Kiểm thử và CI
 
 ```bash
-cd gin-blog-server && go test ./...   # 后端: model / handle / middleware / global / utils / 路由注册, 8 个包
-cd irohasu_jaspr && flutter test      # Jaspr 博客前台
-cd gin-blog-admin  && pnpm test       # 后台: vitest, 27 个文件 165 条
+cd gin-blog-server && go test ./...   # Backend: model / handle / middleware / global / utils / đăng ký tuyến, 8 gói
+cd irohasu_jaspr && flutter test      # Giao diện blog Jaspr
+cd gin-blog-admin  && pnpm test       # Giao diện quản trị: vitest, 27 tệp, 165 ca kiểm thử
 ```
 
-前端测试以回归为主：每条都验证过「把修复回退后会变红」，覆盖的具体缺陷见 `code_audit.md` 的「组件测试」一节。
+Kiểm thử frontend chủ yếu là kiểm thử hồi quy: mỗi ca đều đã được xác nhận sẽ thất bại nếu hoàn tác bản sửa lỗi tương ứng. Các lỗi cụ thể được kiểm thử nằm trong mục «Kiểm thử thành phần» của `code_audit.md`.
 
-`.github/workflows/ci.yml` 在 push 和 PR 时跑四组任务：
+`.github/workflows/ci.yml` chạy bốn nhóm tác vụ khi push và tạo PR:
 
-- Server：`gofmt` / `go vet` / `go test`，并校验 `docs/` 与 Swagger 注解是否一致
-- Frontend：Jaspr 前台跑 `dart analyze` / `flutter test` / `jaspr build`，Vue 后台跑 `pnpm lint` / `pnpm test` / `pnpm build`
-- Docker：构建 web 与 server 镜像并启动做健康检查。web 镜像直接用 Frontend job 的产物 + `deploy/build/web/Dockerfile`（不在容器里重新打包前端），server 镜像走 buildx + GitHub Actions 缓存。main 有新提交时，冒烟测试通过后把两个镜像推到 GHCR（`latest` 与 `main-<短 sha>`）
-- Deploy：起完整的 compose 栈，校验权限种子数据的不变式（admin 能改配置、guest 不能、未登录被拦，重复执行不新增资源）
+- Server: `gofmt` / `go vet` / `go test`, đồng thời kiểm tra tính nhất quán giữa `docs/` và chú thích Swagger
+- Frontend: giao diện Jaspr chạy `dart analyze` / `flutter test` / `jaspr build`; giao diện quản trị Vue chạy `pnpm lint` / `pnpm test` / `pnpm build`
+- Docker: dựng image web và server, sau đó khởi động để kiểm tra tình trạng hoạt động. Image web sử dụng trực tiếp sản phẩm đầu ra của tác vụ Frontend cùng `deploy/build/web/Dockerfile` (không dựng lại frontend trong container); image server dùng buildx và bộ nhớ đệm GitHub Actions. Khi nhánh main có commit mới, sau khi vượt qua kiểm thử nhanh, hai image được đẩy lên GHCR với các thẻ `latest` và `main-<SHA rút gọn>`
+- Deploy: khởi động toàn bộ hệ thống Compose, kiểm tra các điều kiện bất biến của dữ liệu phân quyền ban đầu (admin có thể sửa cấu hình, guest không thể, người chưa đăng nhập bị chặn, chạy lại không tạo thêm tài nguyên)
 
-## Roadmap
+## Lộ trình phát triển
 
-完整的规划与「为什么不做某些事」见 [roadmap.md](./roadmap.md)，下次接手先看那里的「当前状态」一节。下面是概览。
+Kế hoạch đầy đủ và lý do không triển khai một số hạng mục nằm trong [roadmap.md](./roadmap.md). Khi tiếp quản công việc, hãy đọc mục «Trạng thái hiện tại» trong đó trước. Dưới đây là phần tổng quan.
 
-功能：
+Tính năng:
 
-- 前台侧边信息模块（`AuthorInfo` / `Announcement` / `WebsiteInfo`）需要重新设计：窄屏下整列消失，手机上看不到公告和网站资讯
-- 文章分享元信息：只设了 `document.title`，没有 `meta description` 和 `og:*`
-- 前台「相册」页目前是「禁止访问」占位页（`views/entertainment/album`），导航里两个入口都还在
-- 说说的图片支持（第一版只做纯文本 + 评论，图片要一起解决存储与缩略图）
-- 通知定位目前靠前端逐页加载找目标评论，评论量大了要后端补一个「按评论 id 算页码」的接口
+- Cần thiết kế lại các khối thông tin ở thanh bên của giao diện blog (`AuthorInfo` / `Announcement` / `WebsiteInfo`): toàn bộ cột bị ẩn trên màn hình hẹp, khiến người dùng điện thoại không thấy thông báo và thông tin website
+- Siêu dữ liệu khi chia sẻ bài viết: mới chỉ thiết lập `document.title`, chưa có `meta description` và `og:*`
+- Trang «Album ảnh» hiện chỉ là trang giữ chỗ «Truy cập bị cấm» (`views/entertainment/album`), cả hai liên kết trong menu điều hướng vẫn còn
+- Hỗ trợ hình ảnh cho trạng thái ngắn (phiên bản đầu chỉ có văn bản và bình luận; việc bổ sung hình ảnh cần giải quyết cả lưu trữ và ảnh thu nhỏ)
+- Hiện frontend phải tải lần lượt từng trang để tìm bình luận đích từ thông báo; khi có nhiều bình luận, backend cần bổ sung API tính số trang theo ID bình luận
 
-工程：
+Kỹ thuật:
 
-- 注册链接携带明文密码、邮件模块的日志与 TLS（`code_audit.md` 的 S6、S7）——只在启用邮件注册时成立，当前配置没开，暂缓
-- 部署侧改成拉 GHCR 镜像（CI 已经在发布，但 compose 仍是本地 `build:`）
-- 拆分 `gin-blog-front` 和 `gin-blog-admin` 为独立仓库
-- 完善接口文档
+- Liên kết đăng ký chứa mật khẩu dạng văn bản thuần, cùng các vấn đề về nhật ký và TLS của mô-đun email (S6, S7 trong `code_audit.md`) — chỉ phát sinh khi bật đăng ký qua email; cấu hình hiện tại chưa bật nên tạm hoãn
+- Chuyển cách triển khai sang tải image từ GHCR (CI đã phát hành image, nhưng Compose vẫn dùng `build:` cục bộ)
+- Tách `gin-blog-front` và `gin-blog-admin` thành các kho mã độc lập
+- Hoàn thiện tài liệu API
 
-明确不做的（理由见 [roadmap.md](./roadmap.md)）：ElasticSearch 搜索、SSR / SSG、第三方登录、国际化、RSS / sitemap、后端日志切割、把 `@iconify/vue` 换成 UnoCSS 图标类。
+Các hạng mục xác định không triển khai (xem lý do trong [roadmap.md](./roadmap.md)): tìm kiếm bằng ElasticSearch, SSR / SSG, đăng nhập qua bên thứ ba, quốc tế hóa, RSS / sitemap, xoay vòng nhật ký backend, thay `@iconify/vue` bằng các lớp biểu tượng UnoCSS.
